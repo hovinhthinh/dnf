@@ -194,10 +194,6 @@ def split_by_features_GetWeather():
         intent_count[i] = intent_count.get(i, 0) + 1
     print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
 
-    def dict_keys_matches(d, target_keys: list[str]):
-        target_keys = sorted(target_keys)
-        return sorted(list(d.keys())) == target_keys
-
     def GetCurrentWeatherInALocation(u):
         found = False
         good_time_range = True
@@ -260,12 +256,59 @@ def split_by_features_GetWeather():
     )
 
 
+def split_by_features_RateBook():
+    # print_file('data/snips/RateBook/train_RateBook_full.json')
+    utrs = get_utterances_and_slots('data/snips/RateBook/train_RateBook_full.json')
+    intent_count = {}
+    for u in utrs:
+        i = ' '.join(sorted(list(u['slots'].keys())))
+        intent_count[i] = intent_count.get(i, 0) + 1
+
+    def RateCurrentBook(u):
+        if ('rating_value' not in u['slots']) or ('object_select' not in u['slots']) or (
+                u['slots']['object_select'] not in ['this', 'current', 'this current']):
+            return False
+        otype = u['slots'].get('object_type', None) or u['slots'].get('object_part_of_series_type', None)
+        return otype in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga', 'chronicle', 'essay book',
+                         'book novel', 'book album', 'series chronicle']
+
+    def RatePreviousBook(u):
+        if ('rating_value' not in u['slots']) or ('object_select' not in u['slots']) or (
+                u['slots']['object_select'] not in ['previous', 'last']):
+            return False
+        otype = u['slots'].get('object_type', None) or u['slots'].get('object_part_of_series_type', None)
+        return otype in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga', 'chronicle', 'essay book',
+                         'book novel', 'book album', 'series chronicle']
+
+    def RateNextBook(u):
+        if ('rating_value' not in u['slots']) or ('object_select' not in u['slots']) or (
+                u['slots']['object_select'] not in ['next']):
+            return False
+        otype = u['slots'].get('object_type', None) or u['slots'].get('object_part_of_series_type', None)
+        return otype in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga', 'chronicle', 'essay book',
+                         'book novel', 'book album', 'series chronicle']
+
+    extract_utterances_splitted_by_features(
+        {
+            'RateABook': lambda u: 'object_name' in u['slots'] and 'rating_value' in u['slots'],
+            'RateCurrentBook': lambda u: RateCurrentBook(u),
+            'RatePreviousBook': lambda u: RatePreviousBook(u),
+            'RateNextBook': lambda u: RateNextBook(u)
+        },
+        utrs,
+        'RateBook',
+        'data/snips/slot_based_clusters/RateBook.json'
+    )
+
+
 if __name__ == '__main__':
     # print_file('data/snips/PlayMusic/train_PlayMusic_full.json')
-    # print_file('data/snips/RateBook/train_RateBook_full.json')
     # print_file('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
     # print_file('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json')
 
-    split_by_features_AddToPlaylist()
+    # split_by_features_AddToPlaylist()
     # split_by_features_BookRestaurant()
-    split_by_features_GetWeather()
+    # split_by_features_GetWeather()
+    # split_by_features_RateBook()
+
+    pass
