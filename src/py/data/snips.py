@@ -75,7 +75,7 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
     print('==== Overlap ====')
 
     overlap_ids = set()
-
+    clustered_ids = set()
     for u, cu in clusters.items():
         for v, cv in clusters.items():
             if u >= v:
@@ -85,10 +85,16 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
 
             for x in overlap:
                 overlap_ids.add(x['id'])
+
     for u, cu in clusters.items():
         for i in reversed(range(len(cu))):
             if cu[i]['id'] in overlap_ids:
                 cu.pop(i)
+            else:
+                clustered_ids.add(cu[i]['id'])
+
+    # Add an unknown cluster
+    clusters[intent_name + '_UNK'] = list(filter(lambda u: u['id'] not in clustered_ids, utrs))
 
     print('==== Cluster Size After Removing Overlaps ====')
 
@@ -112,16 +118,8 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
     return clusters
 
 
-if __name__ == '__main__':
+def split_by_features_AddToPlaylist():
     print_file('data/snips/AddToPlaylist/train_AddToPlaylist_full.json')
-    # print_file('data/snips/BookRestaurant/train_BookRestaurant_full.json')
-    # print_file('data/snips/GetWeather/train_GetWeather_full.json')
-    # print_file('data/snips/PlayMusic/train_PlayMusic_full.json')
-    # print_file('data/snips/RateBook/train_RateBook_full.json')
-    # print_file('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
-    # print_file('data/snips/SearchCreativeWork/validate_SearchCreativeWork.json')
-
-    # AddToPlaylist
     utrs = get_utterances_and_slots('data/snips/AddToPlaylist/train_AddToPlaylist_full.json')
     intent_count = {}
     for u in utrs:
@@ -131,22 +129,29 @@ if __name__ == '__main__':
 
     extract_utterances_splitted_by_features(
         {
-            'AddASpecificSongToASpecificPlaylist':
+            'AddASpecificSongToAPlaylist':
                 lambda u: ('entity_name' in u['slots']) and ('playlist' in u['slots']),
 
-            'AddASpecificArtistToASpecificPlaylist':
-                lambda u: ('artist' in u['slots']) and ('playlist' in u['slots']) and ('music_item' not in u['slots']),
+            'AddASpecificArtistToAPlaylist':
+                lambda u: ('artist' in u['slots']) and ('playlist' in u['slots']) and (
+                        'music_item' not in u['slots'] or u['slots']['music_item'] == 'artist'),
 
-            'AddCurrentSongToASpecificPlaylist':
+            'AddCurrentSongToAPlaylist':
                 lambda u: ('music_item' in u['slots'] and u['slots']['music_item'] in ['song', 'track', 'tune'])
-                          and ('playlist' in u['slots']) and ('artist' not in u['slots']),
+                          and ('playlist' in u['slots'])
+                          and ('artist' not in u['slots'] or ' this ' in u['text'])
+                          and (' a ' not in u['text'] and ' an ' not in u['text'] and ' another ' not in u['text']),
 
-            'AddCurrentAlbumToASpecificPlaylist':
+            'AddCurrentAlbumToAPlaylist':
                 lambda u: (('music_item', 'album') in u['slots'].items()) and ('playlist' in u['slots'])
                           and (' a ' not in u['text'] and ' an ' not in u['text'])
                           and (('artist' not in u['slots']) or ' this ' in u['text']),
 
-            'AddAnArtistAlbumToASpecificPlaylist':
+            'AddCurrentArtistToAPlaylist':
+                lambda u: (('music_item', 'artist') in u['slots'].items()) and ('playlist' in u['slots']) and (
+                        'artist' not in u['slots']),
+
+            'AddAnArtistAlbumToAPlaylist':
                 lambda u: (('music_item', 'album') in u['slots'].items()) and ('playlist' in u['slots'])
                           and ('artist' in u['slots']) and (' this ' not in u['text'])
         },
@@ -154,3 +159,33 @@ if __name__ == '__main__':
         'AddToPlaylist',
         'data/snips/slot_based_clusters/AddToPlaylist.json'
     )
+
+
+def split_by_features_BookRestaurant():
+    print_file('data/snips/BookRestaurant/train_BookRestaurant_full.json')
+    utrs = get_utterances_and_slots('data/snips/BookRestaurant/train_BookRestaurant_full.json')
+    intent_count = {}
+    for u in utrs:
+        i = ' '.join(sorted(list(u['slots'].keys())))
+        intent_count[i] = intent_count.get(i, 0) + 1
+    print(sorted(intent_count.items(), key=lambda k: k[0], reverse=True))
+
+    extract_utterances_splitted_by_features(
+        {
+            # TODO
+        },
+        utrs,
+        'BookRestaurant',
+        'data/snips/slot_based_clusters/BookRestaurant.json'
+    )
+
+
+if __name__ == '__main__':
+    # print_file('data/snips/GetWeather/train_GetWeather_full.json')
+    # print_file('data/snips/PlayMusic/train_PlayMusic_full.json')
+    # print_file('data/snips/RateBook/train_RateBook_full.json')
+    # print_file('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
+    # print_file('data/snips/SearchCreativeWork/validate_SearchCreativeWork.json')
+
+    split_by_features_AddToPlaylist()
+    split_by_features_BookRestaurant()
