@@ -125,7 +125,7 @@ def split_by_features_AddToPlaylist():
     for u in utrs:
         i = ' '.join(sorted(list(u['slots'].keys())))
         intent_count[i] = intent_count.get(i, 0) + 1
-    print(sorted(intent_count.items(), key=lambda k: k[0], reverse=True))
+    print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
 
     extract_utterances_splitted_by_features(
         {
@@ -168,7 +168,7 @@ def split_by_features_BookRestaurant():
     for u in utrs:
         i = ' '.join(sorted(list(u['slots'].keys())))
         intent_count[i] = intent_count.get(i, 0) + 1
-    print(sorted(intent_count.items(), key=lambda k: k[0], reverse=True))
+    print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
 
     extract_utterances_splitted_by_features(
         {
