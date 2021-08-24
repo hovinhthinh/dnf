@@ -1,5 +1,5 @@
 import random
-
+random.seed(0)
 
 # Disjoint set
 def _get_root(dad: list[int], u):
