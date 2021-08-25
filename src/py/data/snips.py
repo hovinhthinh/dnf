@@ -263,6 +263,7 @@ def split_by_features_RateBook():
     for u in utrs:
         i = ' '.join(sorted(list(u['slots'].keys())))
         intent_count[i] = intent_count.get(i, 0) + 1
+    print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
 
     def RateCurrentBook(u):
         if ('rating_value' not in u['slots']) or ('object_select' not in u['slots']) or (
@@ -301,6 +302,198 @@ def split_by_features_RateBook():
     )
 
 
+def split_by_features_PlayMusic():
+    # print_file('data/snips/PlayMusic/train_PlayMusic_full.json')
+    utrs = get_utterances_and_slots('data/snips/PlayMusic/train_PlayMusic_full.json')
+    intent_count = {}
+    for u in utrs:
+        i = ' '.join(sorted(list(u['slots'].keys())))
+        intent_count[i] = intent_count.get(i, 0) + 1
+    print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
+
+    def PlayOnService(u):
+        found = False
+        for k in u['slots']:
+            if k == 'service':
+                found = True
+            elif k not in ['music_item', 'sort']:
+                return False
+        return found
+
+    def PlayTrack(u):
+        found = False
+        for k in u['slots']:
+            if k == 'track':
+                found = True
+            elif k == 'music_item':
+                if u['slots'][k] not in ['song', 'track', 'tune', 'soundtrack', 'sound track', 'record']:
+                    return False
+            elif k not in ['artist']:
+                return False
+        return found
+
+    def PlayTrackOnService(u):
+        found = False
+        service_found = False
+        for k in u['slots']:
+            if k == 'track':
+                found = True
+            elif k == 'music_item':
+                if u['slots'][k] not in ['song', 'track']:
+                    return False
+            elif k == 'service':
+                service_found = True
+            elif k not in ['artist']:
+                return False
+        return found and service_found
+
+    def PlayAlbum(u):
+        found = False
+        for k in u['slots']:
+            if k == 'album':
+                found = True
+            elif k == 'music_item':
+                if u['slots'][k] not in ['album', 'song', 'track']:
+                    return False
+            elif k not in ['artist', 'sort']:
+                return False
+        return found
+
+    def PlayAlbumOnService(u):
+        found = False
+        service_found = False
+        for k in u['slots']:
+            if k == 'album':
+                found = True
+            elif k == 'music_item':
+                if u['slots'][k] not in ['album', 'song', 'track']:
+                    return False
+            elif k == 'service':
+                service_found = True
+            elif k not in ['artist', 'sort']:
+                return False
+        return found and service_found
+
+    def PlayMusicByArtist(u):
+        found = False
+        for k in u['slots']:
+            if k == 'artist':
+                found = True
+            elif k not in ['music_item', 'sort']:
+                return False
+        return found
+
+    def PlayMusicByArtistOnService(u):
+        found = False
+        service_found = False
+        for k in u['slots']:
+            if k == 'artist':
+                found = True
+            elif k == 'service':
+                service_found = True
+            elif k not in ['music_item', 'sort']:
+                return False
+        return found and service_found
+
+    def PlayMusicByYear(u):
+        found = False
+        for k in u['slots']:
+            if k == 'year':
+                found = True
+            elif k not in ['music_item', 'sort']:
+                return False
+        return found
+
+    def PlayMusicByYearOnService(u):
+        found = False
+        service_found = False
+        for k in u['slots']:
+            if k == 'year':
+                found = True
+            elif k == 'service':
+                service_found = True
+            elif k not in ['music_item', 'sort']:
+                return False
+        return found and service_found
+
+    def PlayMusicByArtistAndYear(u):
+        artist_found = False
+        year_found = False
+        for k in u['slots']:
+            if k == 'artist':
+                artist_found = True
+            elif k == 'year':
+                year_found = True
+            elif k not in ['music_item', 'sort']:
+                return False
+        return year_found and artist_found
+
+    def PlayMusicByArtistAndYearOnService(u):
+        artist_found = False
+        year_found = False
+        service_found = False
+        for k in u['slots']:
+            if k == 'artist':
+                artist_found = True
+            elif k == 'year':
+                year_found = True
+            elif k == 'service':
+                service_found = True
+            elif k not in ['music_item', 'sort']:
+                return False
+        return year_found and artist_found and service_found
+
+    def PlayMusicByGenre(u):
+        found = False
+        for k in u['slots']:
+            if k == 'genre':
+                found = True
+            elif k == 'music_item':
+                if u['slots'][k] not in ['track', 'song']:
+                    return False
+            elif k not in ['sort']:
+                return False
+        return found
+
+    def PlayMusicByGenreOnService(u):
+        found = False
+        service_found = False
+        for k in u['slots']:
+            if k == 'genre':
+                found = True
+            elif k == 'music_item':
+                if u['slots'][k] not in ['track', 'song']:
+                    return False
+            elif k == 'service':
+                service_found = True
+            elif k not in ['sort']:
+                return False
+        return found and service_found
+
+    extract_utterances_splitted_by_features(
+        {
+            'PlayOnService': lambda u: PlayOnService(u),
+            'PlayTrack': lambda u: PlayTrack(u),
+            'PlayTrackOnService': lambda u: PlayTrackOnService(u),
+            'PlayAlbum': lambda u: PlayAlbum(u),
+            'PlayAlbumOnService': lambda u: PlayAlbumOnService(u),
+            'PlayMusicByArtist': lambda u: PlayMusicByArtist(u),
+            'PlayMusicByArtistOnService': lambda u: PlayMusicByArtistOnService(u),
+            'PlayPlaylist': lambda u: ('playlist' in u['slots']) and ('service' not in u['slots']),
+            'PlayPlaylistOnService': lambda u: ('playlist' in u['slots']) and ('service' in u['slots']),
+            'PlayMusicByYear': lambda u: PlayMusicByYear(u),
+            'PlayMusicByYearOnService': lambda u: PlayMusicByYearOnService(u),
+            'PlayMusicByGenre': lambda u: PlayMusicByGenre(u),
+            'PlayMusicByGenreOnService': lambda u: PlayMusicByGenreOnService(u),
+            'PlayMusicByArtistAndYear': lambda u: PlayMusicByArtistAndYear(u),
+            'PlayMusicByArtistAndYearOnService': lambda u: PlayMusicByArtistAndYearOnService(u),
+        },
+        utrs,
+        'PlayMusic',
+        'data/snips/slot_based_clusters/PlayMusic.json'
+    )
+
+
 if __name__ == '__main__':
     # print_file('data/snips/PlayMusic/train_PlayMusic_full.json')
     # print_file('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
@@ -310,5 +503,6 @@ if __name__ == '__main__':
     # split_by_features_BookRestaurant()
     # split_by_features_GetWeather()
     # split_by_features_RateBook()
+    # split_by_features_PlayMusic()
 
     pass
