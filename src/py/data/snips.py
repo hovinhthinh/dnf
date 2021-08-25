@@ -84,6 +84,7 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
             print('{} & {}: {}'.format(u, v, len(overlap)))
 
             for x in overlap:
+                # print(x)
                 overlap_ids.add(x['id'])
 
     for u, cu in clusters.items():
@@ -96,7 +97,7 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
     # Add an unknown cluster
     unk_cluster = list(filter(lambda u: u['id'] not in clustered_ids, utrs))
     if len(unk_cluster) > 0:
-        clusters[intent_name + '_UNK'] = unk_cluster
+        clusters['UNK'] = unk_cluster
 
     print('==== Cluster Size After Removing Overlaps ====')
 
@@ -107,7 +108,7 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
     for k, v in clusters.items():
         print('{}: {}'.format(k, len(v)))
         for u in v:
-            if '_UNK' in k:
+            if k == 'UNK':
                 # print(u)
                 pass
             if f is not None:
@@ -494,9 +495,63 @@ def split_by_features_PlayMusic():
     )
 
 
+# Split by slot values
+def split_by_features_SearchCreativeWork():
+    slot_count = {}
+    for u in get_utterances_and_slots('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json'):
+        for k, v in u['slots'].items():
+            p = k + '|' + v if k == 'object_type' else k
+            slot_count[p] = slot_count.get(p, 0) + 1
+    print(sorted(slot_count.items(), key=lambda x: x[1], reverse=True))
+
+    utrs = get_utterances_and_slots('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
+    intent_count = {}
+    for u in utrs:
+        i = ' '.join(sorted(list(u['slots'].keys())))
+        intent_count[i] = intent_count.get(i, 0) + 1
+    print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
+
+    def is_wh_question(u):
+        text = u['text'].lower()
+        return text.startswith('what ') or text.startswith('where ') or text.startswith('when ') or text.startswith(
+            'who ') or text.startswith('whom ') or text.startswith('which ') or text.startswith(
+            'whose ') or text.startswith('why ') or text.startswith('how ')
+
+    extract_utterances_splitted_by_features(
+        {
+            'SearchCreativeWork': lambda u: ('object_type' not in u['slots']) and not is_wh_question(u),
+            'PlayTVProgram': lambda u: ('object_type' in u['slots'])
+                                       and (u['slots']['object_type'] in ['TV show', 'show', 'TV series',
+                                                                          'television show', 'movie', 'program',
+                                                                          'saga'])
+                                       and not is_wh_question(u),
+            'PlayTVProgramTrailer': lambda u: ('object_type' in u['slots'])
+                                              and (u['slots']['object_type'] in ['trailer'])
+                                              and not is_wh_question(u),
+            'PlaySong': lambda u: ('object_type' in u['slots'])
+                                  and (u['slots']['object_type'] in ['song', 'soundtrack'])
+                                  and not is_wh_question(u),
+            'SearchAlbum': lambda u: ('object_type' in u['slots'])
+                                     and (u['slots']['object_type'] in ['album'])
+                                     and not is_wh_question(u),
+            'SearchBook': lambda u: ('object_type' in u['slots'])
+                                    and (u['slots']['object_type'] in ['book', 'novel'])
+                                    and not is_wh_question(u),
+            'SearchPicture': lambda u: ('object_type' in u['slots'])
+                                       and (u['slots']['object_type'] in ['picture', 'photograph', 'painting'])
+                                       and not is_wh_question(u),
+            'SearchGame': lambda u: ('object_type' in u['slots'])
+                                    and (u['slots']['object_type'] in ['game', 'video game'])
+                                    and not is_wh_question(u),
+            'WHQuestion': lambda u: is_wh_question(u),
+        },
+        utrs,
+        'SearchCreativeWork',
+        'data/snips/slot_based_clusters/SearchCreativeWork.json'
+    )
+
+
 if __name__ == '__main__':
-    # print_file('data/snips/PlayMusic/train_PlayMusic_full.json')
-    # print_file('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
     # print_file('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json')
 
     # split_by_features_AddToPlaylist()
@@ -504,5 +559,6 @@ if __name__ == '__main__':
     # split_by_features_GetWeather()
     # split_by_features_RateBook()
     # split_by_features_PlayMusic()
+    # split_by_features_SearchCreativeWork()
 
     pass
