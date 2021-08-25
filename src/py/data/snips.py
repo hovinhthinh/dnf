@@ -104,7 +104,9 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
     f = None
     if output_file is not None:
         f = open(output_file, 'w')
+        f.write('[\n')
 
+    n_printed = 0
     for k, v in clusters.items():
         print('{}: {}'.format(k, len(v)))
         for u in v:
@@ -112,13 +114,17 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
                 # print(u)
                 pass
             if f is not None:
+                if n_printed > 0:
+                    f.write(',\n')
                 u = u.copy()
                 u.pop('id')
                 u['intent'] = intent_name
                 u['cluster'] = k
-                f.write('{}\n'.format(json.dumps(u)))
+                f.write('{}'.format(json.dumps(u)))
+            n_printed += 1
 
     if f is not None:
+        f.write('\n]')
         f.close()
 
     return clusters
@@ -551,14 +557,182 @@ def split_by_features_SearchCreativeWork():
     )
 
 
-if __name__ == '__main__':
-    # print_file('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json')
+# Split by slot values
+def split_by_features_SearchScreeningEvent():
+    slot_count = {}
+    for u in get_utterances_and_slots('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json'):
+        for k, v in u['slots'].items():
+            p = k + '|' + v if k == 'object_type' else k
+            slot_count[p] = slot_count.get(p, 0) + 1
+    print(sorted(slot_count.items(), key=lambda x: x[1], reverse=True))
 
+    utrs = get_utterances_and_slots('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json')
+    intent_count = {}
+    for u in utrs:
+        i = ' '.join(sorted(list(u['slots'].keys())))
+        intent_count[i] = intent_count.get(i, 0) + 1
+    print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
+
+    def is_yn_question(u):
+        return u['text'].startswith('is ')
+
+    def GetScheduleForAMovie(u):
+        found = False
+        for k in u['slots']:
+            if k == 'movie_name':
+                found = True
+            elif k not in ['object_type', 'object_location_type']:
+                return False
+        return not is_yn_question(u) and found
+
+    def GetScheduleForAMovieAtALocation(u):
+        found = False
+        location_found = False
+
+        for k in u['slots']:
+            if k == 'movie_name':
+                found = True
+            elif k == 'location_name':
+                location_found = True
+            elif k not in ['object_type', 'spatial_relation']:
+                return False
+        return not is_yn_question(u) and found and location_found
+
+    def GetScheduleForAMovieAtNearbyCinemas(u):
+        if 'movie_name' not in u['slots'] \
+                or 'object_location_type' not in u['slots'] \
+                or 'spatial_relation' not in u['slots']:
+            return False
+        for k in u['slots']:
+            if k not in ['object_type', 'movie_name', 'object_location_type', 'spatial_relation']:
+                return False
+        return not is_yn_question(u) and True
+
+    def FindCinemasPlayingAMovieAtATimeRange(u):
+        if 'timeRange' not in u['slots'] or 'movie_name' not in u['slots']:
+            return False
+        for k in u['slots']:
+            if k not in ['movie_name', 'timeRange', 'object_location_type', 'object_type', 'spatial_relation']:
+                return False
+        return not is_yn_question(u) and True
+
+    def GetSchedule(u):
+        for k in u['slots']:
+            if k == 'movie_type':
+                if u['slots'][k] not in ['films', 'movies', 'movie', 'film']:
+                    return False
+            elif k not in ['object_type']:
+                return False
+        return not is_yn_question(u) and True
+
+    def GetScheduleAtNearbyCinemas(u):
+        if 'spatial_relation' not in u['slots']:
+            return False
+        for k in u['slots']:
+            if k == 'movie_type':
+                if u['slots'][k] not in ['films', 'movies', 'film', 'movie']:
+                    return False
+            elif k not in ['object_type', 'object_location_type', 'spatial_relation']:
+                return False
+        return not is_yn_question(u) and True
+
+    def GetScheduleForAnimatedMoviesAtNearbyCinemas(u):
+        if 'object_location_type' not in u['slots'] or 'spatial_relation' not in u['slots']:
+            return False
+        if ('movie_type', 'animated movies') not in u['slots'].items():
+            return False
+        for k in u['slots']:
+            if k not in ['movie_type', 'object_type', 'object_location_type', 'spatial_relation']:
+                return False
+        return not is_yn_question(u) and True
+
+    def GetScheduleAtALocation(u):
+        found = False
+        for k in u['slots']:
+            if k == 'location_name':
+                found = True
+            elif k == 'movie_type':
+                if u['slots'][k] not in ['films', 'movies', 'film', 'movie']:
+                    return False
+            elif k not in ['object_type']:  # timeRange: checking if a movie is playing?
+                return False
+        return not is_yn_question(u) and found
+
+    def GetScheduleForAnimatedMovies(u):
+        found = False
+        for k in u['slots']:
+            if k == 'movie_type':
+                if u['slots'][k] in ['animated movies', 'animated movie']:
+                    found = True
+            elif k not in ['object_type', 'spatial_relation']:
+                return False
+        return not is_yn_question(u) and found
+
+    def GetScheduleForAnimatedMoviesAtALocation(u):
+        found = False
+        animated_movie_found = False
+        for k in u['slots']:
+            if k == 'location_name':
+                found = True
+            elif k == 'movie_type':
+                if u['slots'][k] in ['animated movies', 'animated movie']:
+                    animated_movie_found = True
+            elif k not in ['object_type']:  # timeRange: checking if a movie is playing?
+                return False
+        return not is_yn_question(u) and found and animated_movie_found
+
+    def GetScheduleAtATimeRange(u):
+        if 'timeRange' not in u['slots']:
+            return False
+        for k in u['slots']:
+            if k not in ['object_type', 'timeRange', 'object_location_type', 'spatial_relation', 'movie_type']:
+                return False
+        return not is_yn_question(u) and True
+
+    def GetScheduleAtATimeRangeAtALocation(u):
+        time_found = False
+        location_found = False
+        for k in u['slots']:
+            if k == 'location_name':
+                time_found = True
+            elif k == 'timeRange':
+                location_found = True
+            elif k == 'movie_type':
+                if u['slots'][k] not in ['films', 'movies', 'film', 'movie']:
+                    return False
+            elif k not in ['object_type']:  # timeRange: checking if a movie is playing?
+                return False
+        return not is_yn_question(u) and time_found and location_found
+
+    extract_utterances_splitted_by_features(
+        {
+            'GetSchedule': lambda u: GetSchedule(u),
+            'GetScheduleAtATimeRange': lambda u: GetScheduleAtATimeRange(u),
+            'GetScheduleAtALocation': lambda u: GetScheduleAtALocation(u),
+            'GetScheduleAtATimeRangeAtALocation': lambda u: GetScheduleAtATimeRangeAtALocation(u),
+            'GetScheduleAtNearbyCinemas': lambda u: GetScheduleAtNearbyCinemas(u),
+            'GetScheduleForAnimatedMoviesAtNearbyCinemas': lambda u: GetScheduleForAnimatedMoviesAtNearbyCinemas(u),
+            'GetScheduleForAnimatedMovies': lambda u: GetScheduleForAnimatedMovies(u),
+            'GetScheduleForAnimatedMoviesAtALocation': lambda u: GetScheduleForAnimatedMoviesAtALocation(u),
+            # Below are movie-specific clusters
+            'GetScheduleForAMovie': lambda u: GetScheduleForAMovie(u),
+            'GetScheduleForAMovieAtALocation': lambda u: GetScheduleForAMovieAtALocation(u),
+            'GetScheduleForAMovieAtNearbyCinemas': lambda u: GetScheduleForAMovieAtNearbyCinemas(u),
+            'FindCinemasPlayingAMovieAtATimeRange': lambda u: FindCinemasPlayingAMovieAtATimeRange(u),
+        },
+        utrs,
+        'SearchScreeningEvent',
+        'data/snips/slot_based_clusters/SearchScreeningEvent.json'
+    )
+
+
+if __name__ == '__main__':
     # split_by_features_AddToPlaylist()
     # split_by_features_BookRestaurant()
     # split_by_features_GetWeather()
     # split_by_features_RateBook()
     # split_by_features_PlayMusic()
     # split_by_features_SearchCreativeWork()
+    # split_by_features_SearchScreeningEvent()
 
     pass
