@@ -16,7 +16,7 @@ def umap_plot(embeddings, labels, show_labels=False):
         idx = [i for i, _ in enumerate(labels) if _ == l]
         plt.scatter([embeddings[i][0] for i in idx], [embeddings[i][1] for i in idx], label=l)
     if show_labels:
-        plt.legend(loc='best')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='xx-small')
     plt.show()
 
 
@@ -70,8 +70,9 @@ class Pipeline(object):
         else:
             raise Exception('Method {} not supported'.format(method))
 
-    def plot_2d(self):
-        umap_plot(self._get_embedding([u[0] for u in self.utterances]), [u[1] for u in self.utterances])
+    def plot_2d(self, show_labels=False):
+        umap_plot(self._get_embedding([u[0] for u in self.utterances]), [u[1] for u in self.utterances],
+                  show_labels=show_labels)
 
     def find_tune(self):
         pass
@@ -80,13 +81,23 @@ class Pipeline(object):
 
 if __name__ == '__main__':
     intent_data = snips.split_by_features_GetWeather()
+    # The commented code below is to clustering only by intents
+    # intent_data.extend(snips.split_by_features_AddToPlaylist())
+    # intent_data.extend(snips.split_by_features_RateBook())
+    # intent_data.extend(snips.split_by_features_BookRestaurant())
+    # intent_data.extend(snips.split_by_features_PlayMusic())
+    # intent_data.extend(snips.split_by_features_SearchCreativeWork())
+    # intent_data.extend(snips.split_by_features_SearchScreeningEvent())
+    # for u in intent_data:
+    #     u['cluster'] = 'UNK'
+
     intent_map = dict((n, i) for i, n in enumerate(set([u['intent'] + '_' + u['cluster'] for u in intent_data])))
 
     snips_data = []
     for u in intent_data:
         snips_data.append((u['text'], u['intent'] + '_' + u['cluster'], False))
     p = Pipeline(snips_data)
-    p.plot_2d()
+    p.plot_2d(show_labels=True)
 
     sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map))
     print(get_clustering_quality(p.get_true_clusters(), sbert_clusters))
