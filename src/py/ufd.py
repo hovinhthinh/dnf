@@ -10,13 +10,16 @@ from data import snips
 
 
 def umap_plot(embeddings, labels, show_labels=False):
+    if show_labels:
+        plt.rcParams["figure.figsize"] = (10, 4)
     embeddings = umap.UMAP().fit_transform(embeddings)
     u_labels = set(labels)
     for _, l in enumerate(u_labels):
         idx = [i for i, _ in enumerate(labels) if _ == l]
         plt.scatter([embeddings[i][0] for i in idx], [embeddings[i][1] for i in idx], label=l)
     if show_labels:
-        plt.legend()
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
     plt.show()
 
 
@@ -35,7 +38,7 @@ class Pipeline(object):
     def get_true_clusters(self):
         return [self.cluster_label_2_index_map[u[1]] for u in self.utterances]
 
-    def get_pseudo_clusters(self, method='cop-kmeans', k=-1):
+    def get_pseudo_clusters(self, method='cop-kmeans', k=-1, precomputed_embeddings=None):
         train_clusters = [[]] * len(self.cluster_label_2_index_map)
         for i, (_, j, t) in enumerate(self.utterances):
             if t:
@@ -56,7 +59,8 @@ class Pipeline(object):
                 cl.append((train_clusters[i][0], train_clusters[j][0]))
 
         print('Getting embeddings')
-        embeddings = self._get_embedding([u[0] for u in self.utterances])
+        embeddings = precomputed_embeddings if precomputed_embeddings is not None else self._get_embedding(
+            [u[0] for u in self.utterances])
 
         if method == 'cop-kmeans':
             if k <= 0:
@@ -91,13 +95,20 @@ if __name__ == '__main__':
     # for u in intent_data:
     #     u['cluster'] = 'UNK'
 
+    # intent_data = snips.split_by_features_AddToPlaylist()
+    # intent_data = snips.split_by_features_RateBook()
+    # intent_data = snips.split_by_features_BookRestaurant()
+    # intent_data = snips.split_by_features_PlayMusic()
+    # intent_data = snips.split_by_features_SearchCreativeWork()
+    # intent_data = snips.split_by_features_SearchScreeningEvent()
+
     intent_map = dict((n, i) for i, n in enumerate(set([u['intent'] + '_' + u['cluster'] for u in intent_data])))
 
     snips_data = []
     for u in intent_data:
         snips_data.append((u['text'], u['intent'] + '_' + u['cluster'], False))
     p = Pipeline(snips_data)
-    # p.plot_2d(show_labels=False)
+    p.plot_2d(show_labels=True)
 
     sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map))
     print(get_clustering_quality(p.get_true_clusters(), sbert_clusters))

@@ -1,6 +1,6 @@
-from numpy import ndarray
-from transformers import AutoTokenizer, AutoModel
+import numpy
 import torch
+from transformers import AutoTokenizer, AutoModel
 
 
 # Mean Pooling - Take attention mask into account for correct averaging
@@ -15,18 +15,24 @@ tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/paraphrase-mpne
 model = AutoModel.from_pretrained('sentence-transformers/paraphrase-mpnet-base-v2')
 
 
-def get_embeddings(utterances: list[str]) -> ndarray:
-    # Tokenize sentences
-    encoded_input = tokenizer(utterances, padding=True, truncation=True, return_tensors='pt')
+def get_embeddings(utterances: list[str], batch_size=64) -> numpy.ndarray:
+    batches = []
+    cur = 0
+    while cur < len(utterances):
+        last = min(len(utterances), cur + batch_size)
+        # Tokenize sentences
+        encoded_input = tokenizer(utterances[cur: last], padding=True, truncation=True, return_tensors='pt')
+        # Compute token embeddings
+        with torch.no_grad():
+            model_output = model(**encoded_input)
 
-    # Compute token embeddings
-    with torch.no_grad():
-        model_output = model(**encoded_input)
+        # Perform pooling. In this case, max pooling.
+        sentence_embeddings = _mean_pooling(model_output, encoded_input['attention_mask'])
 
-    # Perform pooling. In this case, max pooling.
-    sentence_embeddings = _mean_pooling(model_output, encoded_input['attention_mask'])
-
-    return sentence_embeddings.cpu().detach().numpy()
+        batches.append(sentence_embeddings.cpu().detach().numpy())
+        cur = last
+        print('Get embeddings: {}/{}'.format(cur, len(utterances)))
+    return numpy.concatenate(batches)
 
 
 if __name__ == '__main__':
