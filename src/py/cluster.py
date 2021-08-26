@@ -1,5 +1,12 @@
 import random
+
+import numpy
+from scipy.optimize import linear_sum_assignment
+from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score, adjusted_mutual_info_score, \
+    fowlkes_mallows_score
+
 random.seed(0)
+
 
 # Disjoint set
 def _get_root(dad: list[int], u):
@@ -190,6 +197,31 @@ def _get_ml_info(root_2_idx, dataset):
               for j in range(len(groups))]
 
     return groups, scores, centroids
+
+
+def get_clustering_quality(labels_true, labels_pred):
+    quality = {
+        'NMI': normalized_mutual_info_score(labels_true, labels_pred),
+        'ARI': adjusted_rand_score(labels_true, labels_pred),
+        'AMI': adjusted_mutual_info_score(labels_true, labels_pred),
+        'FMI': fowlkes_mallows_score(labels_true, labels_pred),
+    }
+
+    # Accuracy
+    m_labels = set(labels_true)
+    n_labels = set(labels_pred)
+    cost_matrix = numpy.ndarray((len(m_labels), len(n_labels)))
+    print(cost_matrix)
+    for i, u in enumerate(m_labels):
+        for j, v in enumerate(n_labels):
+            cost_matrix[i][j] = \
+                len(set([x for x, _ in enumerate(labels_true) if _ == u]).intersection(
+                    [x for x, _ in enumerate(labels_pred) if _ == v]))
+
+    row_ind, col_ind = linear_sum_assignment(cost_matrix, maximize=True)
+    quality['ACC'] = cost_matrix[row_ind, col_ind].sum() / len(labels_true)
+
+    return quality
 
 
 if __name__ == '__main__':
