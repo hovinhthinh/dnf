@@ -106,6 +106,7 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
         f = open(output_file, 'w')
         f.write('[\n')
 
+    results = []
     n_printed = 0
     for k, v in clusters.items():
         print('{}: {}'.format(k, len(v)))
@@ -113,13 +114,14 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
             if k == 'UNK':
                 # print(u)
                 pass
+            u = u.copy()
+            u.pop('id')
+            u['intent'] = intent_name
+            u['cluster'] = k
+            results.append(u)
             if f is not None:
                 if n_printed > 0:
                     f.write(',\n')
-                u = u.copy()
-                u.pop('id')
-                u['intent'] = intent_name
-                u['cluster'] = k
                 f.write('{}'.format(json.dumps(u)))
             n_printed += 1
 
@@ -127,7 +129,7 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
         f.write('\n]')
         f.close()
 
-    return clusters
+    return results
 
 
 def split_by_features_AddToPlaylist(output_file=None):
@@ -139,7 +141,7 @@ def split_by_features_AddToPlaylist(output_file=None):
         intent_count[i] = intent_count.get(i, 0) + 1
     print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
 
-    extract_utterances_splitted_by_features(
+    return extract_utterances_splitted_by_features(
         {
             'AddASongToAPlaylist':
                 lambda u: ('entity_name' in u['slots']) and ('playlist' in u['slots']),
@@ -182,7 +184,7 @@ def split_by_features_BookRestaurant(output_file=None):
         intent_count[i] = intent_count.get(i, 0) + 1
     print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
 
-    extract_utterances_splitted_by_features(
+    return extract_utterances_splitted_by_features(
         {
             # TODO
         },
@@ -250,7 +252,7 @@ def split_by_features_GetWeather(output_file=None):
             return False
         return True
 
-    extract_utterances_splitted_by_features(
+    return extract_utterances_splitted_by_features(
         {
             'GetCurrentWeatherInALocation': lambda u: GetCurrentWeatherInALocation(u),
             'GetCurrentWeatherInCurrentPosition': lambda u: GetCurrentWeatherInCurrentPosition(u),
@@ -296,7 +298,7 @@ def split_by_features_RateBook(output_file=None):
         return otype in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga', 'chronicle', 'essay book',
                          'book novel', 'book album', 'series chronicle']
 
-    extract_utterances_splitted_by_features(
+    return extract_utterances_splitted_by_features(
         {
             'RateABook': lambda u: 'object_name' in u['slots'] and 'rating_value' in u['slots'],
             'RateCurrentBook': lambda u: RateCurrentBook(u),
@@ -477,7 +479,7 @@ def split_by_features_PlayMusic(output_file=None):
                 return False
         return found and service_found
 
-    extract_utterances_splitted_by_features(
+    return extract_utterances_splitted_by_features(
         {
             'PlayOnService': lambda u: PlayOnService(u),
             'PlayTrack': lambda u: PlayTrack(u),
@@ -524,7 +526,7 @@ def split_by_features_SearchCreativeWork(output_file=None):
             'who ') or text.startswith('whom ') or text.startswith('which ') or text.startswith(
             'whose ') or text.startswith('why ') or text.startswith('how ')
 
-    extract_utterances_splitted_by_features(
+    return extract_utterances_splitted_by_features(
         {
             'SearchCreativeWork': lambda u: ('object_type' not in u['slots']) and not is_wh_question(u),
             'PlayTVProgram': lambda u: ('object_type' in u['slots'])
@@ -706,7 +708,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
                 return False
         return not is_yn_question(u) and time_found and location_found
 
-    extract_utterances_splitted_by_features(
+    return extract_utterances_splitted_by_features(
         {
             'GetSchedule': lambda u: GetSchedule(u),
             'GetScheduleAtATimeRange': lambda u: GetScheduleAtATimeRange(u),
