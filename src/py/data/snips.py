@@ -130,7 +130,7 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
     return clusters
 
 
-def split_by_features_AddToPlaylist():
+def split_by_features_AddToPlaylist(output_file=None):
     # print_file('data/snips/AddToPlaylist/train_AddToPlaylist_full.json')
     utrs = get_utterances_and_slots('data/snips/AddToPlaylist/train_AddToPlaylist_full.json')
     intent_count = {}
@@ -169,11 +169,11 @@ def split_by_features_AddToPlaylist():
         },
         utrs,
         'AddToPlaylist',
-        'data/snips/slot_based_clusters/AddToPlaylist.json'
+        output_file
     )
 
 
-def split_by_features_BookRestaurant():
+def split_by_features_BookRestaurant(output_file=None):
     # print_file('data/snips/BookRestaurant/train_BookRestaurant_full.json')
     utrs = get_utterances_and_slots('data/snips/BookRestaurant/train_BookRestaurant_full.json')
     intent_count = {}
@@ -188,11 +188,11 @@ def split_by_features_BookRestaurant():
         },
         utrs,
         'BookRestaurant',
-        'data/snips/slot_based_clusters/BookRestaurant.json'
+        output_file
     )
 
 
-def split_by_features_GetWeather():
+def split_by_features_GetWeather(output_file=None):
     # print_file('data/snips/GetWeather/train_GetWeather_full.json')
     utrs = get_utterances_and_slots('data/snips/GetWeather/train_GetWeather_full.json')
     intent_count = {}
@@ -259,11 +259,11 @@ def split_by_features_GetWeather():
         },
         utrs,
         'GetWeather',
-        'data/snips/slot_based_clusters/GetWeather.json'
+        output_file
     )
 
 
-def split_by_features_RateBook():
+def split_by_features_RateBook(output_file=None):
     # print_file('data/snips/RateBook/train_RateBook_full.json')
     utrs = get_utterances_and_slots('data/snips/RateBook/train_RateBook_full.json')
     intent_count = {}
@@ -305,11 +305,11 @@ def split_by_features_RateBook():
         },
         utrs,
         'RateBook',
-        'data/snips/slot_based_clusters/RateBook.json'
+        output_file
     )
 
 
-def split_by_features_PlayMusic():
+def split_by_features_PlayMusic(output_file=None):
     # print_file('data/snips/PlayMusic/train_PlayMusic_full.json')
     utrs = get_utterances_and_slots('data/snips/PlayMusic/train_PlayMusic_full.json')
     intent_count = {}
@@ -497,20 +497,21 @@ def split_by_features_PlayMusic():
         },
         utrs,
         'PlayMusic',
-        'data/snips/slot_based_clusters/PlayMusic.json'
+        output_file
     )
 
 
 # Split by slot values
-def split_by_features_SearchCreativeWork():
+def split_by_features_SearchCreativeWork(output_file=None):
+    utrs = get_utterances_and_slots('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
+
     slot_count = {}
-    for u in get_utterances_and_slots('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json'):
+    for u in utrs:
         for k, v in u['slots'].items():
             p = k + '|' + v if k == 'object_type' else k
             slot_count[p] = slot_count.get(p, 0) + 1
     print(sorted(slot_count.items(), key=lambda x: x[1], reverse=True))
 
-    utrs = get_utterances_and_slots('data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json')
     intent_count = {}
     for u in utrs:
         i = ' '.join(sorted(list(u['slots'].keys())))
@@ -553,20 +554,21 @@ def split_by_features_SearchCreativeWork():
         },
         utrs,
         'SearchCreativeWork',
-        'data/snips/slot_based_clusters/SearchCreativeWork.json'
+        output_file
     )
 
 
 # Split by slot values
-def split_by_features_SearchScreeningEvent():
+def split_by_features_SearchScreeningEvent(output_file=None):
+    utrs = get_utterances_and_slots('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json')
+
     slot_count = {}
-    for u in get_utterances_and_slots('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json'):
+    for u in utrs:
         for k, v in u['slots'].items():
             p = k + '|' + v if k == 'object_type' else k
             slot_count[p] = slot_count.get(p, 0) + 1
     print(sorted(slot_count.items(), key=lambda x: x[1], reverse=True))
 
-    utrs = get_utterances_and_slots('data/snips/SearchScreeningEvent/train_SearchScreeningEvent_full.json')
     intent_count = {}
     for u in utrs:
         i = ' '.join(sorted(list(u['slots'].keys())))
@@ -722,17 +724,17 @@ def split_by_features_SearchScreeningEvent():
         },
         utrs,
         'SearchScreeningEvent',
-        'data/snips/slot_based_clusters/SearchScreeningEvent.json'
+        output_file
     )
 
 
 if __name__ == '__main__':
-    # split_by_features_AddToPlaylist()
-    # split_by_features_BookRestaurant()
-    # split_by_features_GetWeather()
-    # split_by_features_RateBook()
-    # split_by_features_PlayMusic()
-    # split_by_features_SearchCreativeWork()
-    # split_by_features_SearchScreeningEvent()
+    split_by_features_AddToPlaylist('data/snips/slot_based_clusters/AddToPlaylist.json')
+    split_by_features_BookRestaurant('data/snips/slot_based_clusters/BookRestaurant.json')
+    split_by_features_GetWeather('data/snips/slot_based_clusters/GetWeather.json')
+    split_by_features_RateBook('data/snips/slot_based_clusters/RateBook.json')
+    split_by_features_PlayMusic('data/snips/slot_based_clusters/PlayMusic.json')
+    split_by_features_SearchCreativeWork('data/snips/slot_based_clusters/SearchCreativeWork.json')
+    split_by_features_SearchScreeningEvent('data/snips/slot_based_clusters/SearchScreeningEvent.json')
 
     pass
