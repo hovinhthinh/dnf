@@ -211,7 +211,6 @@ def get_clustering_quality(labels_true, labels_pred):
     m_labels = set(labels_true)
     n_labels = set(labels_pred)
     cost_matrix = numpy.ndarray((len(m_labels), len(n_labels)))
-    print(cost_matrix)
     for i, u in enumerate(m_labels):
         for j, v in enumerate(n_labels):
             cost_matrix[i][j] = \

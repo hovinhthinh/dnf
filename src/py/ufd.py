@@ -16,7 +16,7 @@ def umap_plot(embeddings, labels, show_labels=False):
         idx = [i for i, _ in enumerate(labels) if _ == l]
         plt.scatter([embeddings[i][0] for i in idx], [embeddings[i][1] for i in idx], label=l)
     if show_labels:
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='xx-small')
+        plt.legend()
     plt.show()
 
 
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     for u in intent_data:
         snips_data.append((u['text'], u['intent'] + '_' + u['cluster'], False))
     p = Pipeline(snips_data)
-    p.plot_2d(show_labels=True)
+    # p.plot_2d(show_labels=False)
 
     sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map))
     print(get_clustering_quality(p.get_true_clusters(), sbert_clusters))
