@@ -12,10 +12,10 @@ tokenizer = None
 model = None
 
 
-def load(model_path):
+def load(model_path, from_tf=False):
     global tokenizer, model
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModel.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, from_tf=from_tf)
+    model = AutoModel.from_pretrained(model_path, from_tf=from_tf)
 
 
 def save(model_path):
