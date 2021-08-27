@@ -45,7 +45,8 @@ def get_embeddings(utterances: list[str], batch_size=64) -> numpy.ndarray:
 
         batches.append(sentence_embeddings.cpu().detach().numpy())
         cur = last
-        print('Get embeddings: {}/{} ({:.1f}%)'.format(cur, len(utterances), 100 * cur / len(utterances)))
+        print('\rGet embeddings: {}/{} ({:.1f}%)'.format(cur, len(utterances), 100 * cur / len(utterances)),
+              end='' if cur < len(utterances) else '\n')
     return numpy.concatenate(batches)
 
 
