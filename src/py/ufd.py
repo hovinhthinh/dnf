@@ -1,3 +1,4 @@
+import os
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
@@ -8,7 +9,7 @@ from cluster import cop_kmeans, get_clustering_quality
 from data import snips
 
 
-def umap_plot(embeddings, labels, show_labels=False):
+def umap_plot(embeddings, labels, show_labels=False, output_file_path=None):
     if show_labels:
         plt.rcParams["figure.figsize"] = (10, 4)
     embeddings = umap.UMAP().fit_transform(embeddings)
@@ -19,7 +20,11 @@ def umap_plot(embeddings, labels, show_labels=False):
     if show_labels:
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
-    plt.show()
+
+    if output_file_path == None:
+        plt.show()
+    else:
+        plt.savefig(output_file_path)
 
 
 class Pipeline(object):
@@ -68,9 +73,9 @@ class Pipeline(object):
         else:
             raise Exception('Method {} not supported'.format(method))
 
-    def plot_2d(self, show_labels=False, precomputed_embeddings=None):
+    def plot_2d(self, show_labels=False, precomputed_embeddings=None, output_file_path=None):
         umap_plot(precomputed_embeddings if precomputed_embeddings is not None else self.get_embeddings(),
-                  [u[1] for u in self.utterances], show_labels=show_labels)
+                  [u[1] for u in self.utterances], show_labels=show_labels, output_file_path=output_file_path)
 
     def find_tune_pseudo_classification(self, k=None, precomputed_embeddings=None):
         pseudo_clusters = p.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map),
@@ -111,12 +116,15 @@ if __name__ == '__main__':
 
     # Pseudo clustering
     embeddings = p.get_embeddings()
-    p.plot_2d(show_labels=True, precomputed_embeddings=embeddings)
+    os.makedirs('./reports/fine_tune_pseudo_classification', exist_ok=True)
+    p.plot_2d(show_labels=True, precomputed_embeddings=embeddings,
+              output_file_path='./reports/fine_tune_pseudo_classification/0.pdf')
     for iter in range(10):
-        print('Iter: #{}'.format(iter))
+        print('Iter: #{}'.format(iter + 1))
         p.find_tune_pseudo_classification(precomputed_embeddings=embeddings)
         embeddings = p.get_embeddings()
-        p.plot_2d(show_labels=True, precomputed_embeddings=embeddings)
+        p.plot_2d(show_labels=True, precomputed_embeddings=embeddings,
+                  output_file_path='./reports/fine_tune_pseudo_classification/{}.pdf'.format(iter + 1))
 
     sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map), precomputed_embeddings=embeddings)
     print(get_clustering_quality(p.get_true_clusters(), sbert_clusters))

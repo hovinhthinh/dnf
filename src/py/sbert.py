@@ -10,12 +10,14 @@ from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer
 
 tokenizer = None
 model = None
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def load(model_path, from_tf=False):
     global tokenizer, model
     tokenizer = AutoTokenizer.from_pretrained(model_path, from_tf=from_tf)
     model = AutoModel.from_pretrained(model_path, from_tf=from_tf)
+    model.to(device)
 
 
 def save(model_path):
@@ -37,6 +39,7 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
         last = min(len(utterances), cur + batch_size)
         # Tokenize sentences
         encoded_input = tokenizer(utterances[cur: last], padding=True, truncation=True, return_tensors='pt')
+        encoded_input.to(device)
         # Compute token embeddings
         with torch.no_grad():
             model_output = model(**encoded_input)
@@ -44,7 +47,7 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
         # Perform pooling. In this case, max pooling.
         sentence_embeddings = _mean_pooling(model_output, encoded_input['attention_mask'])
 
-        batches.append(sentence_embeddings.cpu().detach().numpy())
+        batches.append(sentence_embeddings.detach().cpu().numpy())
         cur = last
         print('\rGet embeddings: {}/{} ({:.1f}%)'.format(cur, len(utterances), 100 * cur / len(utterances)),
               end='' if cur < len(utterances) else '\n')
