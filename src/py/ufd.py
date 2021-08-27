@@ -13,7 +13,7 @@ def umap_plot(embeddings, labels, show_labels=False):
     u_labels = set(labels)
     for _, l in enumerate(u_labels):
         idx = [i for i, _ in enumerate(labels) if _ == l]
-        plt.scatter([embeddings[i][0] for i in idx], [embeddings[i][1] for i in idx], label=l)
+        plt.scatter([embeddings[i][0] for i in idx], [embeddings[i][1] for i in idx], label=l, s=10)
     if show_labels:
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
