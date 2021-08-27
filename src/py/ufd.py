@@ -1,8 +1,5 @@
-from typing import Union
-
 import matplotlib.pyplot as plt
 import umap
-from numpy import ndarray
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
@@ -27,19 +24,16 @@ class Pipeline(object):
 
     def __init__(self, utterances: list[tuple[str, any, bool]]):  # (utterance, cluster_label, is_train)
         self.utterances = utterances
-        self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([i for (_, i, _) in self.utterances])))
+        self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([j for (_, j, _) in self.utterances])))
 
-    def _get_embedding(self, utterances: Union[str, list[str]]) -> ndarray:
-        if type(utterances) == list:
-            return sbert.get_embeddings(utterances)
-        else:
-            return sbert.get_embeddings([utterances])
+    def get_embeddings(self):
+        return sbert.get_embeddings([u[0] for u in self.utterances])
 
     def get_true_clusters(self):
         return [self.cluster_label_2_index_map[u[1]] for u in self.utterances]
 
     def get_pseudo_clusters(self, method='cop-kmeans', k=-1, precomputed_embeddings=None):
-        train_clusters = [[]] * len(self.cluster_label_2_index_map)
+        train_clusters = [[] for _ in range(len(self.cluster_label_2_index_map))]
         for i, (_, j, t) in enumerate(self.utterances):
             if t:
                 train_clusters[self.cluster_label_2_index_map[j]].append(i)
@@ -58,9 +52,7 @@ class Pipeline(object):
                     continue
                 cl.append((train_clusters[i][0], train_clusters[j][0]))
 
-        print('Getting embeddings')
-        embeddings = precomputed_embeddings if precomputed_embeddings is not None else self._get_embedding(
-            [u[0] for u in self.utterances])
+        embeddings = precomputed_embeddings if precomputed_embeddings is not None else self.get_embeddings()
 
         if method == 'cop-kmeans':
             if k <= 0:
@@ -74,13 +66,14 @@ class Pipeline(object):
         else:
             raise Exception('Method {} not supported'.format(method))
 
-    def plot_2d(self, show_labels=False):
-        umap_plot(self._get_embedding([u[0] for u in self.utterances]), [u[1] for u in self.utterances],
-                  show_labels=show_labels)
+    def plot_2d(self, show_labels=False, precomputed_embeddings=None):
+        umap_plot(precomputed_embeddings if precomputed_embeddings is not None else self.get_embeddings(),
+                  [u[1] for u in self.utterances], show_labels=show_labels)
 
-    def find_tune(self):
-        pass
-        # TODO
+    def find_tune_pseudo_classification(self, k=None, precomputed_embeddings=None):
+        pseudo_clusters = p.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map),
+                                                precomputed_embeddings=precomputed_embeddings)
+        sbert.fine_tune_classification([u[0] for u in self.utterances], pseudo_clusters)
 
 
 if __name__ == '__main__':
@@ -104,13 +97,26 @@ if __name__ == '__main__':
 
     intent_map = dict((n, i) for i, n in enumerate(set([u['intent'] + '_' + u['cluster'] for u in intent_data])))
 
+    sbert.load('sentence-transformers/paraphrase-mpnet-base-v2')
+
+    # Prepare data
     snips_data = []
     for u in intent_data:
-        snips_data.append((u['text'], u['intent'] + '_' + u['cluster'], False))
-    p = Pipeline(snips_data)
-    p.plot_2d(show_labels=True)
+        is_train = u['cluster'] in ['GetCurrentWeatherInALocation', 'GetWeatherInCurrentPositionAtATimeRange']
+        snips_data.append((u['text'], u['intent'] + '_' + u['cluster'] + ('_T' if is_train else ''), is_train))
 
-    sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map))
+    p = Pipeline(snips_data)
+
+    # Pseudo clustering
+    embeddings = p.get_embeddings()
+    p.plot_2d(show_labels=True, precomputed_embeddings=embeddings)
+    for iter in range(10):
+        print('Iter: #{}'.format(iter))
+        p.find_tune_pseudo_classification(precomputed_embeddings=embeddings)
+        embeddings = p.get_embeddings()
+        p.plot_2d(show_labels=True, precomputed_embeddings=embeddings)
+
+    sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map), precomputed_embeddings=embeddings)
     print(get_clustering_quality(p.get_true_clusters(), sbert_clusters))
 
     pass
