@@ -17,7 +17,7 @@ def get_utterances(input_file):
 
 def get_all_utterances_and_labels():
     """
-    :return: list[tuple[utterance, cluster_index, is_train]]
+    :return: List[tuple[utterance, cluster_index, is_train]]
     """
     input_files = ['data/snips/AddToPlaylist/train_AddToPlaylist_full.json',
                    'data/snips/BookRestaurant/train_BookRestaurant_full.json',
@@ -36,7 +36,7 @@ def get_all_utterances_and_labels():
 def get_utterances_and_slots(input_file):
     """
     :param input_file:
-    :return: list[dict]
+    :return: List[dict]
     """
     data = json.loads(open(input_file, 'r').read())
 

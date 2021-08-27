@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy
 import torch
 from datasets import load_metric
@@ -28,7 +30,7 @@ def _mean_pooling(model_output, attention_mask):
     return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
 
-def get_embeddings(utterances: list[str], batch_size=64) -> numpy.ndarray:
+def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
     batches = []
     cur = 0
     while cur < len(utterances):

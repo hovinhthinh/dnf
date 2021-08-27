@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import matplotlib.pyplot as plt
 import umap
 
@@ -22,7 +24,7 @@ def umap_plot(embeddings, labels, show_labels=False):
 
 class Pipeline(object):
 
-    def __init__(self, utterances: list[tuple[str, any, bool]]):  # (utterance, cluster_label, is_train)
+    def __init__(self, utterances: List[Tuple[str, any, bool]]):  # (utterance, cluster_label, is_train)
         self.utterances = utterances
         self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([j for (_, j, _) in self.utterances])))
 

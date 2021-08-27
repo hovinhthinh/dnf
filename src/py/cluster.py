@@ -1,4 +1,5 @@
 import random
+from typing import List
 
 import numpy
 from scipy.optimize import linear_sum_assignment
@@ -9,14 +10,14 @@ random.seed(0)
 
 
 # Disjoint set
-def _get_root(dad: list[int], u):
+def _get_root(dad: List[int], u):
     if dad[u] < 0:
         return u
     dad[u] = _get_root(dad, dad[u])
     return dad[u]
 
 
-def _union(dad: list[int], root_u, root_v):
+def _union(dad: List[int], root_u, root_v):
     if dad[root_u] >= 0 or dad[root_v] >= 0:
         raise Exception("Either u or v is not a tree root")
     if root_u == root_v:
