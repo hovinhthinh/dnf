@@ -1,9 +1,8 @@
 import numpy
 import torch
 from datasets import load_metric
-from sentence_transformers.losses import MSELoss
 from torch import nn
-from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
+from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss, MSELoss
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer
 
