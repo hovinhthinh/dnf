@@ -25,6 +25,7 @@ def umap_plot(embeddings, labels, show_labels=False, output_file_path=None):
         plt.show()
     else:
         plt.savefig(output_file_path)
+    plt.close()
 
 
 class Pipeline(object):
