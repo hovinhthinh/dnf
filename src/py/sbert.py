@@ -162,6 +162,17 @@ class PseudoClassificationModel(nn.Module):
 
 
 def fine_tune_classification(train_texts, train_labels, val_texts, val_labels, test_texts=None, test_labels=None):
+    label_set = set(train_labels)
+    label_set.update(val_labels)
+    if test_labels is not None:
+        label_set.update(test_labels)
+    label_map = {l: i for i, l in enumerate(label_set)}
+
+    train_labels = [label_map[l] for l in train_labels]
+    val_labels = [label_map[l] for l in val_labels]
+    if test_labels is not None:
+        test_labels = [label_map[l] for l in test_labels]
+
     metric_accuracy = load_metric("accuracy")
 
     def compute_accuracy(eval_pred):
@@ -178,20 +189,20 @@ def fine_tune_classification(train_texts, train_labels, val_texts, val_labels, t
     val_dataset = ClassificationDataset(val_encodings, val_labels)
     test_dataset = ClassificationDataset(test_encodings, test_labels) if test_texts is not None else None
 
-    classifier = PseudoClassificationModel(model, 3)
+    classifier = PseudoClassificationModel(model, len(label_set))
 
     # print(classifier(**train_encodings))
 
     trainer = Trainer(
         model=classifier,
         args=TrainingArguments(
-            output_dir='./results',  # output directory
-            num_train_epochs=3,  # total number of training epochs
-            per_device_train_batch_size=16,  # batch size per device during training
-            per_device_eval_batch_size=8,  # batch size for evaluation
-            warmup_steps=500,  # number of warmup steps for learning rate scheduler
-            weight_decay=0.01,  # strength of weight decay
-            logging_dir='./logs',  # directory for storing logs
+            output_dir='./results',
+            num_train_epochs=3,
+            per_device_train_batch_size=32,
+            per_device_eval_batch_size=8,
+            warmup_steps=500,
+            weight_decay=0.01,
+            logging_dir='./logs',
             evaluation_strategy='epoch'
         ),
         train_dataset=train_dataset,
