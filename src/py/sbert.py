@@ -161,15 +161,18 @@ class PseudoClassificationModel(nn.Module):
         )
 
 
-def fine_tune_classification(train_texts, train_labels, val_texts, val_labels, test_texts=None, test_labels=None):
+def fine_tune_classification(train_texts, train_labels,
+                             val_texts=None, val_labels=None, test_texts=None, test_labels=None):
     label_set = set(train_labels)
-    label_set.update(val_labels)
+    if val_labels is not None:
+        label_set.update(val_labels)
     if test_labels is not None:
         label_set.update(test_labels)
     label_map = {l: i for i, l in enumerate(label_set)}
 
     train_labels = [label_map[l] for l in train_labels]
-    val_labels = [label_map[l] for l in val_labels]
+    if val_labels is not None:
+        val_labels = [label_map[l] for l in val_labels]
     if test_labels is not None:
         test_labels = [label_map[l] for l in test_labels]
 
@@ -181,12 +184,13 @@ def fine_tune_classification(train_texts, train_labels, val_texts, val_labels, t
         return metric_accuracy.compute(predictions=predictions, references=labels)
 
     train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
-    val_encodings = tokenizer(val_texts, truncation=True, padding=True, return_tensors='pt')
+    val_encodings = tokenizer(val_texts, truncation=True, padding=True,
+                              return_tensors='pt') if val_texts is not None else None
     test_encodings = tokenizer(test_texts, truncation=True, padding=True,
                                return_tensors='pt') if test_texts is not None else None
 
     train_dataset = ClassificationDataset(train_encodings, train_labels)
-    val_dataset = ClassificationDataset(val_encodings, val_labels)
+    val_dataset = ClassificationDataset(val_encodings, val_labels) if val_texts is not None else None
     test_dataset = ClassificationDataset(test_encodings, test_labels) if test_texts is not None else None
 
     classifier = PseudoClassificationModel(model, len(label_set))
@@ -203,7 +207,7 @@ def fine_tune_classification(train_texts, train_labels, val_texts, val_labels, t
             warmup_steps=500,
             weight_decay=0.01,
             logging_dir='./logs',
-            evaluation_strategy='epoch'
+            evaluation_strategy='epoch' if val_dataset is not None else 'no'
         ),
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
