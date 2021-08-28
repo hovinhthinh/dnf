@@ -1,4 +1,5 @@
 import os
+import random
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
@@ -119,8 +120,13 @@ if __name__ == '__main__':
 
     # Prepare data
     snips_data = []
+
+    clusters = list(set([u['cluster'] for u in intent_data]))
+    random.shuffle(clusters)
+    train_clusters = clusters[0:int(len(clusters) * 0.6)]
     for u in intent_data:
-        is_train = u['cluster'] in ['GetCurrentWeatherInALocation', 'GetWeatherInCurrentPositionAtATimeRange']
+        is_train = u['cluster'] in train_clusters
+        # is_train = u['cluster'] in ['GetCurrentWeatherInALocation', 'GetWeatherInCurrentPositionAtATimeRange']
         snips_data.append((u['text'], u['intent'] + '_' + u['cluster'] + ('_T' if is_train else ''), is_train))
 
     p = Pipeline(snips_data)
@@ -128,7 +134,7 @@ if __name__ == '__main__':
     # Pseudo clustering
     embeddings = p.get_embeddings()
 
-    output_file_path = './reports/fine_tune_pseudo_classification/0.pdf'
+    output_file_path = './reports/fine_tune_pseudo_classification'
     # output_file_path = None
 
     if output_file_path is not None:
