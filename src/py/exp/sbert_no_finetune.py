@@ -46,5 +46,5 @@ for data, output, title in intent_data:
     p.plot(precomputed_embeddings=embeddings, show_labels=True, output_file_path=output_file_path + output, title=title)
 
     sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map), precomputed_embeddings=embeddings)
-    print('Inter-intent clustering-metrics -', title, ':',
+    print('Intra-intent clustering-metrics -', title, ':',
           get_clustering_quality(p.get_true_clusters(), sbert_clusters))
