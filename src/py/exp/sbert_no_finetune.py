@@ -12,6 +12,7 @@ if output_file_path is not None:
 sbert.load('sentence-transformers/paraphrase-mpnet-base-v2')
 
 intent_data = [
+    (snips.split_by_features_GetWeather(), '/intra_intent_GetWeather.pdf', 'intra_intent_GetWeather'),
     (snips.split_by_features_AddToPlaylist(), '/intra_intent_AddToPlaylist.pdf', 'intra_intent_AddToPlaylist'),
     (snips.split_by_features_RateBook(), '/intra_intent_RateBook.pdf', 'intra_intent_RateBook'),
     (snips.split_by_features_BookRestaurant(), '/intra_intent_BookRestaurant.pdf', 'split_by_features_BookRestaurant'),
