@@ -63,7 +63,7 @@ for name, intent_data in intra_intent_data:
 
     print('======== Intent:', name, '========')
     train_size = len([u for u in intent_data if u[2]])
-    print('Training/Testing: {}/{} ({:.1f}%)'.format(train_size, len(intent_data), 100 * train_size / len(intent_data)))
+    print('Training utterances: {}/{} ({:.1f}%)'.format(train_size, len(intent_data), 100 * train_size / len(intent_data)))
     p = Pipeline(intent_data)
     if output_file_path is not None:
         os.makedirs(output_file_path + '/' + name, exist_ok=True)

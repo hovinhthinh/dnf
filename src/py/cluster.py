@@ -3,6 +3,7 @@ from typing import List
 
 import numpy
 from scipy.optimize import linear_sum_assignment
+from sklearn.cluster._kmeans import _tolerance
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score, adjusted_mutual_info_score, \
     fowlkes_mallows_score
 
@@ -57,7 +58,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
         cl_root[rv].add(ru)
 
     ml_info = _get_ml_info(root_2_idx, dataset)
-    tol = _tolerance(tol, dataset)
+    tol = _tolerance(dataset, tol)
 
     centers = _initialize_centers(dataset, k, initialization)
 
@@ -91,7 +92,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
                     return None, None
 
         clusters_, centers_ = _compute_centers(clusters_, dataset, k, ml_info)
-        shift = sum(_l2_distance(centers[i], centers_[i]) for i in range(k))
+        shift = numpy.sum((centers - centers_) ** 2)
         if shift <= tol:
             break
 
@@ -102,16 +103,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
 
 
 def _l2_distance(point1, point2):
-    return sum([(float(i) - float(j)) ** 2 for (i, j) in zip(point1, point2)])
-
-
-# taken from scikit-learn (https://goo.gl/1RYPP5)
-def _tolerance(tol, dataset):
-    n = len(dataset)
-    dim = len(dataset[0])
-    averages = [sum(dataset[i][d] for i in range(n)) / float(n) for d in range(dim)]
-    variances = [sum((dataset[i][d] - averages[d]) ** 2 for i in range(n)) / float(n) for d in range(dim)]
-    return tol * sum(variances) / dim
+    return numpy.sum((point1 - point2) ** 2)
 
 
 def _closest_clusters(centers, datapoint):
@@ -153,27 +145,18 @@ def _compute_centers(clusters, dataset, k, ml_info):
     id_map = dict(zip(cluster_ids, range(k_new)))
     clusters = [id_map[x] for x in clusters]
 
-    dim = len(dataset[0])
-    centers = [[0.0] * dim for _ in range(k)]
-
-    counts = [0] * k_new
+    centers = numpy.zeros((k, len(dataset[0])))
+    counts = numpy.zeros((k_new))
     for j, c in enumerate(clusters):
-        for i in range(dim):
-            centers[c][i] += dataset[j][i]
+        centers[c] += dataset[j]
         counts[c] += 1
-
     for j in range(k_new):
-        for i in range(dim):
-            centers[j][i] = centers[j][i] / float(counts[j])
+        centers[j] /= counts[j]
 
     if k_new < k:
         ml_groups, ml_scores, ml_centroids = ml_info
-        current_scores = [sum(_l2_distance(centers[clusters[i]], dataset[i])
-                              for i in group)
-                          for group in ml_groups]
-        group_ids = sorted(range(len(ml_groups)),
-                           key=lambda x: current_scores[x] - ml_scores[x],
-                           reverse=True)
+        current_scores = [sum(_l2_distance(centers[clusters[i]], dataset[i]) for i in group) for group in ml_groups]
+        group_ids = sorted(range(len(ml_groups)), key=lambda x: current_scores[x] - ml_scores[x], reverse=True)
 
         for j in range(k - k_new):
             gid = group_ids[j]
@@ -187,18 +170,14 @@ def _compute_centers(clusters, dataset, k, ml_info):
 
 def _get_ml_info(root_2_idx, dataset):
     groups = list(root_2_idx.values())
-    dim = len(dataset[0])
-    centroids = [[0.0] * dim for _ in range(len(groups))]
+    centroids = numpy.zeros((len(groups), len(dataset[0])))
 
     for j, group in enumerate(groups):
-        for d in range(dim):
-            for i in group:
-                centroids[j][d] += dataset[i][d]
-            centroids[j][d] /= float(len(group))
+        for i in group:
+            centroids[j] += dataset[i]
+        centroids[j] /= float(len(group))
 
-    scores = [sum(_l2_distance(centroids[j], dataset[i])
-                  for i in groups[j])
-              for j in range(len(groups))]
+    scores = [sum(_l2_distance(centroids[j], dataset[i]) for i in group) for j, group in enumerate(groups)]
 
     return groups, scores, centroids
 
