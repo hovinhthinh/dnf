@@ -62,6 +62,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
     centers = _initialize_centers(dataset, k, initialization)
 
     for _ in range(max_iter):
+        print('\rCOP-KMeans iteration:', _, end='')
         clusters_ = [-1] * n
         for i, d in enumerate(dataset):
             if clusters_[i] == -1:
@@ -86,6 +87,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
                     counter += 1
 
                 if not found_cluster:
+                    print()
                     return None, None
 
         clusters_, centers_ = _compute_centers(clusters_, dataset, k, ml_info)
@@ -95,6 +97,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
 
         centers = centers_
 
+    print()
     return clusters_, centers_
 
 

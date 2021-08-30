@@ -75,7 +75,7 @@ class Pipeline(object):
             if k <= 0:
                 raise Exception('Invalid k={}'.format(k))
 
-            print('Clustering: ', method)
+            print('Clustering:', method)
 
             clusters, centers = cop_kmeans(dataset=embeddings, k=k, ml=ml, cl=cl)
 
