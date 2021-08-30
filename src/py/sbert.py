@@ -207,7 +207,7 @@ def fine_tune_classification(train_texts, train_labels,
         model=classifier,
         args=TrainingArguments(
             output_dir='./results',
-            num_train_epochs=1,
+            num_train_epochs=3,
             per_device_train_batch_size=32,
             per_device_eval_batch_size=8,
             warmup_steps=500,
