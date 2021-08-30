@@ -61,14 +61,12 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
     tol = _tolerance(dataset, tol)
 
     centers = _initialize_centers(dataset, k, initialization)
+    cls = [-1] * n
 
     for _ in range(max_iter):
         print('\rCOP-KMeans iteration:', _ + 1, end='')
-        ids = list(range(len(dataset)))
-        random.shuffle(ids)
         clusters_ = [-1] * n
-        for i in ids:
-            d = dataset[i]
+        for i, d in enumerate(dataset):
             if clusters_[i] == -1:
                 indices, _ = _closest_clusters(centers, d)
                 counter = 0
@@ -96,13 +94,24 @@ def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, to
 
         clusters_, centers_ = _compute_centers(clusters_, dataset, k, ml_info)
         shift = numpy.sum((centers - centers_) ** 2)
-        if shift <= tol:
+        if shift <= tol or _relabel(clusters_) == _relabel(cls):
             break
 
         centers = centers_
+        cls = clusters_
 
     print()
     return clusters_, centers_
+
+
+def _relabel(cls):
+    cluster_map = {}
+    cluster_count = 0
+    for c in cls:
+        if c not in cluster_map:
+            cluster_map[c] = cluster_count
+            cluster_count += 1
+    return [cluster_map[c] for c in cls]
 
 
 def _l2_distance(point1, point2):
