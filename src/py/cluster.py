@@ -207,13 +207,13 @@ def get_clustering_quality(labels_true, labels_pred):
 
 
 if __name__ == '__main__':
-    dataset = [
+    dataset = numpy.asarray([
         (1, 2),
         (1, 2),
         (1, 2),
         (4, 5),
         (5, 6)
-    ]
+    ])
     clusters, _ = cop_kmeans(dataset, 3, ml=[(0, 4), (1, 2), (0, 3)], cl=[(0, 2)])
 
     print(clusters)
