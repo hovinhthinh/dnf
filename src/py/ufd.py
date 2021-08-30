@@ -90,5 +90,5 @@ class Pipeline(object):
     def find_tune_pseudo_classification(self, k=None, precomputed_embeddings=None):
         pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map),
                                                    precomputed_embeddings=precomputed_embeddings)
-        print('Clustering quality before fine-tuning:', get_clustering_quality(p.get_true_clusters(), pseudo_clusters))
+        print('Clustering quality before fine-tuning:', get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
         sbert.fine_tune_classification([u[0] for u in self.utterances], pseudo_clusters)
