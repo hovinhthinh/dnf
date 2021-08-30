@@ -62,7 +62,7 @@ else:
 for name, intent_data in intra_intent_data:
     if name == 'BookRestaurant':
         continue
-    print('======== Intent:', name, '========')
+    print('======== Intra-intent:', name, '========')
     train_size = len([u for u in intent_data if u[2]])
     print('Training utterances: {}/{} ({:.1f}%)'.format(train_size, len(intent_data),
                                                         100 * train_size / len(intent_data)))
@@ -88,3 +88,29 @@ for name, intent_data in intra_intent_data:
           get_clustering_quality(p.get_true_clusters(), predicted_clusters))
 
 # Processing inter-intents
+inter_intent_data = [u for u in inter_intent_data if not u[1].startswith('BookRestaurant_')]
+
+print('======== Inter-intent ========')
+train_size = len([u for u in inter_intent_data if u[2]])
+print('Training utterances: {}/{} ({:.1f}%)'.format(train_size, len(inter_intent_data),
+                                                    100 * train_size / len(inter_intent_data)))
+p = Pipeline(inter_intent_data)
+if output_file_path is not None:
+    os.makedirs(output_file_path + '/inter-intent', exist_ok=True)
+
+sbert.load('./models/sentence-transformers.paraphrase-mpnet-base-v2')
+embeddings = p.get_embeddings()
+p.plot(title='inter-intent', show_labels=True, precomputed_embeddings=embeddings, plot_3d=False,
+       output_file_path=output_file_path + '/inter-intent' + '/0.pdf' if output_file_path is not None else None)
+for it in range(10):
+    print('Iter: #{}'.format(it + 1))
+    p.find_tune_pseudo_classification(precomputed_embeddings=embeddings)
+    embeddings = p.get_embeddings()
+    p.plot(title='inter-intent', show_labels=True, precomputed_embeddings=embeddings, plot_3d=False,
+           output_file_path=output_file_path + '/inter-intent' + '/{}.pdf'.format(it + 1)
+           if output_file_path is not None else None)
+
+predicted_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
+                                           precomputed_embeddings=embeddings)
+print('Clustering quality after fine-tuning:',
+      get_clustering_quality(p.get_true_clusters(), predicted_clusters))
