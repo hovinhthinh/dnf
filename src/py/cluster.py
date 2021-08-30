@@ -31,7 +31,7 @@ def _union(dad: List[int], root_u, root_v):
         dad[root_u] = root_v
 
 
-def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=300, tol=1e-4):
+def cop_kmeans(dataset, k, ml=[], cl=[], initialization='kmpp', max_iter=100, tol=1e-4):
     n = len(dataset)
     dad = [-1] * n
     for u, v in ml:
@@ -131,22 +131,22 @@ def _initialize_centers(dataset, k, method):
         return [dataset[i] for i in ids[:k]]
 
     elif method == 'kmpp':
-        chances = [1] * len(dataset)
+        chances_raw = numpy.asarray([1.0] * len(dataset))
         centers = []
-
-        for _ in range(k):
-            chances = [x / sum(chances) for x in chances]
+        for it in range(k):
+            chances = chances_raw / numpy.sum(chances_raw)
             r = random.random()
             acc = 0.0
             for index, chance in enumerate(chances):
-                if acc + chance >= r:
-                    break
                 acc += chance
+                if acc >= r:
+                    break
             centers.append(dataset[index])
 
             for index, point in enumerate(dataset):
-                cids, distances = _closest_clusters(centers, point)
-                chances[index] = distances[cids[0]]
+                d = _l2_distance(point, centers[-1])
+                if it == 0 or chances_raw[index] > d:
+                    chances_raw[index] = d
 
         return centers
 
