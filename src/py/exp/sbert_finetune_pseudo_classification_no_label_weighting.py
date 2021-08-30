@@ -50,7 +50,7 @@ if generate_data:
                 splitted_data.extend([(u['text'], c, False) for u in cluster_data])
 
         intra_intent_data.append((name, splitted_data))
-        inter_intent_data.append(
+        inter_intent_data.extend(
             [(text, data[0]['intent'] + '_' + cluster, is_train) for text, cluster, is_train in splitted_data])
 
     with open(output_file_path + '/data.json', 'w') as f:
@@ -60,10 +60,12 @@ else:
 
 # Processing intra-intents
 for name, intent_data in intra_intent_data:
-
+    if name == 'BookRestaurant':
+        continue
     print('======== Intent:', name, '========')
     train_size = len([u for u in intent_data if u[2]])
-    print('Training utterances: {}/{} ({:.1f}%)'.format(train_size, len(intent_data), 100 * train_size / len(intent_data)))
+    print('Training utterances: {}/{} ({:.1f}%)'.format(train_size, len(intent_data),
+                                                        100 * train_size / len(intent_data)))
     p = Pipeline(intent_data)
     if output_file_path is not None:
         os.makedirs(output_file_path + '/' + name, exist_ok=True)
