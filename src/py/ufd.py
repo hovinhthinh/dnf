@@ -26,13 +26,13 @@ def umap_plot(embeddings, labels, title=None, show_labels=False, plot_3d=False, 
     if title is not None:
         plt.title(title)
     if show_labels:
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
     plt.tight_layout()
 
     if output_file_path == None:
         plt.show()
     else:
-        plt.savefig(output_file_path)
+        plt.savefig(output_file_path, bbox_inches='tight')
     plt.close()
 
 
