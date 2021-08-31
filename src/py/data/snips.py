@@ -15,24 +15,6 @@ def get_utterances(input_file):
     return utterances
 
 
-def get_all_utterances_and_labels():
-    """
-    :return: List[tuple[utterance, cluster_index, is_train]]
-    """
-    input_files = ['data/snips/AddToPlaylist/train_AddToPlaylist_full.json',
-                   'data/snips/BookRestaurant/train_BookRestaurant_full.json',
-                   'data/snips/GetWeather/train_GetWeather_full.json',
-                   'data/snips/PlayMusic/train_PlayMusic_full.json',
-                   'data/snips/RateBook/train_RateBook_full.json',
-                   'data/snips/SearchCreativeWork/train_SearchCreativeWork_full.json',
-                   'data/snips/SearchCreativeWork/validate_SearchCreativeWork.json']
-
-    utterances_and_labels = []
-    for i, inp in enumerate(input_files):
-        utterances_and_labels.extend([(u, i, False) for u in get_utterances(inp)])
-    return utterances_and_labels
-
-
 def get_utterances_and_slots(input_file):
     """
     :param input_file:
@@ -730,7 +712,64 @@ def split_by_features_SearchScreeningEvent(output_file=None):
     )
 
 
+def get_train_test_data(generate_data=False):
+    """
+    :return: intra_intent_data: List[Tuple[utterance: str, cluster_label: any, is_train: bool]],
+    inter_intent_data: List[Tuple[intent_name, List]]
+    """
+    train_test_data_file = './data/snips/slot_based_clusters/train_test_data.json'
+
+    if generate_data:
+        intent_data = [
+            split_by_features_GetWeather(),
+            split_by_features_AddToPlaylist(),
+            split_by_features_RateBook(),
+            split_by_features_BookRestaurant(),
+            split_by_features_PlayMusic(),
+            split_by_features_SearchCreativeWork(),
+            split_by_features_SearchScreeningEvent()
+        ]
+
+        inter_intent_data = []
+        intra_intent_data = []
+        # Prepare data
+        for data in intent_data:
+            clusters = list(set([u['cluster'] for u in data]))
+            # Filter clusters with small size
+            clusters = [c for c in clusters if sum([1 for u in data if u['cluster'] == c]) >= 40]
+
+            # Random train clusters
+            random.shuffle(clusters)
+            train_clusters = clusters[0:int(len(clusters) * 0.6)]
+            print('Train/Test clusters:', train_clusters, clusters[int(len(clusters) * 0.6):])
+
+            # Split into train/test utterances
+            splitted_data = []
+            for c in clusters:
+                cluster_data = [u for u in data if u['cluster'] == c]
+
+                if c in train_clusters:
+                    random.shuffle(cluster_data)
+                    train_size = int(len(cluster_data) * 0.6)
+                    splitted_data.extend([(u['text'], c + '_T', True) for u in cluster_data[0:train_size]])
+                    splitted_data.extend([(u['text'], c + '_T', False) for u in cluster_data[train_size:]])
+                else:
+                    splitted_data.extend([(u['text'], c, False) for u in cluster_data])
+
+            intra_intent_data.append((data[0]['intent'], splitted_data))
+            inter_intent_data.extend(
+                [(text, data[0]['intent'] + '_' + cluster, is_train) for text, cluster, is_train in splitted_data])
+
+        # with open(train_test_data_file, 'w') as f:
+        #     f.write(json.dumps((intra_intent_data, inter_intent_data)))
+    else:
+        intra_intent_data, inter_intent_data = json.loads(open(train_test_data_file).read())
+
+    return intra_intent_data, inter_intent_data
+
+
 if __name__ == '__main__':
+    get_train_test_data()
     split_by_features_AddToPlaylist('data/snips/slot_based_clusters/AddToPlaylist.json')
     split_by_features_BookRestaurant('data/snips/slot_based_clusters/BookRestaurant.json')
     split_by_features_GetWeather('data/snips/slot_based_clusters/GetWeather.json')
