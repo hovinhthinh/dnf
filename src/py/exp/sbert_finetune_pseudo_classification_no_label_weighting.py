@@ -34,7 +34,7 @@ if generate_data:
         # Random train clusters
         random.shuffle(clusters)
         train_clusters = clusters[0:int(len(clusters) * 0.6)]
-        print('Train clusters:', train_clusters)
+        print('Train/Test clusters:', train_clusters, clusters[int(len(clusters) * 0.6):])
 
         # Split into train/test utterances
         splitted_data = []
