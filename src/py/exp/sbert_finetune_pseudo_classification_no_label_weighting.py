@@ -66,3 +66,14 @@ predicted_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
                                            precomputed_embeddings=embeddings)
 print('Clustering quality after fine-tuning:',
       get_clustering_quality(p.get_true_clusters(), predicted_clusters))
+
+# Apply back to intra-intent
+print('======== Apply back to intra-intent ========')
+for name, intent_data in intra_intent_data:
+    if name == 'BookRestaurant':
+        continue
+    print('======== Intent:', name, '========')
+    p = Pipeline(intent_data)
+    predicted_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map))
+    print('Clustering quality after fine-tuning:',
+          get_clustering_quality(p.get_true_clusters(), predicted_clusters))
