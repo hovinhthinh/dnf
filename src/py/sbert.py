@@ -1,3 +1,4 @@
+import random
 from typing import List
 
 import numpy
@@ -7,6 +8,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss, MSELoss
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer
+from transformers.modeling_outputs import SequenceClassifierOutput
 
 tokenizer = None
 model = None
@@ -104,13 +106,7 @@ class PseudoClassificationModel(nn.Module):
             self,
             input_ids=None,
             attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
             labels=None,
-            output_attentions=None,
-            output_hidden_states=None,
             return_dict=None,
     ):
         r"""
@@ -122,12 +118,12 @@ class PseudoClassificationModel(nn.Module):
         outputs = self.base_model(
             input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            output_attentions=None,
+            output_hidden_states=None,
             return_dict=return_dict,
         )
         logits = self.classifier(_mean_pooling(outputs, attention_mask))
@@ -159,7 +155,7 @@ class PseudoClassificationModel(nn.Module):
             output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
 
-        return ClassificationHead(
+        return SequenceClassifierOutput(
             loss=loss,
             logits=logits,
             hidden_states=outputs.hidden_states,
@@ -232,7 +228,7 @@ if __name__ == '__main__':
     load('sentence-transformers/paraphrase-mpnet-base-v2')
 
     print(type(get_embeddings(['This is an example sentence', 'Each sentence is converted'])))
-    train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] * 10, [1, 0, 1, 0, 1, 0, 1, 0] * 10
+    train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0]
     val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
 
     fine_tune_classification(train_texts, train_labels, val_texts, val_labels)
