@@ -98,3 +98,7 @@ class Pipeline(object):
         print('Pseudo-cluster quality:',
               get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
         sbert.fine_tune_classification([u[0] for u in self.utterances], pseudo_clusters)
+
+    def find_tune_utterance_similarity(self):
+        cluster_indices = [u[1] if u[2] else None for u in self.utterances]
+        sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices)

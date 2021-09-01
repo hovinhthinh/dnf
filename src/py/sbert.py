@@ -6,6 +6,7 @@ import torch
 from datasets import load_metric
 from torch import nn
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss, MSELoss
+from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer
 from transformers.modeling_outputs import SequenceClassifierOutput
@@ -57,6 +58,7 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
 
 
 class ClassificationDataset(torch.utils.data.Dataset):
+    # labels \in {0,1,2,3,...}
     def __init__(self, encodings, labels):
         self.encodings = encodings
         self.labels = labels
@@ -153,6 +155,7 @@ class PseudoClassificationModel(nn.Module):
 
         if not return_dict:
             output = (logits,) + outputs[2:]
+            # The first should be loss, used by trainer. The second should be logits, used by compute_metrics
             return ((loss,) + output) if loss is not None else output
 
         return SequenceClassifierOutput(
@@ -224,11 +227,175 @@ def fine_tune_classification(train_texts, train_labels,
         print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
 
 
+class UtteranceSimilarityDataset(torch.utils.data.Dataset):
+    # labels \in {-1,0,1,2,3,...}, -1 means unseen
+    def __init__(self, encodings, labels, unseen_negative_sampling_rate=0.5):
+        self.unseen_indices = []
+        self.n_seen_clusters = max(labels) + 1
+        self.n_seen_utterances = 0
+        self.seen_indices = [[] for _ in range(self.n_seen_clusters)]
+
+        for i, l in enumerate(labels):
+            if l != -1:
+                self.seen_indices[l].append(i)
+                self.n_seen_utterances += 1
+            else:
+                self.unseen_indices.append(i)
+
+        self.encodings = encodings
+        self.labels = labels
+
+        # Idx bound for each type of sample
+        self.pos_pair_bound = self.n_seen_utterances
+        self.neg_pair_bound = self.pos_pair_bound + (self.n_seen_utterances if self.n_seen_clusters > 1 else 0)
+        self.unseen_neg_pair_bound = self.neg_pair_bound + (int(
+            self.n_seen_utterances * unseen_negative_sampling_rate) if len(self.unseen_indices) > 0 else 0)
+
+    def _get_positive_pair(self, idx):
+        for c in self.seen_indices:
+            if idx >= len(c):
+                idx -= len(c)
+            else:
+                return c[idx], random.choice(c)
+        raise Exception('Invalid idx')
+
+    def _get_negative_pair(self, idx):
+        for cpos_idx, cpos in enumerate(self.seen_indices):
+            if idx >= len(cpos):
+                idx -= len(cpos)
+            else:
+                idx2 = random.randrange(self.n_seen_utterances - len(cpos))
+                for cneg_idx, cneg in enumerate(self.seen_indices):
+                    if cneg_idx == cpos_idx:
+                        continue
+                    if idx2 >= len(cneg):
+                        idx2 -= len(cneg)
+                    else:
+                        return cpos[idx], cneg[idx2]
+                raise Exception('Less than two clusters')
+        raise Exception('Invalid idx')
+
+    def _get_unseen_negative_pair(self):
+        idx = random.randrange(self.n_seen_utterances)
+        for cpos in self.seen_indices:
+            if idx >= len(cpos):
+                idx -= len(cpos)
+            else:
+                return cpos[idx], random.choice(self.unseen_indices)
+        raise Exception('Invalid idx')
+
+    def __getitem__(self, idx):
+        item = {}
+        if idx < self.pos_pair_bound:  # positive intra-cluster sample
+            idx, idx2 = self._get_positive_pair(idx)
+            item['labels'] = 1.0
+        elif idx < self.neg_pair_bound:  # negative inter-cluster sample
+            idx, idx2 = self._get_negative_pair(idx - self.pos_pair_bound)
+            item['labels'] = -1.0
+        else:  # negative sample with unseen data
+            idx, idx2 = self._get_unseen_negative_pair()
+            item['labels'] = -1.0
+
+        for key, val in self.encodings.items():
+            item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
+
+        return item
+
+    def __len__(self):
+        return self.unseen_neg_pair_bound
+
+
+class UtteranceSimilarityModel(nn.Module):
+    def __init__(self, base_model):
+        super().__init__()
+        self.config = base_model.config
+        self.base_model = base_model
+
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            labels=None,
+    ):
+        input_ids_0, attention_mask_0 = input_ids[:, 0, :], attention_mask[:, 0, :]
+        input_ids_1, attention_mask_1 = input_ids[:, 1, :], attention_mask[:, 1, :]
+        first_outputs = _mean_pooling(self.base_model(input_ids_0, attention_mask=attention_mask_0),
+                                      attention_mask_0)
+        second_outputs = _mean_pooling(self.base_model(input_ids_1, attention_mask=attention_mask_1),
+                                       attention_mask_1)
+        loss_fct = MSELoss()
+        loss = loss_fct(cosine_similarity(first_outputs, second_outputs), labels)
+
+        return (loss,)
+
+
+# labels: None means unseen
+def fine_tune_utterance_similarity(train_texts, train_labels,
+                                   val_texts=None, val_labels=None, test_texts=None, test_labels=None):
+    label_set = set(train_labels)
+    if val_labels is not None:
+        label_set.update(val_labels)
+    if test_labels is not None:
+        label_set.update(test_labels)
+
+    label_map = {None: -1}
+    label_count = 0
+    for l in label_set:
+        if l != None:
+            label_map[l] = label_count
+            label_count += 1
+
+    train_labels = [label_map[l] for l in train_labels]
+    if val_labels is not None:
+        val_labels = [label_map[l] for l in val_labels]
+    if test_labels is not None:
+        test_labels = [label_map[l] for l in test_labels]
+
+    train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
+    val_encodings = tokenizer(val_texts, truncation=True, padding=True,
+                              return_tensors='pt') if val_texts is not None else None
+    test_encodings = tokenizer(test_texts, truncation=True, padding=True,
+                               return_tensors='pt') if test_texts is not None else None
+
+    train_dataset = UtteranceSimilarityDataset(train_encodings, train_labels)
+    val_dataset = UtteranceSimilarityDataset(val_encodings, val_labels) if val_texts is not None else None
+    test_dataset = UtteranceSimilarityDataset(test_encodings, test_labels) if test_texts is not None else None
+
+    estimator = UtteranceSimilarityModel(model)
+
+    # print(classifier(**train_encodings))
+
+    trainer = Trainer(
+        model=estimator,
+        args=TrainingArguments(
+            output_dir='./results',
+            num_train_epochs=3,
+            per_device_train_batch_size=32,
+            per_device_eval_batch_size=8,
+            warmup_steps=500,
+            weight_decay=0.01,
+            logging_dir='./logs',
+            evaluation_strategy='epoch' if val_dataset is not None else 'no'
+        ),
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
+    )
+    if test_dataset is not None:
+        print('Evaluate test_dataset (before):', trainer.evaluate(test_dataset))
+
+    trainer.train()
+
+    if test_dataset is not None:
+        print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
+
+
 if __name__ == '__main__':
     load('sentence-transformers/paraphrase-mpnet-base-v2')
 
-    print(type(get_embeddings(['This is an example sentence', 'Each sentence is converted'])))
-    train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0]
-    val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
+    # train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0]
+    # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
+    # fine_tune_classification(train_texts, train_labels, val_texts, val_labels)
 
-    fine_tune_classification(train_texts, train_labels, val_texts, val_labels)
+    # train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, None, None]
+    # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
+    # fine_tune_utterance_similarity(train_texts, train_labels)
