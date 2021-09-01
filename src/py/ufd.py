@@ -45,10 +45,13 @@ class Pipeline(object):
     def get_embeddings(self):
         return sbert.get_embeddings([u[0] for u in self.utterances])
 
-    def get_true_clusters(self):
-        return [self.cluster_label_2_index_map[u[1]] for u in self.utterances]
+    def get_true_clusters(self, test_only=False):
+        if test_only:
+            return [self.cluster_label_2_index_map[u[1]] for u in self.utterances if not u[2]]
+        else:
+            return [self.cluster_label_2_index_map[u[1]] for u in self.utterances]
 
-    def get_pseudo_clusters(self, method='cop-kmeans', k=-1, precomputed_embeddings=None):
+    def get_pseudo_clusters(self, method='cop-kmeans', k=-1, precomputed_embeddings=None, test_only=False):
         train_clusters = [[] for _ in range(len(self.cluster_label_2_index_map))]
         for i, (_, j, t) in enumerate(self.utterances):
             if t:
@@ -78,6 +81,8 @@ class Pipeline(object):
 
             clusters, centers = cop_kmeans(dataset=embeddings, k=k, ml=ml, cl=cl)
 
+            if test_only:
+                clusters = [c for i, c in enumerate(clusters) if not self.utterances[i][2]]
             return clusters
         else:
             raise Exception('Method {} not supported'.format(method))
@@ -90,5 +95,6 @@ class Pipeline(object):
     def find_tune_pseudo_classification(self, k=None, precomputed_embeddings=None):
         pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map),
                                                    precomputed_embeddings=precomputed_embeddings)
-        print('Clustering quality before fine-tuning:', get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
+        print('Pseudo-cluster quality:',
+              get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
         sbert.fine_tune_classification([u[0] for u in self.utterances], pseudo_clusters)

@@ -26,6 +26,10 @@ for name, intent_data in intra_intent_data:
     embeddings = p.get_embeddings()
     p.plot(title=name, show_labels=True, precomputed_embeddings=embeddings, plot_3d=False,
            output_file_path=output_file_path + '/' + name + '/0.pdf' if output_file_path is not None else None)
+    print('Clustering quality before fine-tuning:',
+          get_clustering_quality(p.get_true_clusters(test_only=True),
+                                 p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
+                                                       precomputed_embeddings=embeddings, test_only=True)))
     for it in range(10):
         print('Iter: #{}'.format(it + 1))
         p.find_tune_pseudo_classification(precomputed_embeddings=embeddings)
@@ -34,10 +38,10 @@ for name, intent_data in intra_intent_data:
                output_file_path=output_file_path + '/' + name + '/{}.pdf'.format(it + 1)
                if output_file_path is not None else None)
 
-    predicted_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
-                                               precomputed_embeddings=embeddings)
     print('Clustering quality after fine-tuning:',
-          get_clustering_quality(p.get_true_clusters(), predicted_clusters))
+          get_clustering_quality(p.get_true_clusters(test_only=True),
+                                 p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
+                                                       precomputed_embeddings=embeddings, test_only=True)))
 
 # Processing inter-intents
 inter_intent_data = [u for u in inter_intent_data if not u[1].startswith('BookRestaurant_')]
@@ -54,6 +58,10 @@ sbert.load('./models/sentence-transformers.paraphrase-mpnet-base-v2')
 embeddings = p.get_embeddings()
 p.plot(title='inter-intent', show_labels=True, precomputed_embeddings=embeddings, plot_3d=False,
        output_file_path=output_file_path + '/inter-intent' + '/0.pdf' if output_file_path is not None else None)
+print('Clustering quality before fine-tuning:',
+      get_clustering_quality(p.get_true_clusters(test_only=True),
+                             p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
+                                                   precomputed_embeddings=embeddings, test_only=True)))
 for it in range(10):
     print('Iter: #{}'.format(it + 1))
     p.find_tune_pseudo_classification(precomputed_embeddings=embeddings)
@@ -62,10 +70,10 @@ for it in range(10):
            output_file_path=output_file_path + '/inter-intent' + '/{}.pdf'.format(it + 1)
            if output_file_path is not None else None)
 
-predicted_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
-                                           precomputed_embeddings=embeddings)
 print('Clustering quality after fine-tuning:',
-      get_clustering_quality(p.get_true_clusters(), predicted_clusters))
+      get_clustering_quality(p.get_true_clusters(test_only=True),
+                             p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map),
+                                                   precomputed_embeddings=embeddings, test_only=True)))
 
 # Apply back to intra-intent
 print('======== Apply back to intra-intent ========')
@@ -74,6 +82,6 @@ for name, intent_data in intra_intent_data:
         continue
     print('======== Intent:', name, '========')
     p = Pipeline(intent_data)
-    predicted_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map))
     print('Clustering quality after fine-tuning:',
-          get_clustering_quality(p.get_true_clusters(), predicted_clusters))
+          get_clustering_quality(p.get_true_clusters(test_only=True),
+                                 p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map), test_only=True)))
