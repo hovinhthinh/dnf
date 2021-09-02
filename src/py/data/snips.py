@@ -741,7 +741,6 @@ def get_train_test_data(generate_data=False):
             # Random train clusters
             random.shuffle(clusters)
             train_clusters = clusters[0:int(len(clusters) * 0.6)]
-            print('Train/Test clusters:', train_clusters, clusters[int(len(clusters) * 0.6):])
 
             # Split into train/test utterances
             splitted_data = []
@@ -764,6 +763,20 @@ def get_train_test_data(generate_data=False):
         #     f.write(json.dumps((intra_intent_data, inter_intent_data)))
     else:
         intra_intent_data, inter_intent_data = json.loads(open(train_test_data_file).read())
+
+    print('======== Cluster information ========')
+    for name, cluster_data in intra_intent_data:
+        print("====", name)
+        clusters = set(u[1] for u in cluster_data)
+        train_clusters = []
+        test_clusters = []
+        for c in clusters:
+            if c.endswith('_T'):
+                train_clusters.append(c)
+            else:
+                test_clusters.append(c)
+        print('Train:', train_clusters)
+        print('Test:', test_clusters)
 
     return intra_intent_data, inter_intent_data
 
