@@ -196,10 +196,10 @@ def _get_ml_info(root_2_idx, dataset):
 
 def get_clustering_quality(labels_true, labels_pred):
     quality = {
-        'NMI': normalized_mutual_info_score(labels_true, labels_pred),
-        'ARI': adjusted_rand_score(labels_true, labels_pred),
-        'AMI': adjusted_mutual_info_score(labels_true, labels_pred),
-        'FMI': fowlkes_mallows_score(labels_true, labels_pred),
+        'NMI': round(normalized_mutual_info_score(labels_true, labels_pred), 3),
+        'ARI': round(adjusted_rand_score(labels_true, labels_pred), 3),
+        'AMI': round(adjusted_mutual_info_score(labels_true, labels_pred), 3),
+        'FMI': round(fowlkes_mallows_score(labels_true, labels_pred), 3),
     }
 
     # Accuracy
@@ -213,7 +213,7 @@ def get_clustering_quality(labels_true, labels_pred):
                     [x for x, _ in enumerate(labels_pred) if _ == v]))
 
     row_ind, col_ind = linear_sum_assignment(cost_matrix, maximize=True)
-    quality['ACC'] = cost_matrix[row_ind, col_ind].sum() / len(labels_true)
+    quality['ACC'] = round(cost_matrix[row_ind, col_ind].sum() / len(labels_true), 3)
 
     return quality
 
