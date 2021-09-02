@@ -820,7 +820,7 @@ def get_train_test_data(generate_data=False, use_dev=True):
             print('Dev:', dev_clusters)
         print('Test:', test_clusters)
 
-        if len(train_clusters) < 2 or len(test_clusters) < 2 or (use_dev and len(dev_clusters) < 2):
+        if len(train_clusters) < 1 or len(test_clusters) < 1 or (use_dev and len(dev_clusters) < 1):
             print('Ignore this intent for intra-intent setting')
         else:
             intra_intent_data_filtered.append((intent_name, cluster_data))
