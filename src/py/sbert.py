@@ -331,7 +331,8 @@ class UtteranceSimilarityModel(nn.Module):
 
 # labels: None means unseen
 def fine_tune_utterance_similarity(train_texts, train_labels,
-                                   val_texts=None, val_labels=None, test_texts=None, test_labels=None):
+                                   val_texts=None, val_labels=None, test_texts=None, test_labels=None,
+                                   n_train_epochs=10, unseen_negative_sampling_rate=0.5):
     label_set = set(train_labels)
     if val_labels is not None:
         label_set.update(val_labels)
@@ -357,9 +358,12 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
     test_encodings = tokenizer(test_texts, truncation=True, padding=True,
                                return_tensors='pt') if test_texts is not None else None
 
-    train_dataset = UtteranceSimilarityDataset(train_encodings, train_labels)
-    val_dataset = UtteranceSimilarityDataset(val_encodings, val_labels) if val_texts is not None else None
-    test_dataset = UtteranceSimilarityDataset(test_encodings, test_labels) if test_texts is not None else None
+    train_dataset = UtteranceSimilarityDataset(train_encodings, train_labels,
+                                               unseen_negative_sampling_rate=unseen_negative_sampling_rate)
+    val_dataset = UtteranceSimilarityDataset(val_encodings, val_labels,
+                                             unseen_negative_sampling_rate=unseen_negative_sampling_rate) if val_texts is not None else None
+    test_dataset = UtteranceSimilarityDataset(test_encodings, test_labels,
+                                              unseen_negative_sampling_rate=unseen_negative_sampling_rate) if test_texts is not None else None
 
     estimator = UtteranceSimilarityModel(model)
 
@@ -369,7 +373,7 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
         model=estimator,
         args=TrainingArguments(
             output_dir='./results',
-            num_train_epochs=3,
+            num_train_epochs=n_train_epochs,
             per_device_train_batch_size=32,
             per_device_eval_batch_size=8,
             warmup_steps=500,
