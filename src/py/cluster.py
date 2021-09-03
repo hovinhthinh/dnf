@@ -198,8 +198,8 @@ def get_clustering_quality(labels_true, labels_pred):
     quality = {
         'NMI': round(normalized_mutual_info_score(labels_true, labels_pred), 3),
         'ARI': round(adjusted_rand_score(labels_true, labels_pred), 3),
-        'AMI': round(adjusted_mutual_info_score(labels_true, labels_pred), 3),
-        'FMI': round(fowlkes_mallows_score(labels_true, labels_pred), 3),
+        # 'AMI': round(adjusted_mutual_info_score(labels_true, labels_pred), 3),
+        # 'FMI': round(fowlkes_mallows_score(labels_true, labels_pred), 3),
     }
 
     # Accuracy
