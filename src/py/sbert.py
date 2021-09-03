@@ -342,7 +342,7 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
     label_map = {None: -1}
     label_count = 0
     for l in label_set:
-        if l != None:
+        if l is not None:
             label_map[l] = label_count
             label_count += 1
 
