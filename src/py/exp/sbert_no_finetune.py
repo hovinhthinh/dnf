@@ -9,7 +9,7 @@ output_file_path = './reports/snips_no_finetune'
 if output_file_path is not None:
     os.makedirs(output_file_path, exist_ok=True)
 
-sbert.load('sentence-transformers/paraphrase-mpnet-base-v2')
+sbert.load()
 
 intent_data = [
     (snips.split_by_features_GetWeather(), '/intra_intent_GetWeather.pdf', 'intra_intent_GetWeather'),

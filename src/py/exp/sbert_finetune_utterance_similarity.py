@@ -19,7 +19,7 @@ for name, intent_data in intra_intent_data:
     if output_file_path is not None:
         os.makedirs(output_file_path + '/' + name, exist_ok=True)
 
-    sbert.load('./models/sentence-transformers.paraphrase-mpnet-base-v2')
+    sbert.load()
     embeddings = p.get_embeddings()
     p.plot(title=name, precomputed_embeddings=embeddings, plot_3d=False,
            output_file_path=output_file_path + '/' + name + '/0.pdf' if output_file_path is not None else None)
@@ -51,7 +51,7 @@ p = Pipeline(inter_intent_data)
 if output_file_path is not None:
     os.makedirs(output_file_path + '/inter-intent', exist_ok=True)
 
-sbert.load('./models/sentence-transformers.paraphrase-mpnet-base-v2')
+sbert.load()
 embeddings = p.get_embeddings()
 p.plot(title='inter-intent', precomputed_embeddings=embeddings, plot_3d=False,
        output_file_path=output_file_path + '/inter-intent' + '/0.pdf' if output_file_path is not None else None)
