@@ -93,6 +93,9 @@ class Pipeline(object):
 
         self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([j for (_, j, _) in self.utterances])))
 
+        self.embeddings = None
+        self.test_embeddings = None
+
         # Label plotting order
         self.label_plotting_order = []
         for u in [u[1] for u in utterances if u[2] == 'TRAIN'] \
@@ -107,11 +110,15 @@ class Pipeline(object):
         self.label_plotting_order = [(l, ax.scatter([], []).get_facecolor()[0]) for l in self.label_plotting_order]
         plt.close()
 
-    def get_embeddings(self, utterances: List[str] = None):
-        return sbert.get_embeddings([u[0] for u in self.utterances] if utterances is None else utterances)
+    def update_embeddings(self):
+        self.embeddings = sbert.get_embeddings([u[0] for u in self.utterances])
 
-    def get_test_embeddings(self):
-        return sbert.get_embeddings([u[0] for u in self.test_utterances])
+    def update_test_embeddings(self, reuse_from_train_dev=True):
+        if self.use_dev or self.embeddings is None or not reuse_from_train_dev:
+            self.test_embeddings = sbert.get_embeddings([u[0] for u in self.test_utterances])
+        else:
+            indices = [i for i, u in enumerate(self.utterances) if u[2] == 'TEST']
+            self.test_embeddings = self.embeddings[indices]
 
     def get_true_clusters(self, including_train=True):
         if including_train:
@@ -119,8 +126,7 @@ class Pipeline(object):
         else:
             return [self.cluster_label_2_index_map[u[1]] for u in self.utterances if u[2] != 'TRAIN']
 
-    # precomputed_embeddings is for train/dev only
-    def get_pseudo_clusters(self, method='cop-kmeans', k=-1, precomputed_embeddings=None, including_train=True):
+    def get_pseudo_clusters(self, method='cop-kmeans', k=-1, including_train=True):
         train_clusters = [[] for _ in range(len(self.cluster_label_2_index_map))]
         for i, (_, j, t) in enumerate(self.utterances):
             if t == 'TRAIN':
@@ -140,15 +146,13 @@ class Pipeline(object):
                     continue
                 cl.append((train_clusters[i][0], train_clusters[j][0]))
 
-        embeddings = precomputed_embeddings if precomputed_embeddings is not None else self.get_embeddings()
-
         if method == 'cop-kmeans':
             if k <= 0:
                 raise Exception('Invalid k={}'.format(k))
 
             print('Clustering:', method)
 
-            clusters, centers = cop_kmeans(dataset=embeddings, k=k, ml=ml, cl=cl)
+            clusters, centers = cop_kmeans(dataset=self.embeddings, k=k, ml=ml, cl=cl)
 
             if not including_train:
                 clusters = [c for i, c in enumerate(clusters) if self.utterances[i][2] != 'TRAIN']
@@ -156,40 +160,23 @@ class Pipeline(object):
         else:
             raise Exception('Method {} not supported'.format(method))
 
-    # precomputed_embeddings is for train/dev only
     def plot(self, show_train_dev_only=False, show_test_only=False, show_labels=True, show_sample_type=True,
-             precomputed_embeddings=None, precomputed_test_embeddings=None, plot_3d=False,
-             output_file_path=None):
+             plot_3d=False, output_file_path=None):
         if show_train_dev_only:
-            embeddings = precomputed_embeddings if precomputed_embeddings is not None else self.get_embeddings()
             labels = [u[1] for u in self.utterances]
             sample_type = [u[2] for u in self.utterances]
-            umap_plot(embeddings, labels, sample_type if show_sample_type else None,
+            umap_plot(self.embeddings, labels, sample_type if show_sample_type else None,
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
                       label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
         elif show_test_only:
-            if self.use_dev or precomputed_embeddings is None:
-                test_embeddings = precomputed_test_embeddings if precomputed_test_embeddings is not None \
-                    else self.get_test_embeddings()
-            else:
-                indices = [i for i, u in enumerate(self.utterances) if u[2] == 'TEST']
-                test_embeddings = precomputed_embeddings[indices]
-
             test_labels = [u[1] for u in self.test_utterances]
 
-            umap_plot(test_embeddings, test_labels, title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
+            umap_plot(self.test_embeddings, test_labels, title=self.dataset_name, show_labels=show_labels,
+                      plot_3d=plot_3d,
                       label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
         else:
-            train_dev_embeddings = precomputed_embeddings if precomputed_embeddings is not None else self.get_embeddings()
-
-            # Compute test_embeddings only when use_dev is True, otherwise it has been already included in train_dev_embeddings
-            if self.use_dev:
-                test_embeddings = precomputed_test_embeddings if precomputed_test_embeddings is not None \
-                    else self.get_test_embeddings()
-            else:
-                test_embeddings = numpy.ndarray((0, train_dev_embeddings.shape[1]))
-
-            embeddings = numpy.concatenate([train_dev_embeddings, test_embeddings])
+            embeddings = numpy.concatenate([self.embeddings, self.test_embeddings if self.use_dev else numpy.ndarray(
+                (0, self.embeddings.shape[1]))])
 
             labels = [u[1] for u in self.utterances] + ([u[1] for u in self.test_utterances] if self.use_dev else [])
             sample_type = [u[2] for u in self.utterances] + (
@@ -199,42 +186,48 @@ class Pipeline(object):
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
                       label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
 
-    def find_tune_pseudo_classification(self, k=None, precomputed_embeddings=None):
-        pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map),
-                                                   precomputed_embeddings=precomputed_embeddings)
+    def find_tune_pseudo_classification(self, k=None):
+        pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map))
         print('Pseudo-cluster quality:',
               get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
         sbert.fine_tune_classification([u[0] for u in self.utterances], pseudo_clusters)
 
-    def find_tune_utterance_similarity(self):
+    def find_tune_utterance_similarity(self, n_train_epochs=10):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
-        sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices)
+        sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices,
+                                             n_train_epochs=n_train_epochs)
 
-    def get_test_quality(self, precomputed_test_embedding=None):
-        test_cluster_label_2_index_map = dict(
-            (n, i) for i, n in enumerate(set([j for (_, j, _) in self.test_utterances])))
-        test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
+    def get_test_clustering_quality(self, k=None):
+        if self.use_dev:
+            # Use KMeans. we haven't seen the testing utterances yet, so we use normal KMeans here.
+            # The model is fully trained, and we don't want to touch the train set anymore.
+            test_cluster_label_2_index_map = dict(
+                (l, i) for i, l in enumerate(set([u[1] for u in self.test_utterances])))
+            test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
 
-        test_embeddings = precomputed_test_embedding if precomputed_test_embedding is not None \
-            else self.get_test_embeddings()
-        test_predicted_clusters = KMeans(n_clusters=len(test_cluster_label_2_index_map)).fit(test_embeddings).labels_
+            test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map)) \
+                .fit(self.test_embeddings).labels_
 
-        return get_clustering_quality(test_true_clusters, test_predicted_clusters)
+            return get_clustering_quality(test_true_clusters, test_predicted_clusters)
+        else:
+            # Use COP-KMeans. In this setting, we cluster the testing set, coupling with constraints from the train set.
+            # So we use COP-KMeans here, which is similar to pseudo-classification.
+            test_predicted_clusters = self.get_pseudo_clusters(
+                k=k if k is not None else len(self.cluster_label_2_index_map), including_train=False)
+            return get_clustering_quality(self.get_true_clusters(including_train=False), test_predicted_clusters)
+
+        # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
 
     def run(self, report_folder=None, steps=[
-        'test-no-finetune',
-        'finetune-utterance-similarity'
-        'test-utterance-similarity',
+        'no-finetune',
+        'finetune-utterance-similarity',
         'finetune-pseudo-classification',
-        'test-pseudo-classification',
     ]):
         for s in steps:
             if s not in [
-                'test-no-finetune',
-                'finetune-utterance-similarity'
-                'test-utterance-similarity',
+                'no-finetune',
+                'finetune-utterance-similarity',
                 'finetune-pseudo-classification',
-                'test-pseudo-classification',
             ]:
                 raise Exception('Invalid step name:', s)
 
@@ -245,33 +238,100 @@ class Pipeline(object):
             os.makedirs(report_folder, exist_ok=True)
             stats_file = open(os.path.join(report_folder, 'stats.txt'), 'w')
 
-        if 'test-no-finetune' in steps:
+        if 'no-finetune' in steps:
+            print('==================== Step: no-finetune ====================')
             folder = None
             if report_folder is not None:
                 folder = os.path.join(report_folder, 'no-finetune')
                 os.makedirs(folder, exist_ok=True)
-            train_dev_embeddings = self.get_embeddings()
-            test_embeddings = self.get_test_embeddings()
-            self.plot(show_train_dev_only=True, plot_3d=False,
-                      precomputed_embeddings=train_dev_embeddings,
-                      output_file_path=os.path.join(folder, 'train-dev.pdf') if folder is not None else None)
-            self.plot(plot_3d=False,
-                      precomputed_embeddings=train_dev_embeddings, precomputed_test_embeddings=test_embeddings,
-                      output_file_path=os.path.join(folder, 'train-dev-test.pdf') if folder is not None else None)
 
-            test_quality = self.get_test_quality(precomputed_test_embedding=test_embeddings)
+            # Testing
+            self.update_embeddings()
+            self.update_test_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
+            self.plot(output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+
+            test_quality = self.get_test_clustering_quality()
             print('No-finetune test quality:', test_quality)
             if stats_file is not None:
                 stats_file.write('No-finetune test quality: {}\n'.format(test_quality))
 
         if 'finetune-utterance-similarity' in steps:
-            pass
-        if 'test-utterance-similarity' in steps:
-            pass
+            print(
+                '==================== Step: finetune-utterance-similarity ====================')
+            folder = None
+            if report_folder is not None:
+                folder = os.path.join(report_folder, 'finetune-utterance-similarity')
+                os.makedirs(folder, exist_ok=True)
+
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
+            print('Clustering DEV(unseen) before fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)))
+            # Fine-tuning. Here we train 3 times, each with 3 epochs. We can also train once with more epochs, however
+            # we want to track the quality after each epoch.
+            for it in range(3):
+                print('Epoch: #{}'.format((it + 1) * 3))
+                self.find_tune_utterance_similarity(n_train_epochs=3)
+                self.update_embeddings()
+                self.plot(show_train_dev_only=True,
+                          output_file_path=os.path.join(folder,
+                                                        '{}.pdf'.format((it + 1) * 3)) if folder is not None else None)
+
+            print('Clustering DEV(unseen) after fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)))
+
+            # Testing
+            self.update_test_embeddings()
+            self.plot(output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+
+            test_quality = self.get_test_clustering_quality()
+            print('Finetune-utterance-similarity test quality:', test_quality)
+            if stats_file is not None:
+                stats_file.write('Finetune-utterance-similarity test quality: {}\n'.format(test_quality))
+
         if 'finetune-pseudo-classification' in steps:
-            pass
-        if 'test-pseudo-classification' in steps:
-            pass
+            print('==================== Step: finetune-pseudo-classification ====================')
+            folder = None
+            if report_folder is not None:
+                folder = os.path.join(report_folder, 'finetune-pseudo-classification')
+                os.makedirs(folder, exist_ok=True)
+
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
+            print('Clustering DEV(unseen) before fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)))
+            # Fine-tuning
+            for it in range(10):
+                print('Iter: #{}'.format(it + 1))
+                self.find_tune_pseudo_classification()
+                self.update_embeddings()
+                self.plot(show_train_dev_only=True,
+                          output_file_path=os.path.join(folder,
+                                                        '{}.pdf'.format(it + 1)) if folder is not None else None)
+
+            print('Clustering DEV(unseen) after fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)))
+
+            # Testing
+            self.update_test_embeddings()
+            self.plot(output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+
+            test_quality = self.get_test_clustering_quality()
+            print('Finetune-pseudo-classification test quality:', test_quality)
+            if stats_file is not None:
+                stats_file.write('Finetune-pseudo-classification test quality: {}\n'.format(test_quality))
 
         if stats_file is not None:
             stats_file.close()
