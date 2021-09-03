@@ -1,50 +1,51 @@
 import os
 
-import sbert
-from cluster import get_clustering_quality
 from data import snips
+from data.snips import print_train_dev_test_stats
 from ufd import Pipeline
 
-output_file_path = './reports/snips_no_finetune'
-if output_file_path is not None:
-    os.makedirs(output_file_path, exist_ok=True)
+report_folder = './reports/global/snips_no_finetune/'
 
-sbert.load()
+intra_intent_data, inter_intent_data = snips.get_train_test_data(use_dev=True)
 
-intent_data = [
-    (snips.split_by_features_GetWeather(), '/intra_intent_GetWeather.pdf', 'intra_intent_GetWeather'),
-    (snips.split_by_features_AddToPlaylist(), '/intra_intent_AddToPlaylist.pdf', 'intra_intent_AddToPlaylist'),
-    (snips.split_by_features_RateBook(), '/intra_intent_RateBook.pdf', 'intra_intent_RateBook'),
-    (snips.split_by_features_BookRestaurant(), '/intra_intent_BookRestaurant.pdf', 'intra_intent_BookRestaurant'),
-    (snips.split_by_features_PlayMusic(), '/intra_intent_PlayMusic.pdf', 'intra_intent_PlayMusic'),
-    (snips.split_by_features_SearchCreativeWork(), '/intra_intent_SearchCreativeWork.pdf',
-     'intra_intent_SearchCreativeWork'),
-    (snips.split_by_features_SearchScreeningEvent(), '/intra_intent_SearchScreeningEvent.pdf',
-     'intra_intent_SearchScreeningEvent'),
+pipeline_steps = [
+    'no-finetune',
+    # 'finetune-utterance-similarity',
+    # 'finetune-pseudo-classification',
 ]
 
-# inter-intent
-inter_intent_data = []
-for data, output, title in intent_data:
-    for u in data:
-        inter_intent_data.append((u['text'], u['intent'], False))
-p = Pipeline(inter_intent_data)
-embeddings = p.get_embeddings()
-p.plot(precomputed_embeddings=embeddings, show_labels=True,
-       output_file_path=output_file_path + '/inter_intent.pdf', title='inter intent')
+# Processing intra-intents
+for intent_name, intent_data in intra_intent_data:
+    print('======================================== Intra-intent:', intent_name,
+          '========================================')
+    print_train_dev_test_stats(intent_data)
+    p = Pipeline(intent_data, dataset_name=intent_name)
+    intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
+    p.run(report_folder=intent_report_folder, steps=pipeline_steps)
 
-sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map), precomputed_embeddings=embeddings)
-print('Inter-intent clustering-metrics:', get_clustering_quality(p.get_true_clusters(), sbert_clusters))
+# Processing inter-intents
+print('======================================== Inter-intent ======================================')
+print_train_dev_test_stats(inter_intent_data)
+p = Pipeline(inter_intent_data, dataset_name='inter-intent')
+intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
+p.run(report_folder=intent_report_folder, steps=pipeline_steps)
 
-# intra-intent
-for data, output, title in intent_data:
-    snips_data = []
-    for u in data:
-        snips_data.append((u['text'], u['cluster'], False))
-    p = Pipeline(snips_data)
-    embeddings = p.get_embeddings()
-    p.plot(precomputed_embeddings=embeddings, show_labels=True, output_file_path=output_file_path + output, title=title)
+# Apply back to intra-intent
+print('======== Apply inter-intent model back to intra-intent ========')
 
-    sbert_clusters = p.get_pseudo_clusters(k=len(p.cluster_label_2_index_map), precomputed_embeddings=embeddings)
-    print('Intra-intent clustering-metrics -', title, ':',
-          get_clustering_quality(p.get_true_clusters(), sbert_clusters))
+stats_file = None
+if report_folder is not None:
+    os.makedirs(report_folder, exist_ok=True)
+    stats_file = open(os.path.join(report_folder, 'stats.txt'), 'w')
+    stats_file.write('======== Apply inter-intent model back to intra-intent ========\n')
+
+for intent_name, intent_data in intra_intent_data:
+    p = Pipeline(intent_data)
+    p.update_test_embeddings()
+    test_quality = p.get_test_clustering_quality()
+    print('Clustering test quality [{}]: {}'.format(intent_name, test_quality))
+    if stats_file is not None:
+        stats_file.write('Clustering test quality [{}]: {}\n'.format(intent_name, test_quality))
+
+if stats_file is not None:
+    stats_file.close()
