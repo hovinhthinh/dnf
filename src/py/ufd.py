@@ -11,26 +11,31 @@ from cluster import cop_kmeans, get_clustering_quality
 
 
 def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=False, plot_3d=False,
-              output_file_path=None):
+              label_plotting_order=None, output_file_path=None):
     if show_labels:
         plt.rcParams["figure.figsize"] = (10, 4)
     embeddings = umap.UMAP(n_components=3 if plot_3d else 2).fit_transform(embeddings)
     ax = plt.figure().add_subplot(projection='3d' if plot_3d else None)
 
     u_labels = set(labels)
-    for _, l in enumerate(u_labels):
+    if label_plotting_order is None:
+        label_plotting_order = [(l, None) for l in u_labels]
+
+    for l, lc in label_plotting_order:
+        if l not in u_labels:
+            continue
         idx = [i for i, _ in enumerate(labels) if _ == l]
         if plot_3d:
             if sample_type is None:
                 ax.scatter([embeddings[i][0] for i in idx],
                            [embeddings[i][1] for i in idx],
-                           [embeddings[i][2] for i in idx], label='{} ({})'.format(l, len(idx)), s=10)
+                           [embeddings[i][2] for i in idx], label='{} ({})'.format(l, len(idx)), s=10, color=lc)
             else:
                 # sample_type is provided, draw them with different markers
                 color = ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'TEST'],
                                    [embeddings[i][1] for i in idx if sample_type[i] == 'TEST'],
                                    [embeddings[i][2] for i in idx if sample_type[i] == 'TEST'],
-                                   label='{} ({})'.format(l, len(idx)), s=10, marker='o').get_facecolor()[0]
+                                   label='{} ({})'.format(l, len(idx)), s=10, marker='o', color=lc).get_facecolor()[0]
                 ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'DEV'],
                            [embeddings[i][1] for i in idx if sample_type[i] == 'DEV'],
                            [embeddings[i][2] for i in idx if sample_type[i] == 'DEV'],
@@ -42,12 +47,12 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
         else:
             if sample_type is None:
                 ax.scatter([embeddings[i][0] for i in idx],
-                           [embeddings[i][1] for i in idx], label='{} ({})'.format(l, len(idx)), s=10)
+                           [embeddings[i][1] for i in idx], label='{} ({})'.format(l, len(idx)), s=10, color=lc)
             else:
                 # sample_type is provided, draw them with different markers
                 color = ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'TEST'],
                                    [embeddings[i][1] for i in idx if sample_type[i] == 'TEST'],
-                                   label='{} ({})'.format(l, len(idx)), s=10, marker='o').get_facecolor()[0]
+                                   label='{} ({})'.format(l, len(idx)), s=10, marker='o', color=lc).get_facecolor()[0]
                 ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'DEV'],
                            [embeddings[i][1] for i in idx if sample_type[i] == 'DEV'],
                            s=10, color=color, marker='x')
@@ -87,6 +92,20 @@ class Pipeline(object):
                 raise Exception('Invalid sample type')
 
         self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([j for (_, j, _) in self.utterances])))
+
+        # Label plotting order
+        self.label_plotting_order = []
+        for u in [u[1] for u in utterances if u[2] == 'TRAIN'] \
+                 + [u[1] for u in utterances if u[2] == 'DEV'] \
+                 + [u[1] for u in utterances if u[2] == 'TEST']:
+            if u in self.label_plotting_order:
+                continue
+            self.label_plotting_order.append(u)
+
+        # pseudo-scatter for getting colors.
+        ax = plt.figure().add_subplot()
+        self.label_plotting_order = [(l, ax.scatter([], []).get_facecolor()[0]) for l in self.label_plotting_order]
+        plt.close()
 
     def get_embeddings(self, utterances: List[str] = None):
         return sbert.get_embeddings([u[0] for u in self.utterances] if utterances is None else utterances)
@@ -147,7 +166,7 @@ class Pipeline(object):
             sample_type = [u[2] for u in self.utterances]
             umap_plot(embeddings, labels, sample_type if show_sample_type else None,
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
-                      output_file_path=output_file_path)
+                      label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
         elif show_test_only:
             if self.use_dev or precomputed_embeddings is None:
                 test_embeddings = precomputed_test_embeddings if precomputed_test_embeddings is not None \
@@ -159,7 +178,7 @@ class Pipeline(object):
             test_labels = [u[1] for u in self.test_utterances]
 
             umap_plot(test_embeddings, test_labels, title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
-                      output_file_path=output_file_path)
+                      label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
         else:
             train_dev_embeddings = precomputed_embeddings if precomputed_embeddings is not None else self.get_embeddings()
 
@@ -178,7 +197,7 @@ class Pipeline(object):
 
             umap_plot(embeddings, labels, sample_type if show_sample_type else None,
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
-                      output_file_path=output_file_path)
+                      label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
 
     def find_tune_pseudo_classification(self, k=None, precomputed_embeddings=None):
         pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map),
