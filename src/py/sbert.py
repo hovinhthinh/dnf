@@ -16,7 +16,7 @@ model = None
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def load(model_path, from_tf=False):
+def load(model_path='sentence-transformers/paraphrase-mpnet-base-v2', from_tf=False):
     global tokenizer, model
     tokenizer = AutoTokenizer.from_pretrained(model_path, from_tf=from_tf)
     model = AutoModel.from_pretrained(model_path, from_tf=from_tf)
