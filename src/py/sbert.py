@@ -229,11 +229,10 @@ def fine_tune_classification(train_texts, train_labels,
 
 class UtteranceSimilarityDataset(torch.utils.data.Dataset):
     # labels \in {-1,0,1,2,3,...}, -1 means unseen
-    def __init__(self, encodings, labels, unseen_negative_sampling_rate=0.5):
+    def __init__(self, encodings, labels, negative_to_positive_rate: int = 3):
         self.unseen_indices = []
-        self.n_seen_clusters = max(labels) + 1
         self.n_seen_utterances = 0
-        self.seen_indices = [[] for _ in range(self.n_seen_clusters)]
+        self.seen_indices = [[] for _ in range(max(labels) + 1)]
 
         for i, l in enumerate(labels):
             if l != -1:
@@ -244,12 +243,7 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
 
         self.encodings = encodings
         self.labels = labels
-
-        # Idx bound for each type of sample
-        self.pos_pair_bound = self.n_seen_utterances
-        self.neg_pair_bound = self.pos_pair_bound + (self.n_seen_utterances if self.n_seen_clusters > 1 else 0)
-        self.unseen_neg_pair_bound = self.neg_pair_bound + (int(
-            self.n_seen_utterances * unseen_negative_sampling_rate) if len(self.unseen_indices) > 0 else 0)
+        self.dataset_len = self.n_seen_utterances * (1 + negative_to_positive_rate)
 
     def _get_positive_pair(self, idx):
         for c in self.seen_indices:
@@ -264,7 +258,7 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
             if idx >= len(cpos):
                 idx -= len(cpos)
             else:
-                idx2 = random.randrange(self.n_seen_utterances - len(cpos))
+                idx2 = random.randrange(self.n_seen_utterances + len(self.unseen_indices) - len(cpos))
                 for cneg_idx, cneg in enumerate(self.seen_indices):
                     if cneg_idx == cpos_idx:
                         continue
@@ -272,28 +266,16 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
                         idx2 -= len(cneg)
                     else:
                         return cpos[idx], cneg[idx2]
-                raise Exception('Less than two clusters')
-        raise Exception('Invalid idx')
-
-    def _get_unseen_negative_pair(self):
-        idx = random.randrange(self.n_seen_utterances)
-        for cpos in self.seen_indices:
-            if idx >= len(cpos):
-                idx -= len(cpos)
-            else:
-                return cpos[idx], random.choice(self.unseen_indices)
+                return cpos[idx], self.unseen_indices[idx2]
         raise Exception('Invalid idx')
 
     def __getitem__(self, idx):
         item = {}
-        if idx < self.pos_pair_bound:  # positive intra-cluster sample
+        if idx < self.n_seen_utterances:  # positive sample
             idx, idx2 = self._get_positive_pair(idx)
             item['labels'] = 1.0
-        elif idx < self.neg_pair_bound:  # negative inter-cluster sample
-            idx, idx2 = self._get_negative_pair(idx - self.pos_pair_bound)
-            item['labels'] = -1.0
-        else:  # negative sample with unseen data
-            idx, idx2 = self._get_unseen_negative_pair()
+        else:  # negative sample
+            idx, idx2 = self._get_negative_pair(idx % self.n_seen_utterances)
             item['labels'] = -1.0
 
         for key, val in self.encodings.items():
@@ -302,7 +284,7 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
         return item
 
     def __len__(self):
-        return self.unseen_neg_pair_bound
+        return self.dataset_len
 
 
 class UtteranceSimilarityModel(nn.Module):
@@ -332,7 +314,7 @@ class UtteranceSimilarityModel(nn.Module):
 # labels: None means unseen
 def fine_tune_utterance_similarity(train_texts, train_labels,
                                    val_texts=None, val_labels=None, test_texts=None, test_labels=None,
-                                   n_train_epochs=10, unseen_negative_sampling_rate=0.5):
+                                   n_train_epochs=10, negative_to_positive_rate=3):
     label_set = set(train_labels)
     if val_labels is not None:
         label_set.update(val_labels)
@@ -359,11 +341,11 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
                                return_tensors='pt') if test_texts is not None else None
 
     train_dataset = UtteranceSimilarityDataset(train_encodings, train_labels,
-                                               unseen_negative_sampling_rate=unseen_negative_sampling_rate)
+                                               negative_to_positive_rate=negative_to_positive_rate)
     val_dataset = UtteranceSimilarityDataset(val_encodings, val_labels,
-                                             unseen_negative_sampling_rate=unseen_negative_sampling_rate) if val_texts is not None else None
+                                             negative_to_positive_rate=negative_to_positive_rate) if val_texts is not None else None
     test_dataset = UtteranceSimilarityDataset(test_encodings, test_labels,
-                                              unseen_negative_sampling_rate=unseen_negative_sampling_rate) if test_texts is not None else None
+                                              negative_to_positive_rate=negative_to_positive_rate) if test_texts is not None else None
 
     estimator = UtteranceSimilarityModel(model)
 
