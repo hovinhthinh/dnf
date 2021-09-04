@@ -741,8 +741,8 @@ def get_train_test_data(generate_data=False, use_dev=True):
             clusters = list(set([u['cluster'] for u in data]))
 
             if predefined_clusters is not None:
-                train_clusters = predefined_clusters['TRAIN'],
-                dev_clusters = predefined_clusters['DEV'],
+                train_clusters = predefined_clusters['TRAIN']
+                dev_clusters = predefined_clusters['DEV']
                 test_clusters = predefined_clusters['TEST']
                 for c in train_clusters + dev_clusters + test_clusters:
                     if c not in clusters:
