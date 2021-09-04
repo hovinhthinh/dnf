@@ -1,5 +1,6 @@
 import json
 import random
+from math import ceil
 
 
 def get_utterances(input_file):
@@ -753,9 +754,9 @@ def get_train_test_data(generate_data=False, use_dev=True):
 
                 # Random train/dev/test clusters
                 random.shuffle(clusters)
-                train_clusters = clusters[:int(len(clusters) * 0.4)]
-                dev_clusters = clusters[int(len(clusters) * 0.4):int(len(clusters) * 0.7)]
-                test_clusters = clusters[int(len(clusters) * 0.7):]
+                train_clusters = clusters[:ceil(len(clusters) * 0.4)]
+                dev_clusters = clusters[ceil(len(clusters) * 0.4):ceil(len(clusters) * 0.7)]
+                test_clusters = clusters[ceil(len(clusters) * 0.7):]
 
             # Split into train/test utterances
             splitted_data = []
@@ -764,16 +765,16 @@ def get_train_test_data(generate_data=False, use_dev=True):
                 random.shuffle(cluster_data)
                 if c in train_clusters:
                     splitted_data.extend([(u['text'], c + '_TRAIN', 'TRAIN') for u in
-                                          cluster_data[:int(len(cluster_data) * 0.4)]])
+                                          cluster_data[:ceil(len(cluster_data) * 0.4)]])
                     splitted_data.extend([(u['text'], c + '_TRAIN', 'DEV') for u in
-                                          cluster_data[int(len(cluster_data) * 0.4):int(len(cluster_data) * 0.7)]])
+                                          cluster_data[ceil(len(cluster_data) * 0.4):ceil(len(cluster_data) * 0.7)]])
                     splitted_data.extend([(u['text'], c + '_TRAIN', 'TEST') for u in
-                                          cluster_data[int(len(cluster_data) * 0.7):]])
+                                          cluster_data[ceil(len(cluster_data) * 0.7):]])
                 elif c in dev_clusters:
                     splitted_data.extend([(u['text'], c + '_DEV', 'DEV') for u in
-                                          cluster_data[:int(len(cluster_data) * 0.7)]])
+                                          cluster_data[:ceil(len(cluster_data) * 0.7)]])
                     splitted_data.extend([(u['text'], c + '_DEV', 'TEST') for u in
-                                          cluster_data[int(len(cluster_data) * 0.7):]])
+                                          cluster_data[ceil(len(cluster_data) * 0.7):]])
                 elif c in test_clusters:
                     splitted_data.extend([(u['text'], c + '_TEST', 'TEST') for u in cluster_data])
 
