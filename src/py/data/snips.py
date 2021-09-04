@@ -722,18 +722,41 @@ def get_train_test_data(generate_data=False, use_dev=True):
 
     if generate_data:
         intent_data = [
-            # (split_by_features_GetWeather(), { # Hard-code train/dev/test clusters
-            #     'TRAIN': ['GetWeatherInCurrentPositionAtATimeRange'],
-            #     'DEV': ['GetCurrentWeatherInCurrentPosition'],
-            #     'TEST': ['GetWeatherInALocationAtATimeRange', 'GetCurrentWeatherInALocation'],
-            # }),
-            (split_by_features_GetWeather(), None),
-            (split_by_features_AddToPlaylist(), None),
-            (split_by_features_RateBook(), None),
-            (split_by_features_BookRestaurant(), None),
-            (split_by_features_PlayMusic(), None),
-            (split_by_features_SearchCreativeWork(), None),
-            (split_by_features_SearchScreeningEvent(), None),
+            (split_by_features_GetWeather(), {  # Hard-code train/dev/test clusters
+                'TRAIN': ['GetCurrentWeatherInALocation', 'GetWeatherInCurrentPositionAtATimeRange'],
+                'DEV': ['GetCurrentWeatherInCurrentPosition'],
+                'TEST': ['GetWeatherInALocationAtATimeRange'],
+            }),
+            (split_by_features_AddToPlaylist(), {
+                'TRAIN': ['AddCurrentArtistToAPlaylist', 'AddASongToAPlaylist'],
+                'DEV': ['AddAnArtistToAPlaylist', 'AddCurrentSongToAPlaylist'],
+                'TEST': ['AddCurrentAlbumToAPlaylist'],
+            }),
+            (split_by_features_RateBook(), {
+                'TRAIN': ['RateABook'],
+                'DEV': ['RateCurrentBook'],
+                'TEST': [],
+            }),
+            (split_by_features_BookRestaurant(), None),  # Set to None to automatically randomly sample
+            (split_by_features_PlayMusic(), {
+                'TRAIN': ['PlayAlbum', 'PlayMusicByYear', 'PlayMusicByGenre', 'PlayMusicByGenreOnService',
+                          'PlayMusicByArtistAndYearOnService', 'PlayMusicByArtist'],
+                'DEV': ['PlayTrack', 'PlayMusicByYearOnService', 'PlayTrackOnService', 'PlayPlaylist'],
+                'TEST': ['PlayAlbumOnService', 'PlayMusicByArtistOnService', 'PlayOnService',
+                         'PlayMusicByArtistAndYear'],
+            }),
+            (split_by_features_SearchCreativeWork(), {
+                'TRAIN': ['WHQuestion', 'PlayTVProgramTrailer', 'SearchAlbum', 'SearchGame'],
+                'DEV': ['PlaySong', 'SearchCreativeWork', 'PlayTVProgram'],
+                'TEST': ['SearchBook', 'SearchPicture'],
+            }),
+            (split_by_features_SearchScreeningEvent(), {  # Hard-code train/dev/test clusters
+                'TRAIN': ['GetScheduleForAMovieAtNearbyCinemas', 'GetSchedule', 'GetScheduleForAMovie',
+                          'GetScheduleAtATimeRange'],
+                'DEV': ['GetScheduleForAnimatedMovies', 'GetScheduleAtNearbyCinemas',
+                        'GetScheduleForAMovieAtALocation'],
+                'TEST': ['FindCinemasPlayingAMovieAtATimeRange', 'GetScheduleAtALocation'],
+            }),
         ]
 
         intra_intent_data = []
