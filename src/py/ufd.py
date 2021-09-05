@@ -249,7 +249,7 @@ class Pipeline(object):
 
         # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
 
-    def run(self, report_folder=None, steps=[
+    def run(self, report_folder=None, config={}, steps=[
         'no-finetune',
         'finetune-utterance-similarity',
         'finetune-pseudo-classification',
@@ -342,7 +342,8 @@ class Pipeline(object):
             # Fine-tuning
             for it in range(10):
                 print('Iter: #{}'.format(it + 1))
-                self.fine_tune_pseudo_classification(use_sample_weights=False)
+                self.fine_tune_pseudo_classification(
+                    use_sample_weights=(('classification_sample_weights', True) in config.items()))
                 self.update_embeddings()
                 self.plot(show_train_dev_only=True,
                           output_file_path=os.path.join(folder,
