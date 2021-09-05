@@ -7,6 +7,7 @@ import numpy
 import umap
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
+from sklearn.preprocessing import StandardScaler
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
@@ -78,8 +79,9 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
 class Pipeline(object):
 
     def __init__(self, utterances: List[Tuple[str, any, str]],  # (utterance, cluster_label, sample_type)
-                 dataset_name=None):
+                 dataset_name=None, normalize_embeddings=False):
         self.dataset_name = dataset_name
+        self.normalize_embeddings = normalize_embeddings
         self.use_dev = 'DEV' in [u[2] for u in utterances]
         self.utterances = []  # TRAIN + DEV, if DEV is not provided, use DEV = TEST instead.
         self.test_utterances = []
@@ -155,10 +157,16 @@ class Pipeline(object):
 
             print('Clustering:', method)
 
-            clusters, centers = cop_kmeans(dataset=self.embeddings, k=k, ml=ml, cl=cl)
+            if self.normalize_embeddings:
+                scaler = StandardScaler()
+                scaler.fit(self.embeddings)
+                embeddings = scaler.transform(self.embeddings)
+            else:
+                embeddings = self.embeddings
+            clusters, centers = cop_kmeans(dataset=embeddings, k=k, ml=ml, cl=cl)
 
             assignment_conf = []
-            distance_matrix = pairwise_distances(self.embeddings, centers)
+            distance_matrix = pairwise_distances(embeddings, centers)
             pow_scale = 8
             for i, u in enumerate(self.utterances):
                 if u[2] == 'TRAIN':
@@ -221,8 +229,15 @@ class Pipeline(object):
                 (l, i) for i, l in enumerate(set([u[1] for u in self.test_utterances])))
             test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
 
+            if self.normalize_embeddings:
+                scaler = StandardScaler()
+                scaler.fit(self.test_embeddings)
+                embeddings = scaler.transform(self.test_embeddings)
+            else:
+                embeddings = self.test_embeddings
+
             test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map)) \
-                .fit(self.test_embeddings).labels_
+                .fit(embeddings).labels_
 
             return get_clustering_quality(test_true_clusters, test_predicted_clusters)
         else:
