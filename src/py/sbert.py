@@ -138,7 +138,7 @@ class PseudoClassificationModel(nn.Module):
 
 
 def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=None,
-                             val_texts=None, val_labels=None, test_texts=None, test_labels=None):
+                                    val_texts=None, val_labels=None, test_texts=None, test_labels=None):
     label_set = set(train_labels)
     if val_labels is not None:
         label_set.update(val_labels)
@@ -330,12 +330,14 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
     trainer = Trainer(
         model=estimator,
         args=TrainingArguments(
+            save_strategy='no',
             output_dir='./results',
             num_train_epochs=n_train_epochs,
             per_device_train_batch_size=16,
             per_device_eval_batch_size=64,
             warmup_steps=500,
             weight_decay=0.01,
+            logging_strategy='no',
             logging_dir='./logs',
             evaluation_strategy='epoch' if val_dataset is not None else 'no'
         ),
