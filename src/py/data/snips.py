@@ -739,23 +739,22 @@ def get_train_test_data(generate_data=False, use_dev=True):
             }),
             (split_by_features_BookRestaurant(), None),  # Set to None to automatically randomly sample
             (split_by_features_PlayMusic(), {
-                'TRAIN': ['PlayAlbum', 'PlayMusicByYear', 'PlayMusicByGenre', 'PlayMusicByGenreOnService',
+                'TRAIN': ['PlayAlbum', 'PlayMusicByYear', 'PlayMusicByGenre', 'PlayMusicByArtistOnService',
                           'PlayMusicByArtistAndYearOnService', 'PlayMusicByArtist'],
                 'DEV': ['PlayTrack', 'PlayMusicByYearOnService', 'PlayTrackOnService', 'PlayPlaylist'],
-                'TEST': ['PlayAlbumOnService', 'PlayMusicByArtistOnService', 'PlayOnService',
+                'TEST': ['PlayAlbumOnService', 'PlayMusicByGenreOnService', 'PlayOnService',
                          'PlayMusicByArtistAndYear'],
             }),
             (split_by_features_SearchCreativeWork(), {
-                'TRAIN': ['WHQuestion', 'PlayTVProgramTrailer', 'SearchAlbum', 'SearchGame'],
-                'DEV': ['PlaySong', 'SearchCreativeWork', 'PlayTVProgram'],
-                'TEST': ['SearchBook', 'SearchPicture'],
+                'TRAIN': ['WHQuestion', 'SearchPicture', 'PlayTVProgram', 'SearchGame'],
+                'DEV': ['PlaySong', 'SearchCreativeWork', 'SearchAlbum'],
+                'TEST': ['SearchBook', 'PlayTVProgramTrailer'],
             }),
             (split_by_features_SearchScreeningEvent(), {  # Hard-code train/dev/test clusters
                 'TRAIN': ['GetScheduleForAMovieAtNearbyCinemas', 'GetSchedule', 'GetScheduleForAMovie',
-                          'GetScheduleAtATimeRange'],
-                'DEV': ['GetScheduleForAnimatedMovies', 'GetScheduleAtNearbyCinemas',
-                        'GetScheduleForAMovieAtALocation'],
-                'TEST': ['FindCinemasPlayingAMovieAtATimeRange', 'GetScheduleAtALocation'],
+                          'GetScheduleAtALocation'],
+                'DEV': ['GetScheduleForAnimatedMovies', 'GetScheduleAtNearbyCinemas', 'GetScheduleAtATimeRange'],
+                'TEST': ['FindCinemasPlayingAMovieAtATimeRange', 'GetScheduleForAMovieAtALocation'],
             }),
         ]
 
