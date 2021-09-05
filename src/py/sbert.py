@@ -208,8 +208,8 @@ def fine_tune_classification(train_texts, train_labels,
         args=TrainingArguments(
             output_dir='./results',
             num_train_epochs=1,
-            per_device_train_batch_size=32,
-            per_device_eval_batch_size=8,
+            per_device_train_batch_size=16,
+            per_device_eval_batch_size=64,
             warmup_steps=500,
             weight_decay=0.01,
             logging_dir='./logs',
@@ -386,7 +386,7 @@ if __name__ == '__main__':
 
     # train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0]
     # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
-    # fine_tune_classification(train_texts, train_labels, val_texts, val_labels)
+    # fine_tune_classification(train_texts, train_labels)
 
     # train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, None, None]
     # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
