@@ -1,10 +1,12 @@
 import os
+from math import pow
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy
 import umap
 from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
@@ -126,6 +128,7 @@ class Pipeline(object):
         else:
             return [self.cluster_label_2_index_map[u[1]] for u in self.utterances if u[2] != 'TRAIN']
 
+    # Returns pseudo clusters and assignment confidences
     def get_pseudo_clusters(self, method='cop-kmeans', k=-1, including_train=True):
         train_clusters = [[] for _ in range(len(self.cluster_label_2_index_map))]
         for i, (_, j, t) in enumerate(self.utterances):
@@ -154,9 +157,20 @@ class Pipeline(object):
 
             clusters, centers = cop_kmeans(dataset=self.embeddings, k=k, ml=ml, cl=cl)
 
+            assignment_conf = []
+            distance_matrix = pairwise_distances(self.embeddings, centers)
+            pow_scale = 16
+            for i, u in enumerate(self.utterances):
+                if u[2] == 'TRAIN':
+                    assignment_conf.append(1.0)
+                else:
+                    scaled_dist = [pow(1 / d, pow_scale) for d in distance_matrix[i]]
+                    assignment_conf.append(scaled_dist[clusters[i]] / sum(scaled_dist))
+
             if not including_train:
                 clusters = [c for i, c in enumerate(clusters) if self.utterances[i][2] != 'TRAIN']
-            return clusters
+                assignment_conf = [c for i, c in enumerate(assignment_conf) if self.utterances[i][2] != 'TRAIN']
+            return clusters, assignment_conf
         else:
             raise Exception('Method {} not supported'.format(method))
 
@@ -186,11 +200,13 @@ class Pipeline(object):
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
                       label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
 
-    def fine_tune_pseudo_classification(self, k=None):
-        pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map))
+    def fine_tune_pseudo_classification(self, k=None, use_sample_weights=False):
+        pseudo_clusters, weights = self.get_pseudo_clusters(
+            k=k if k is not None else len(self.cluster_label_2_index_map))
         print('Pseudo-cluster quality:',
               get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
-        sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters)
+        sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
+                                              train_sample_weights=weights if use_sample_weights else None)
 
     def fine_tune_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
@@ -213,7 +229,7 @@ class Pipeline(object):
             # Use COP-KMeans. In this setting, we cluster the testing set, coupling with constraints from the train set.
             # So we use COP-KMeans here, which is similar to pseudo-classification.
             test_predicted_clusters = self.get_pseudo_clusters(
-                k=k if k is not None else len(self.cluster_label_2_index_map), including_train=False)
+                k=k if k is not None else len(self.cluster_label_2_index_map), including_train=False)[0]
             return get_clustering_quality(self.get_true_clusters(including_train=False), test_predicted_clusters)
 
         # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
@@ -272,7 +288,7 @@ class Pipeline(object):
             print('Clustering DEV(unseen) before fine-tuning:',
                   get_clustering_quality(self.get_true_clusters(including_train=False),
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)))
+                                                                  including_train=False)[0]))
             # Fine-tuning
             self.fine_tune_utterance_similarity()
             self.update_embeddings()
@@ -282,7 +298,7 @@ class Pipeline(object):
             print('Clustering DEV(unseen) after fine-tuning:',
                   get_clustering_quality(self.get_true_clusters(including_train=False),
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)))
+                                                                  including_train=False)[0]))
 
             # Testing
             self.update_test_embeddings()
@@ -307,11 +323,11 @@ class Pipeline(object):
             print('Clustering DEV(unseen) before fine-tuning:',
                   get_clustering_quality(self.get_true_clusters(including_train=False),
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)))
+                                                                  including_train=False)[0]))
             # Fine-tuning
             for it in range(10):
                 print('Iter: #{}'.format(it + 1))
-                self.fine_tune_pseudo_classification()
+                self.fine_tune_pseudo_classification(use_sample_weights=False)
                 self.update_embeddings()
                 self.plot(show_train_dev_only=True,
                           output_file_path=os.path.join(folder,
@@ -320,7 +336,7 @@ class Pipeline(object):
             print('Clustering DEV(unseen) after fine-tuning:',
                   get_clustering_quality(self.get_true_clusters(including_train=False),
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)))
+                                                                  including_train=False)[0]))
 
             # Testing
             self.update_test_embeddings()
