@@ -192,10 +192,10 @@ class Pipeline(object):
               get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
         sbert.fine_tune_classification([u[0] for u in self.utterances], pseudo_clusters)
 
-    def find_tune_utterance_similarity(self, n_train_epochs=10):
+    def find_tune_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices,
-                                             n_train_epochs=n_train_epochs)
+                                             n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
     def get_test_clustering_quality(self, k=None):
         if self.use_dev:
@@ -250,7 +250,8 @@ class Pipeline(object):
             self.update_test_embeddings()
             self.plot(show_train_dev_only=True,
                       output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            self.plot(output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+            self.plot(show_test_only=True,
+                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
 
             test_quality = self.get_test_clustering_quality()
             print('No-finetune test quality:', test_quality)
@@ -272,15 +273,11 @@ class Pipeline(object):
                   get_clustering_quality(self.get_true_clusters(including_train=False),
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
                                                                   including_train=False)))
-            # Fine-tuning. Here we train 3 times, each with 3 epochs. We can also train once with more epochs, however
-            # we want to track the quality after each epoch.
-            for it in range(3):
-                print('Epoch: #{}'.format((it + 1) * 3))
-                self.find_tune_utterance_similarity(n_train_epochs=3)
-                self.update_embeddings()
-                self.plot(show_train_dev_only=True,
-                          output_file_path=os.path.join(folder,
-                                                        '{}.pdf'.format((it + 1) * 3)) if folder is not None else None)
+            # Fine-tuning
+            self.find_tune_utterance_similarity()
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
 
             print('Clustering DEV(unseen) after fine-tuning:',
                   get_clustering_quality(self.get_true_clusters(including_train=False),
@@ -289,7 +286,8 @@ class Pipeline(object):
 
             # Testing
             self.update_test_embeddings()
-            self.plot(output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+            self.plot(show_test_only=True,
+                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
 
             test_quality = self.get_test_clustering_quality()
             print('Finetune-utterance-similarity test quality:', test_quality)
@@ -326,7 +324,8 @@ class Pipeline(object):
 
             # Testing
             self.update_test_embeddings()
-            self.plot(output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+            self.plot(show_test_only=True,
+                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
 
             test_quality = self.get_test_clustering_quality()
             print('Finetune-pseudo-classification test quality:', test_quality)

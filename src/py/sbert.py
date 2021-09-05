@@ -1,4 +1,5 @@
 import random
+from math import ceil
 from typing import List
 
 import numpy
@@ -314,7 +315,7 @@ class UtteranceSimilarityModel(nn.Module):
 # labels: None means unseen
 def fine_tune_utterance_similarity(train_texts, train_labels,
                                    val_texts=None, val_labels=None, test_texts=None, test_labels=None,
-                                   n_train_epochs=10, negative_to_positive_rate=3):
+                                   n_train_epochs=-1, n_train_steps=-1, negative_to_positive_rate=3):
     label_set = set(train_labels)
     if val_labels is not None:
         label_set.update(val_labels)
@@ -349,15 +350,20 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
 
     estimator = UtteranceSimilarityModel(model)
 
-    # print(classifier(**train_encodings))
+    # print(estimator(**train_encodings))
+
+    if n_train_epochs == -1:
+        if n_train_steps == -1:
+            n_train_steps = 10000
+        n_train_epochs = max(ceil(n_train_steps / len(train_dataset)), 3)
 
     trainer = Trainer(
         model=estimator,
         args=TrainingArguments(
             output_dir='./results',
             num_train_epochs=n_train_epochs,
-            per_device_train_batch_size=32,
-            per_device_eval_batch_size=8,
+            per_device_train_batch_size=16,
+            per_device_eval_batch_size=64,
             warmup_steps=500,
             weight_decay=0.01,
             logging_dir='./logs',
