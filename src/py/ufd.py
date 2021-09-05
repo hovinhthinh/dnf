@@ -159,7 +159,7 @@ class Pipeline(object):
 
             assignment_conf = []
             distance_matrix = pairwise_distances(self.embeddings, centers)
-            pow_scale = 16
+            pow_scale = 8
             for i, u in enumerate(self.utterances):
                 if u[2] == 'TRAIN':
                     assignment_conf.append(1.0)
