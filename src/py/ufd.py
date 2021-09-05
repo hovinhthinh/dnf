@@ -190,7 +190,7 @@ class Pipeline(object):
         pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map))
         print('Pseudo-cluster quality:',
               get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
-        sbert.fine_tune_classification([u[0] for u in self.utterances], pseudo_clusters)
+        sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters)
 
     def find_tune_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]

@@ -6,11 +6,10 @@ import numpy
 import torch
 from datasets import load_metric
 from torch import nn
-from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss, MSELoss
+from torch.nn import CrossEntropyLoss, MSELoss
 from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer
-from transformers.modeling_outputs import SequenceClassifierOutput
 
 tokenizer = None
 model = None
@@ -60,13 +59,16 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
 
 class ClassificationDataset(torch.utils.data.Dataset):
     # labels \in {0,1,2,3,...}
-    def __init__(self, encodings, labels):
+    def __init__(self, encodings, labels, sample_weights=None):
         self.encodings = encodings
         self.labels = labels
+        self.sample_weights = sample_weights
 
     def __getitem__(self, idx):
         item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
-        item['labels'] = torch.tensor(self.labels[idx])
+        item['labels'] = self.labels[idx]
+        if self.sample_weights is not None:
+            item['sample_weights'] = self.sample_weights[idx]
         return item
 
     def __len__(self):
@@ -104,13 +106,14 @@ class PseudoClassificationModel(nn.Module):
         self.num_labels = num_labels
         self.base_model = base_model
         self.classifier = ClassificationHead(base_model.config, num_labels)
+        self.loss_fct = CrossEntropyLoss(reduction='none')
 
     def forward(
             self,
             input_ids=None,
             attention_mask=None,
             labels=None,
-            return_dict=None,
+            sample_weights=None,
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -121,53 +124,20 @@ class PseudoClassificationModel(nn.Module):
         outputs = self.base_model(
             input_ids,
             attention_mask=attention_mask,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=return_dict,
         )
         logits = self.classifier(_mean_pooling(outputs, attention_mask))
 
-        loss = None
-        if labels is not None:
-            if self.config.problem_type is None:
-                if self.num_labels == 1:
-                    self.config.problem_type = "regression"
-                elif self.num_labels > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
-                    self.config.problem_type = "single_label_classification"
-                else:
-                    self.config.problem_type = "multi_label_classification"
+        per_sample_loss = self.loss_fct(logits, labels)
+        if sample_weights is not None:
+            per_sample_loss = torch.mul(per_sample_loss, sample_weights)
+        loss = torch.mean(per_sample_loss)
 
-            if self.config.problem_type == "regression":
-                loss_fct = MSELoss()
-                if self.num_labels == 1:
-                    loss = loss_fct(logits.squeeze(), labels.squeeze())
-                else:
-                    loss = loss_fct(logits, labels)
-            elif self.config.problem_type == "single_label_classification":
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            elif self.config.problem_type == "multi_label_classification":
-                loss_fct = BCEWithLogitsLoss()
-                loss = loss_fct(logits, labels)
-
-        if not return_dict:
-            output = (logits,) + outputs[2:]
-            # The first should be loss, used by trainer. The second should be logits, used by compute_metrics
-            return ((loss,) + output) if loss is not None else output
-
-        return SequenceClassifierOutput(
-            loss=loss,
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        output = (logits,) + outputs[2:]
+        # The first should be loss, used by trainer. The second should be logits, used by compute_metrics
+        return (loss,) + output
 
 
-def fine_tune_classification(train_texts, train_labels,
+def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=None,
                              val_texts=None, val_labels=None, test_texts=None, test_labels=None):
     label_set = set(train_labels)
     if val_labels is not None:
@@ -195,7 +165,7 @@ def fine_tune_classification(train_texts, train_labels,
     test_encodings = tokenizer(test_texts, truncation=True, padding=True,
                                return_tensors='pt') if test_texts is not None else None
 
-    train_dataset = ClassificationDataset(train_encodings, train_labels)
+    train_dataset = ClassificationDataset(train_encodings, train_labels, train_sample_weights)
     val_dataset = ClassificationDataset(val_encodings, val_labels) if val_texts is not None else None
     test_dataset = ClassificationDataset(test_encodings, test_labels) if test_texts is not None else None
 
@@ -384,9 +354,10 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
 if __name__ == '__main__':
     load('sentence-transformers/paraphrase-mpnet-base-v2')
 
-    # train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0]
-    # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
-    # fine_tune_classification(train_texts, train_labels)
+    train_texts, train_labels, train_labels_weights \
+        = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
+    fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=train_labels_weights)
 
     # train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, None, None]
     # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
