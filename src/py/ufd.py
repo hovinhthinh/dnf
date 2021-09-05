@@ -186,13 +186,13 @@ class Pipeline(object):
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
                       label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
 
-    def find_tune_pseudo_classification(self, k=None):
+    def fine_tune_pseudo_classification(self, k=None):
         pseudo_clusters = self.get_pseudo_clusters(k=k if k is not None else len(self.cluster_label_2_index_map))
         print('Pseudo-cluster quality:',
               get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
         sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters)
 
-    def find_tune_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
+    def fine_tune_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices,
                                              n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
@@ -274,7 +274,7 @@ class Pipeline(object):
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
                                                                   including_train=False)))
             # Fine-tuning
-            self.find_tune_utterance_similarity()
+            self.fine_tune_utterance_similarity()
             self.update_embeddings()
             self.plot(show_train_dev_only=True,
                       output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
@@ -311,7 +311,7 @@ class Pipeline(object):
             # Fine-tuning
             for it in range(10):
                 print('Iter: #{}'.format(it + 1))
-                self.find_tune_pseudo_classification()
+                self.fine_tune_pseudo_classification()
                 self.update_embeddings()
                 self.plot(show_train_dev_only=True,
                           output_file_path=os.path.join(folder,
