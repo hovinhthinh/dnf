@@ -811,19 +811,19 @@ def get_train_test_data(generate_data=False, use_dev=True):
                 cluster_data = [u for u in data if u['cluster'] == c]
                 random.shuffle(cluster_data)
                 if c in train_clusters:
-                    splitted_data.extend([(u['text'], c + '_TRAIN', 'TRAIN') for u in
+                    splitted_data.extend([(u['text'], c + '_TRAIN', 'TRAIN', u['slots']) for u in
                                           cluster_data[:ceil(len(cluster_data) * 0.4)]])
-                    splitted_data.extend([(u['text'], c + '_TRAIN', 'DEV') for u in
+                    splitted_data.extend([(u['text'], c + '_TRAIN', 'DEV', u['slots']) for u in
                                           cluster_data[ceil(len(cluster_data) * 0.4):ceil(len(cluster_data) * 0.7)]])
-                    splitted_data.extend([(u['text'], c + '_TRAIN', 'TEST') for u in
+                    splitted_data.extend([(u['text'], c + '_TRAIN', 'TEST', u['slots']) for u in
                                           cluster_data[ceil(len(cluster_data) * 0.7):]])
                 elif c in dev_clusters:
-                    splitted_data.extend([(u['text'], c + '_DEV', 'DEV') for u in
+                    splitted_data.extend([(u['text'], c + '_DEV', 'DEV', u['slots']) for u in
                                           cluster_data[:ceil(len(cluster_data) * 0.7)]])
-                    splitted_data.extend([(u['text'], c + '_DEV', 'TEST') for u in
+                    splitted_data.extend([(u['text'], c + '_DEV', 'TEST', u['slots']) for u in
                                           cluster_data[ceil(len(cluster_data) * 0.7):]])
                 elif c in test_clusters:
-                    splitted_data.extend([(u['text'], c + '_TEST', 'TEST') for u in cluster_data])
+                    splitted_data.extend([(u['text'], c + '_TEST', 'TEST', u['slots']) for u in cluster_data])
 
             intra_intent_data.append((data[0]['intent'], splitted_data))
 
@@ -844,7 +844,8 @@ def get_train_test_data(generate_data=False, use_dev=True):
     inter_intent_data = []
     for intent_name, cluster_data in intra_intent_data:
         inter_intent_data.extend(
-            [(text, intent_name + '_' + cluster, sample_type) for text, cluster, sample_type in cluster_data])
+            [(text, intent_name + '_' + cluster, sample_type, slots)
+             for text, cluster, sample_type, slots in cluster_data])
 
     print('======== Cluster information ========')
     intra_intent_data_filtered = []
