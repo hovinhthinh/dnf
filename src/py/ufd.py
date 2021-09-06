@@ -95,7 +95,7 @@ class Pipeline(object):
             else:
                 raise Exception('Invalid sample type')
 
-        self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([j for (_, j, _) in self.utterances])))
+        self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([u[1] for u in self.utterances])))
 
         self.embeddings = None
         self.test_embeddings = None
@@ -133,9 +133,9 @@ class Pipeline(object):
     # Returns pseudo clusters and assignment confidences
     def get_pseudo_clusters(self, method='cop-kmeans', k=-1, including_train=True):
         train_clusters = [[] for _ in range(len(self.cluster_label_2_index_map))]
-        for i, (_, j, t) in enumerate(self.utterances):
-            if t == 'TRAIN':
-                train_clusters[self.cluster_label_2_index_map[j]].append(i)
+        for i, u in enumerate(self.utterances):
+            if u[2] == 'TRAIN':
+                train_clusters[self.cluster_label_2_index_map[u[1]]].append(i)
 
         # Constraints
         ml = []
