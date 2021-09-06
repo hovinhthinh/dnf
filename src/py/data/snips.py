@@ -29,27 +29,30 @@ def get_utterances_and_slots(input_file):
     for i, v in enumerate(data):
         u = {
             'id': i,
-            'text': ''.join([t['text'] for t in v['data']]),
             'slots': {}
         }
-        cur = 0
+        text = ''
         for t in v['data']:
+            t_text = t['text'].strip()
+            if t_text == '':
+                continue
+            if len(text) > 0:
+                text += ' '
             if 'entity' in t:
-                beginOffset = 0
-                endOffset = 0
-                if t['text'].startswith(' '):
-                    beginOffset += 1
-                if t['text'].endswith(' '):
-                    endOffset += 1
                 slot = {
-                    'value': t['text'].strip(),
-                    'start': cur + beginOffset,
-                    'end': cur + len(t['text']) - endOffset
+                    'value': t_text,
+                    'start': len(text),
+                    'end': len(text) + len(t_text)
                 }
-                # Verify
-                assert u['text'][slot['start']:slot['end']] == slot['value']
                 u['slots'][t['entity']] = slot
-            cur += len(t['text'])
+
+            text += t_text
+
+        for s in u['slots'].values():
+            # Verify
+            assert text[s['start']:s['end']] == s['value']
+
+        u['text'] = text
         utrs.append(u)
     return utrs
 
