@@ -27,12 +27,30 @@ def get_utterances_and_slots(input_file):
 
     data = list(data.values())[0]
     for i, v in enumerate(data):
-        utrs.append({
+        u = {
             'id': i,
-            'text': ''.join([t['text'] for t in v['data']]).strip().lower(),
-            'slots': {t['entity']: t['text'] for t in filter(lambda x: 'entity' in x, v['data'])}
-        })
-
+            'text': ''.join([t['text'] for t in v['data']]),
+            'slots': {}
+        }
+        cur = 0
+        for t in v['data']:
+            if 'entity' in t:
+                beginOffset = 0
+                endOffset = 0
+                if t['text'].startswith(' '):
+                    beginOffset += 1
+                if t['text'].endswith(' '):
+                    endOffset += 1
+                slot = {
+                    'value': t['text'].strip(),
+                    'start': cur + beginOffset,
+                    'end': cur + len(t['text']) - endOffset
+                }
+                # Verify
+                assert u['text'][slot['start']:slot['end']] == slot['value']
+                u['slots'][t['entity']] = slot
+            cur += len(t['text'])
+        utrs.append(u)
     return utrs
 
 
@@ -131,25 +149,28 @@ def split_by_features_AddToPlaylist(output_file=None):
 
             'AddAnArtistToAPlaylist':
                 lambda u: ('artist' in u['slots']) and ('playlist' in u['slots']) and (
-                        'music_item' not in u['slots'] or u['slots']['music_item'] == 'artist'),
+                        'music_item' not in u['slots'] or u['slots']['music_item']['value'] == 'artist'),
 
             'AddCurrentSongToAPlaylist':
-                lambda u: ('music_item' in u['slots'] and u['slots']['music_item'] in ['song', 'track', 'tune'])
+                lambda u: ('music_item' in u['slots'] and u['slots']['music_item']['value'] in ['song', 'track',
+                                                                                                'tune'])
                           and ('playlist' in u['slots'])
                           and ('artist' not in u['slots'] or ' this ' in u['text'])
                           and (' a ' not in u['text'] and ' an ' not in u['text'] and ' another ' not in u['text']),
 
             'AddCurrentAlbumToAPlaylist':
-                lambda u: (('music_item', 'album') in u['slots'].items()) and ('playlist' in u['slots'])
+                lambda u: ('music_item' in u['slots'] and u['slots']['music_item']['value'] == 'album') and (
+                        'playlist' in u['slots'])
                           and (' a ' not in u['text'] and ' an ' not in u['text'])
                           and (('artist' not in u['slots']) or ' this ' in u['text']),
 
             'AddCurrentArtistToAPlaylist':
-                lambda u: (('music_item', 'artist') in u['slots'].items()) and ('playlist' in u['slots']) and (
-                        'artist' not in u['slots']),
+                lambda u: ('music_item' in u['slots'] and u['slots']['music_item']['value'] == 'artist') and (
+                        'playlist' in u['slots']) and ('artist' not in u['slots']),
 
             'AddAnArtistAlbumToAPlaylist':
-                lambda u: (('music_item', 'album') in u['slots'].items()) and ('playlist' in u['slots'])
+                lambda u: ('music_item' in u['slots'] and u['slots']['music_item']['value'] == 'album') and (
+                        'playlist' in u['slots'])
                           and ('artist' in u['slots']) and (' this ' not in u['text'])
         },
         utrs,
@@ -193,7 +214,7 @@ def split_by_features_GetWeather(output_file=None):
             if k in ['city', 'country', 'state', 'geographic_poi']:
                 found = True
             elif k == 'timeRange':
-                if u['slots'][k] != 'now':
+                if u['slots'][k]['value'] != 'now':
                     good_time_range = False
             elif k not in ['condition_description', 'condition_temperature', 'spatial_relation']:
                 return False
@@ -204,10 +225,10 @@ def split_by_features_GetWeather(output_file=None):
         # if 'condition_description' in slots or 'condition_temperature' in slots:
         #     return False
         if 'current_location' not in slots:
-            for k in u['slots']:
+            for k in slots:
                 if k in ['city', 'country', 'state', 'geographic_poi']:
                     return False
-        if 'timeRange' in slots and slots['timeRange'] != 'now':
+        if 'timeRange' in slots and slots['timeRange']['value'] != 'now':
             return False
         return True
 
@@ -217,7 +238,7 @@ def split_by_features_GetWeather(output_file=None):
         for k in u['slots']:
             if k in ['city', 'country', 'state', 'geographic_poi']:
                 found = True
-            elif k == 'timeRange' and u['slots'][k] != 'now':
+            elif k == 'timeRange' and u['slots'][k]['value'] != 'now':
                 good_time_range = True
             elif k not in ['condition_description', 'condition_temperature', 'spatial_relation']:
                 return False
@@ -228,10 +249,10 @@ def split_by_features_GetWeather(output_file=None):
         # if 'condition_description' in slots or 'condition_temperature' in slots:
         #     return False
         if 'current_location' not in slots:
-            for k in u['slots']:
+            for k in slots:
                 if k in ['city', 'country', 'state', 'geographic_poi']:
                     return False
-        if 'timeRange' not in slots or slots['timeRange'] == 'now':
+        if 'timeRange' not in slots or slots['timeRange']['value'] == 'now':
             return False
         return True
 
@@ -259,27 +280,30 @@ def split_by_features_RateBook(output_file=None):
 
     def RateCurrentBook(u):
         if ('rating_value' not in u['slots']) or ('object_select' not in u['slots']) or (
-                u['slots']['object_select'] not in ['this', 'current', 'this current']):
+                u['slots']['object_select']['value'] not in ['this', 'current', 'this current']):
             return False
         otype = u['slots'].get('object_type', None) or u['slots'].get('object_part_of_series_type', None)
-        return otype in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga', 'chronicle', 'essay book',
-                         'book novel', 'book album', 'series chronicle']
+        return otype is not None and otype['value'] in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga',
+                                                        'chronicle', 'essay book', 'book novel', 'book album',
+                                                        'series chronicle']
 
     def RatePreviousBook(u):
         if ('rating_value' not in u['slots']) or ('object_select' not in u['slots']) or (
-                u['slots']['object_select'] not in ['previous', 'last']):
+                u['slots']['object_select']['value'] not in ['previous', 'last']):
             return False
         otype = u['slots'].get('object_type', None) or u['slots'].get('object_part_of_series_type', None)
-        return otype in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga', 'chronicle', 'essay book',
-                         'book novel', 'book album', 'series chronicle']
+        return otype is not None and otype['value'] in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga',
+                                                        'chronicle', 'essay book', 'book novel', 'book album',
+                                                        'series chronicle']
 
     def RateNextBook(u):
         if ('rating_value' not in u['slots']) or ('object_select' not in u['slots']) or (
-                u['slots']['object_select'] not in ['next']):
+                u['slots']['object_select']['value'] not in ['next']):
             return False
         otype = u['slots'].get('object_type', None) or u['slots'].get('object_part_of_series_type', None)
-        return otype in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga', 'chronicle', 'essay book',
-                         'book novel', 'book album', 'series chronicle']
+        return otype is not None and otype['value'] in ['textbook', 'essay', 'novel', 'book', 'album', 'series', 'saga',
+                                                        'chronicle', 'essay book', 'book novel', 'book album',
+                                                        'series chronicle']
 
     return extract_utterances_splitted_by_features(
         {
@@ -318,7 +342,7 @@ def split_by_features_PlayMusic(output_file=None):
             if k == 'track':
                 found = True
             elif k == 'music_item':
-                if u['slots'][k] not in ['song', 'track', 'tune', 'soundtrack', 'sound track', 'record']:
+                if u['slots'][k]['value'] not in ['song', 'track', 'tune', 'soundtrack', 'sound track', 'record']:
                     return False
             elif k not in ['artist']:
                 return False
@@ -331,7 +355,7 @@ def split_by_features_PlayMusic(output_file=None):
             if k == 'track':
                 found = True
             elif k == 'music_item':
-                if u['slots'][k] not in ['song', 'track']:
+                if u['slots'][k]['value'] not in ['song', 'track']:
                     return False
             elif k == 'service':
                 service_found = True
@@ -345,7 +369,7 @@ def split_by_features_PlayMusic(output_file=None):
             if k == 'album':
                 found = True
             elif k == 'music_item':
-                if u['slots'][k] not in ['album', 'song', 'track']:
+                if u['slots'][k]['value'] not in ['album', 'song', 'track']:
                     return False
             elif k not in ['artist', 'sort']:
                 return False
@@ -358,7 +382,7 @@ def split_by_features_PlayMusic(output_file=None):
             if k == 'album':
                 found = True
             elif k == 'music_item':
-                if u['slots'][k] not in ['album', 'song', 'track']:
+                if u['slots'][k]['value'] not in ['album', 'song', 'track']:
                     return False
             elif k == 'service':
                 service_found = True
@@ -441,7 +465,7 @@ def split_by_features_PlayMusic(output_file=None):
             if k == 'genre':
                 found = True
             elif k == 'music_item':
-                if u['slots'][k] not in ['track', 'song']:
+                if u['slots'][k]['value'] not in ['track', 'song']:
                     return False
             elif k not in ['sort']:
                 return False
@@ -454,7 +478,7 @@ def split_by_features_PlayMusic(output_file=None):
             if k == 'genre':
                 found = True
             elif k == 'music_item':
-                if u['slots'][k] not in ['track', 'song']:
+                if u['slots'][k]['value'] not in ['track', 'song']:
                     return False
             elif k == 'service':
                 service_found = True
@@ -493,7 +517,7 @@ def split_by_features_SearchCreativeWork(output_file=None):
     slot_count = {}
     for u in utrs:
         for k, v in u['slots'].items():
-            p = k + '|' + v if k == 'object_type' else k
+            p = k + '|' + v['value'] if k == 'object_type' else k
             slot_count[p] = slot_count.get(p, 0) + 1
     print(sorted(slot_count.items(), key=lambda x: x[1], reverse=True))
 
@@ -513,27 +537,28 @@ def split_by_features_SearchCreativeWork(output_file=None):
         {
             'SearchCreativeWork': lambda u: ('object_type' not in u['slots']) and not is_wh_question(u),
             'PlayTVProgram': lambda u: ('object_type' in u['slots'])
-                                       and (u['slots']['object_type'] in ['TV show', 'show', 'TV series',
-                                                                          'television show', 'movie', 'program',
-                                                                          'saga'])
+                                       and (u['slots']['object_type']['value'] in ['TV show', 'show', 'TV series',
+                                                                                   'television show', 'movie',
+                                                                                   'program',
+                                                                                   'saga'])
                                        and not is_wh_question(u),
             'PlayTVProgramTrailer': lambda u: ('object_type' in u['slots'])
-                                              and (u['slots']['object_type'] in ['trailer'])
+                                              and (u['slots']['object_type']['value'] in ['trailer'])
                                               and not is_wh_question(u),
             'PlaySong': lambda u: ('object_type' in u['slots'])
-                                  and (u['slots']['object_type'] in ['song', 'soundtrack'])
+                                  and (u['slots']['object_type']['value'] in ['song', 'soundtrack'])
                                   and not is_wh_question(u),
             'SearchAlbum': lambda u: ('object_type' in u['slots'])
-                                     and (u['slots']['object_type'] in ['album'])
+                                     and (u['slots']['object_type']['value'] in ['album'])
                                      and not is_wh_question(u),
             'SearchBook': lambda u: ('object_type' in u['slots'])
-                                    and (u['slots']['object_type'] in ['book', 'novel'])
+                                    and (u['slots']['object_type']['value'] in ['book', 'novel'])
                                     and not is_wh_question(u),
             'SearchPicture': lambda u: ('object_type' in u['slots'])
-                                       and (u['slots']['object_type'] in ['picture', 'photograph', 'painting'])
+                                       and (u['slots']['object_type']['value'] in ['picture', 'photograph', 'painting'])
                                        and not is_wh_question(u),
             'SearchGame': lambda u: ('object_type' in u['slots'])
-                                    and (u['slots']['object_type'] in ['game', 'video game'])
+                                    and (u['slots']['object_type']['value'] in ['game', 'video game'])
                                     and not is_wh_question(u),
             'WHQuestion': lambda u: is_wh_question(u),
         },
@@ -550,7 +575,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
     slot_count = {}
     for u in utrs:
         for k, v in u['slots'].items():
-            p = k + '|' + v if k == 'object_type' else k
+            p = k + '|' + v['value'] if k == 'object_type' else k
             slot_count[p] = slot_count.get(p, 0) + 1
     print(sorted(slot_count.items(), key=lambda x: x[1], reverse=True))
 
@@ -561,7 +586,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
     print(sorted(intent_count.items(), key=lambda k: k[1], reverse=True))
 
     def is_yn_question(u):
-        return u['text'].startswith('is ')
+        return u['text'].lower().startswith('is ')
 
     def GetScheduleForAMovie(u):
         found = False
@@ -606,7 +631,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
     def GetSchedule(u):
         for k in u['slots']:
             if k == 'movie_type':
-                if u['slots'][k] not in ['films', 'movies', 'movie', 'film']:
+                if u['slots'][k]['value'] not in ['films', 'movies', 'movie', 'film']:
                     return False
             elif k not in ['object_type']:
                 return False
@@ -617,7 +642,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
             return False
         for k in u['slots']:
             if k == 'movie_type':
-                if u['slots'][k] not in ['films', 'movies', 'film', 'movie']:
+                if u['slots'][k]['value'] not in ['films', 'movies', 'film', 'movie']:
                     return False
             elif k not in ['object_type', 'object_location_type', 'spatial_relation']:
                 return False
@@ -626,7 +651,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
     def GetScheduleForAnimatedMoviesAtNearbyCinemas(u):
         if 'object_location_type' not in u['slots'] or 'spatial_relation' not in u['slots']:
             return False
-        if ('movie_type', 'animated movies') not in u['slots'].items():
+        if 'movie_type' not in u['slots'] or u['slots']['movie_type']['value'] != 'animated movies':
             return False
         for k in u['slots']:
             if k not in ['movie_type', 'object_type', 'object_location_type', 'spatial_relation']:
@@ -639,7 +664,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
             if k == 'location_name':
                 found = True
             elif k == 'movie_type':
-                if u['slots'][k] not in ['films', 'movies', 'film', 'movie']:
+                if u['slots'][k]['value'] not in ['films', 'movies', 'film', 'movie']:
                     return False
             elif k not in ['object_type']:  # timeRange: checking if a movie is playing?
                 return False
@@ -649,7 +674,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
         found = False
         for k in u['slots']:
             if k == 'movie_type':
-                if u['slots'][k] in ['animated movies', 'animated movie']:
+                if u['slots'][k]['value'] in ['animated movies', 'animated movie']:
                     found = True
             elif k not in ['object_type', 'spatial_relation']:
                 return False
@@ -662,7 +687,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
             if k == 'location_name':
                 found = True
             elif k == 'movie_type':
-                if u['slots'][k] in ['animated movies', 'animated movie']:
+                if u['slots'][k]['value'] in ['animated movies', 'animated movie']:
                     animated_movie_found = True
             elif k not in ['object_type']:  # timeRange: checking if a movie is playing?
                 return False
@@ -685,7 +710,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
             elif k == 'timeRange':
                 location_found = True
             elif k == 'movie_type':
-                if u['slots'][k] not in ['films', 'movies', 'film', 'movie']:
+                if u['slots'][k]['value'] not in ['films', 'movies', 'film', 'movie']:
                     return False
             elif k not in ['object_type']:  # timeRange: checking if a movie is playing?
                 return False
