@@ -172,7 +172,7 @@ class Pipeline(object):
                 if u[2] == 'TRAIN':
                     assignment_conf.append(1.0)
                 else:
-                    scaled_dist = [pow(1 / d, pow_scale) for d in distance_matrix[i]]
+                    scaled_dist = [pow(1 / max(d, 1e-6), pow_scale) for d in distance_matrix[i]]
                     assignment_conf.append(scaled_dist[clusters[i]] / sum(scaled_dist))
 
             if not including_train:
