@@ -78,7 +78,7 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
 
 class Pipeline(object):
 
-    def __init__(self, utterances: List[Tuple[str, any, str]],  # (utterance, cluster_label, sample_type)
+    def __init__(self, utterances: List[Tuple[str, any, str, dict]],  # (utterance, cluster_label, sample_type, slots)
                  dataset_name=None, normalize_embeddings=False):
         self.dataset_name = dataset_name
         self.normalize_embeddings = normalize_embeddings

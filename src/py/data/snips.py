@@ -743,7 +743,7 @@ def split_by_features_SearchScreeningEvent(output_file=None):
 
 def get_train_test_data(generate_data=False, use_dev=True):
     """
-    :return: intra_intent_data: List[Tuple[utterance: str, cluster_label: any, sample_type: 'TRAIN'|'DEV'|'TEST']],
+    :return: intra_intent_data: List[Tuple[utterance: str, cluster_label: any, sample_type: 'TRAIN'|'DEV'|'TEST', slots: dict]],
     inter_intent_data: List[Tuple[intent_name, List]]
     """
     train_test_data_file = './data/snips/slot_based_clusters/train_test_data_global.json'
