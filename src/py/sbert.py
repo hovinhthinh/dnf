@@ -9,7 +9,9 @@ from torch import nn
 from torch.nn import CrossEntropyLoss, MSELoss
 from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer
+from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, set_seed
+
+set_seed(0)
 
 tokenizer = None
 model = None
@@ -324,7 +326,7 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
 
     if n_train_epochs == -1:
         if n_train_steps == -1:
-            n_train_steps = 10000
+            n_train_steps = 3000
         n_train_epochs = min(max(ceil(n_train_steps / len(train_dataset)), 3), 10)
 
     trainer = Trainer(

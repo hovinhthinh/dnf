@@ -236,8 +236,8 @@ class Pipeline(object):
             else:
                 embeddings = self.test_embeddings
 
-            test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map)) \
-                .fit(embeddings).labels_
+            test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map),
+                                             random_state=0).fit(embeddings).labels_
 
             return get_clustering_quality(test_true_clusters, test_predicted_clusters)
         else:
