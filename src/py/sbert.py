@@ -287,7 +287,7 @@ class UtteranceSimilarityModel(nn.Module):
 # labels: None means unseen
 def fine_tune_utterance_similarity(train_texts, train_labels,
                                    val_texts=None, val_labels=None, test_texts=None, test_labels=None,
-                                   n_train_epochs=-1, n_train_steps=-1, negative_to_positive_rate=3):
+                                   n_train_epochs=-1, n_train_steps=-1, negative_to_positive_rate=2):
     label_set = set(train_labels)
     if val_labels is not None:
         label_set.update(val_labels)
@@ -326,8 +326,8 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
 
     if n_train_epochs == -1:
         if n_train_steps == -1:
-            n_train_steps = 3000
-        n_train_epochs = min(max(ceil(n_train_steps / len(train_dataset)), 3), 10)
+            n_train_steps = 1000
+        n_train_epochs = ceil(n_train_steps / len(train_dataset))
 
     trainer = Trainer(
         model=estimator,
