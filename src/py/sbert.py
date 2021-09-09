@@ -326,7 +326,7 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
 
     if n_train_epochs == -1:
         if n_train_steps == -1:
-            n_train_steps = 1000
+            n_train_steps = 2000
         n_train_epochs = ceil(n_train_steps / len(train_dataset))
 
     trainer = Trainer(
@@ -539,7 +539,7 @@ def fine_tune_slot_recognition(train_texts, train_slots,
 
     if n_train_epochs == -1:
         if n_train_steps == -1:
-            n_train_steps = 1000
+            n_train_steps = 2000
         n_train_epochs = max(ceil(n_train_steps / len(train_dataset)), 3)
 
     trainer = Trainer(
