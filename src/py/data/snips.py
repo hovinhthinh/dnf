@@ -193,7 +193,7 @@ def split_by_features_BookRestaurant(output_file=None):
 
     return extract_utterances_splitted_by_features(
         {
-            # TODO
+            'BookRestaurant': lambda u: True  # This intent is included as a whole feature
         },
         utrs,
         'BookRestaurant',
@@ -309,11 +309,14 @@ def split_by_features_RateBook(output_file=None):
                                                         'series chronicle']
 
     return extract_utterances_splitted_by_features(
+        # {
+        #     'RateABook': lambda u: 'object_name' in u['slots'] and 'rating_value' in u['slots'],
+        #     'RateCurrentBook': lambda u: RateCurrentBook(u),
+        #     'RatePreviousBook': lambda u: RatePreviousBook(u),
+        #     'RateNextBook': lambda u: RateNextBook(u)
+        # },
         {
-            'RateABook': lambda u: 'object_name' in u['slots'] and 'rating_value' in u['slots'],
-            'RateCurrentBook': lambda u: RateCurrentBook(u),
-            'RatePreviousBook': lambda u: RatePreviousBook(u),
-            'RateNextBook': lambda u: RateNextBook(u)
+            'RateBook': lambda u: True  # This intent is included as a whole feature
         },
         utrs,
         'RateBook',
@@ -750,7 +753,7 @@ def get_train_test_data(generate_data=False, use_dev=True):
 
     if generate_data:
         intent_data = [
-            (split_by_features_GetWeather(), {  # Hard-code train/dev/test clusters
+            (split_by_features_GetWeather(), {  # Hard-code train/dev/test clusters, set to None to randomly sample
                 'TRAIN': ['GetCurrentWeatherInALocation', 'GetWeatherInCurrentPositionAtATimeRange'],
                 'DEV': ['GetCurrentWeatherInCurrentPosition'],
                 'TEST': ['GetWeatherInALocationAtATimeRange'],
@@ -761,11 +764,17 @@ def get_train_test_data(generate_data=False, use_dev=True):
                 'TEST': ['AddCurrentAlbumToAPlaylist'],
             }),
             (split_by_features_RateBook(), {
-                'TRAIN': ['RateABook'],
-                'DEV': ['RateCurrentBook'],
+                # 'TRAIN': ['RateABook'],
+                # 'DEV': ['RateCurrentBook'],
+                'TRAIN': ['RateBook'],
+                'DEV': [],
                 'TEST': [],
             }),
-            (split_by_features_BookRestaurant(), None),  # Set to None to automatically randomly sample
+            (split_by_features_BookRestaurant(), {
+                'TRAIN': [],
+                'DEV': [],
+                'TEST': ['BookRestaurant'],
+            }),
             (split_by_features_PlayMusic(), {
                 'TRAIN': ['PlayAlbum', 'PlayMusicByYear', 'PlayMusicByGenre', 'PlayMusicByArtistOnService',
                           'PlayMusicByArtistAndYearOnService', 'PlayMusicByArtist'],
@@ -813,6 +822,9 @@ def get_train_test_data(generate_data=False, use_dev=True):
             for c in clusters:
                 cluster_data = [u for u in data if u['cluster'] == c]
                 random.shuffle(cluster_data)
+                if len(cluster_data) > 400:  # Down sample
+                    cluster_data = cluster_data[0:400]
+
                 if c in train_clusters:
                     splitted_data.extend([(u['text'], c + '_TRAIN', 'TRAIN', u['slots']) for u in
                                           cluster_data[:ceil(len(cluster_data) * 0.4)]])
@@ -855,18 +867,23 @@ def get_train_test_data(generate_data=False, use_dev=True):
     for intent_name, cluster_data in intra_intent_data:
         print("====", intent_name)
         clusters = set(u[1] for u in cluster_data)
+        all_clusters = []
         train_clusters = []
         dev_clusters = []
         test_clusters = []
         for c in clusters:
             total = len([u for u in cluster_data if u[1] == c])
             if c.endswith('_TRAIN'):
+                all_clusters.append((c[:-6], total))
                 train_clusters.append((c, total))
             elif c.endswith('_DEV'):
+                all_clusters.append((c[:-4], total))
                 dev_clusters.append((c, total))
             elif c.endswith('_TEST'):
+                all_clusters.append((c[:-5], total))
                 test_clusters.append((c, total))
 
+        print('All:', all_clusters)
         print('Train:', train_clusters)
         if use_dev:
             print('Dev:', dev_clusters)
