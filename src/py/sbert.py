@@ -538,7 +538,7 @@ def fine_tune_slot_recognition(train_texts, train_slots,
     if n_train_epochs == -1:
         if n_train_steps == -1:
             n_train_steps = 1000
-        n_train_epochs = ceil(n_train_steps / len(train_dataset))
+        n_train_epochs = max(ceil(n_train_steps / len(train_dataset)), 3)
 
     trainer = Trainer(
         model=tagger,

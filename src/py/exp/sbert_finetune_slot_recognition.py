@@ -4,14 +4,14 @@ from data import snips
 from data.snips import print_train_dev_test_stats
 from ufd import Pipeline
 
-report_folder = './reports/global/snips_finetune_utterance_similarity/'
+report_folder = './reports/global/snips_finetune_slot_recognition/'
 
 intra_intent_data, inter_intent_data = snips.get_train_test_data(use_dev=True)
 
 pipeline_steps = [
     # 'no-finetune',
-    # 'finetune-slot-recognition',
-    'finetune-utterance-similarity',
+    'finetune-slot-recognition',
+    # 'finetune-utterance-similarity',
     # 'finetune-pseudo-classification',
 ]
 

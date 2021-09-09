@@ -310,7 +310,7 @@ class Pipeline(object):
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
                                                                   including_train=False)[0]))
             # Fine-tuning
-            self.fine_tune_slot_recognition(n_train_epochs=3)
+            self.fine_tune_slot_recognition()
             self.update_embeddings()
             self.plot(show_train_dev_only=True,
                       output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
@@ -380,7 +380,7 @@ class Pipeline(object):
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
                                                                   including_train=False)[0]))
             # Fine-tuning
-            for it in range(10):
+            for it in range(5):
                 print('Iter: #{}'.format(it + 1))
                 self.fine_tune_pseudo_classification(
                     use_sample_weights=(('classification_sample_weights', True) in config.items()))

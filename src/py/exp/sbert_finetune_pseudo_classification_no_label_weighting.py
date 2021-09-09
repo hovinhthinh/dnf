@@ -10,6 +10,7 @@ intra_intent_data, inter_intent_data = snips.get_train_test_data(use_dev=True)
 
 pipeline_steps = [
     # 'no-finetune',
+    # 'finetune-slot-recognition',
     # 'finetune-utterance-similarity',
     'finetune-pseudo-classification',
 ]
