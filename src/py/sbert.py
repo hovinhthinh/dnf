@@ -447,7 +447,7 @@ class SlotRecognitionModel(nn.Module):
 
 def fine_tune_slot_recognition(train_texts, train_slots,
                                val_texts=None, val_slots=None, test_texts=None, test_slots=None,
-                               intent_name=None, n_train_epochs=-1, n_train_steps=-1):
+                               n_train_epochs=-1, n_train_steps=-1):
     def split_text_and_slots_into_tokens_and_tags(texts, slots):
         texts = [text.split(' ') for text in texts]
 
@@ -465,13 +465,13 @@ def fine_tune_slot_recognition(train_texts, train_slots,
                     if cur == info['start']:
                         assert cur + len(t) <= info['end']
                         assert tag is None
-                        tag = ('' if intent_name is None else intent_name + '_') + 'B_' + slot
+                        tag = 'B_' + slot
                         last_b = tag
                     elif info['start'] < cur < info['end']:
                         assert cur + len(t) <= info['end']
                         assert tag is None
-                        assert last_b == ('' if intent_name is None else intent_name + '_') + 'B_' + slot
-                        tag = ('' if intent_name is None else intent_name + '_') + 'I_' + slot
+                        assert last_b == 'B_' + slot
+                        tag = 'I_' + slot
 
                 if tag is None:
                     last_b = None
@@ -582,4 +582,4 @@ if __name__ == '__main__':
     #     = ['this is first sentence', 'this is second with oov word qwertyuiop asdfghjkl'], \
     #       [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
     #        {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}, ]
-    # fine_tune_slot_recognition(train_texts, train_slots, intent_name='test_intent')
+    # fine_tune_slot_recognition(train_texts, train_slots)
