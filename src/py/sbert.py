@@ -445,63 +445,65 @@ class SlotRecognitionModel(nn.Module):
         return ((loss,) + output) if loss is not None else output
 
 
+def _split_text_and_slots_into_tokens_and_tags(texts, slots):
+    texts = [text.split() for text in texts]
+
+    tags = []
+
+    for i, tokens in enumerate(texts):
+        last_b = None
+        u_tags = []
+        cur = 0
+        for j, t in enumerate(tokens):
+            tag = None
+            if j > 0:
+                cur += 1
+            for slot, info in slots[i].items():
+                if cur == info['start']:
+                    assert cur + len(t) <= info['end']
+                    assert tag is None
+                    tag = 'B_' + slot
+                    last_b = tag
+                elif info['start'] < cur < info['end']:
+                    assert cur + len(t) <= info['end']
+                    assert tag is None
+                    assert last_b == 'B_' + slot
+                    tag = 'I_' + slot
+
+            if tag is None:
+                last_b = None
+            u_tags.append('O' if tag is None else tag)
+            cur += len(t)
+
+        tags.append(u_tags)
+
+    return texts, tags
+
+
+def _encode_tags(tags, encodings, tag2id):
+    labels = [[tag2id[tag] for tag in doc] for doc in tags]
+    encoded_labels = []
+    for doc_labels, doc_offset in zip(labels, encodings.offset_mapping):
+        # create an empty array of -100
+        doc_enc_labels = numpy.ones(len(doc_offset), dtype=int) * -100
+        arr_offset = numpy.array(doc_offset)
+
+        # set labels whose first offset position is 0 and the second is not 0
+        doc_enc_labels[(arr_offset[:, 0] == 0) & (arr_offset[:, 1] != 0)] = doc_labels
+        encoded_labels.append(doc_enc_labels.tolist())
+
+    return encoded_labels
+
+
 def fine_tune_slot_recognition(train_texts, train_slots,
                                val_texts=None, val_slots=None, test_texts=None, test_slots=None,
                                n_train_epochs=-1, n_train_steps=-1):
-    def split_text_and_slots_into_tokens_and_tags(texts, slots):
-        texts = [text.split() for text in texts]
-
-        tags = []
-
-        for i, tokens in enumerate(texts):
-            last_b = None
-            u_tags = []
-            cur = 0
-            for j, t in enumerate(tokens):
-                tag = None
-                if j > 0:
-                    cur += 1
-                for slot, info in slots[i].items():
-                    if cur == info['start']:
-                        assert cur + len(t) <= info['end']
-                        assert tag is None
-                        tag = 'B_' + slot
-                        last_b = tag
-                    elif info['start'] < cur < info['end']:
-                        assert cur + len(t) <= info['end']
-                        assert tag is None
-                        assert last_b == 'B_' + slot
-                        tag = 'I_' + slot
-
-                if tag is None:
-                    last_b = None
-                u_tags.append('O' if tag is None else tag)
-                cur += len(t)
-
-            tags.append(u_tags)
-
-        return texts, tags
-
-    def encode_tags(tags, encodings):
-        labels = [[tag2id[tag] for tag in doc] for doc in tags]
-        encoded_labels = []
-        for doc_labels, doc_offset in zip(labels, encodings.offset_mapping):
-            # create an empty array of -100
-            doc_enc_labels = numpy.ones(len(doc_offset), dtype=int) * -100
-            arr_offset = numpy.array(doc_offset)
-
-            # set labels whose first offset position is 0 and the second is not 0
-            doc_enc_labels[(arr_offset[:, 0] == 0) & (arr_offset[:, 1] != 0)] = doc_labels
-            encoded_labels.append(doc_enc_labels.tolist())
-
-        return encoded_labels
-
-    train_texts, train_tags = split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
+    train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
 
     if val_texts is not None:
-        val_texts, val_tags = split_text_and_slots_into_tokens_and_tags(val_texts, val_slots)
+        val_texts, val_tags = _split_text_and_slots_into_tokens_and_tags(val_texts, val_slots)
     if test_texts is not None:
-        test_texts, test_tags = split_text_and_slots_into_tokens_and_tags(test_texts, test_slots)
+        test_texts, test_tags = _split_text_and_slots_into_tokens_and_tags(test_texts, test_slots)
 
     # Tag set
     unique_tags = set(tag for doc in train_tags for tag in doc)
@@ -519,9 +521,9 @@ def fine_tune_slot_recognition(train_texts, train_slots,
     test_encodings = tokenizer(test_texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
                                truncation=True, return_tensors='pt') if test_texts is not None else None
 
-    train_labels = encode_tags(train_tags, train_encodings)
-    val_labels = encode_tags(val_tags, val_encodings) if val_texts is not None else None
-    test_labels = encode_tags(test_tags, test_encodings) if test_texts is not None else None
+    train_labels = _encode_tags(train_tags, train_encodings, tag2id)
+    val_labels = _encode_tags(val_tags, val_encodings, tag2id) if val_texts is not None else None
+    test_labels = _encode_tags(test_tags, test_encodings, tag2id) if test_texts is not None else None
 
     train_encodings.pop("offset_mapping")
     if val_texts is not None:
