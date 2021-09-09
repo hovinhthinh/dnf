@@ -221,6 +221,10 @@ class Pipeline(object):
         sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices,
                                              n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
+    def fine_tune_slot_recognition(self, n_train_epochs=-1, n_train_steps=-1):
+        sbert.fine_tune_slot_recognition([u[0] for u in self.utterances], [u[3] for u in self.utterances],
+                                         n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+
     def get_test_clustering_quality(self, k=None):
         if self.use_dev:
             # Use KMeans. we haven't seen the testing utterances yet, so we use normal KMeans here.
@@ -251,12 +255,14 @@ class Pipeline(object):
 
     def run(self, report_folder=None, config={}, steps=[
         'no-finetune',
+        'finetune-slot-recognition',
         'finetune-utterance-similarity',
         'finetune-pseudo-classification',
     ]):
         for s in steps:
             if s not in [
                 'no-finetune',
+                'finetune-slot-recognition',
                 'finetune-utterance-similarity',
                 'finetune-pseudo-classification',
             ]:
@@ -289,9 +295,43 @@ class Pipeline(object):
             if stats_file is not None:
                 stats_file.write('No-finetune test quality: {}\n'.format(test_quality))
 
+        if 'finetune-slot-recognition' in steps:
+            print('==================== Step: finetune-slot-recognition ====================')
+            folder = None
+            if report_folder is not None:
+                folder = os.path.join(report_folder, 'finetune-slot-recognition')
+                os.makedirs(folder, exist_ok=True)
+
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
+            print('Clustering DEV(unseen) before fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)[0]))
+            # Fine-tuning
+            self.fine_tune_slot_recognition(n_train_epochs=3)
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
+
+            print('Clustering DEV(unseen) after fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)[0]))
+
+            # Testing
+            self.update_test_embeddings()
+            self.plot(show_test_only=True,
+                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+
+            test_quality = self.get_test_clustering_quality()
+            print('Finetune-slot-recognition test quality:', test_quality)
+            if stats_file is not None:
+                stats_file.write('Finetune-slot-recognition test quality: {}\n'.format(test_quality))
+
         if 'finetune-utterance-similarity' in steps:
-            print(
-                '==================== Step: finetune-utterance-similarity ====================')
+            print('==================== Step: finetune-utterance-similarity ====================')
             folder = None
             if report_folder is not None:
                 folder = os.path.join(report_folder, 'finetune-utterance-similarity')

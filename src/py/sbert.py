@@ -361,8 +361,8 @@ class SlotRecognitionDataset(torch.utils.data.Dataset):
         self.labels = labels
 
     def __getitem__(self, idx):
-        item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
-        item['labels'] = torch.tensor(self.labels[idx])
+        item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
+        item['labels'] = self.labels[idx]
         return item
 
     def __len__(self):
@@ -449,7 +449,7 @@ def fine_tune_slot_recognition(train_texts, train_slots,
                                val_texts=None, val_slots=None, test_texts=None, test_slots=None,
                                n_train_epochs=-1, n_train_steps=-1):
     def split_text_and_slots_into_tokens_and_tags(texts, slots):
-        texts = [text.split(' ') for text in texts]
+        texts = [text.split() for text in texts]
 
         tags = []
 

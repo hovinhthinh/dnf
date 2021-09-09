@@ -33,7 +33,7 @@ def get_utterances_and_slots(input_file):
         }
         text = ''
         for t in v['data']:
-            t_text = t['text'].strip()
+            t_text = ' '.join(t['text'].split())
             if t_text == '':
                 continue
             if len(text) > 0:
