@@ -891,5 +891,8 @@ def print_train_dev_test_stats(intent_data):
 
 
 if __name__ == '__main__':
-    get_train_test_data()
+    intra_intent_data, _ = get_train_test_data()
+    for name, data in intra_intent_data:
+        print('Intent: ', name)
+        print_train_dev_test_stats(data)
     pass
