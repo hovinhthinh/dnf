@@ -167,12 +167,11 @@ class Pipeline(object):
 
             assignment_conf = []
             distance_matrix = pairwise_distances(embeddings, centers)
-            pow_scale = 8
             for i, u in enumerate(self.utterances):
                 if u[2] == 'TRAIN':
                     assignment_conf.append(1.0)
                 else:
-                    scaled_dist = [pow(1 / max(d, 1e-6), pow_scale) for d in distance_matrix[i]]
+                    scaled_dist = [1 / (1 + pow(d, 2)) for d in distance_matrix[i]]
                     assignment_conf.append(scaled_dist[clusters[i]] / sum(scaled_dist))
 
             if not including_train:
@@ -381,7 +380,7 @@ class Pipeline(object):
                                          self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
                                                                   including_train=False)[0]))
             # Fine-tuning
-            for it in range(10):
+            for it in range(5):
                 print('Iter: #{}'.format(it + 1))
                 self.fine_tune_pseudo_classification(
                     use_sample_weights=(('classification_sample_weights', True) in config.items()))
