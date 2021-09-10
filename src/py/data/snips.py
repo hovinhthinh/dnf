@@ -908,8 +908,24 @@ def print_train_dev_test_stats(intent_data):
 
 
 if __name__ == '__main__':
-    intra_intent_data, _ = get_train_test_data()
+    intra_intent_data, inter_intent_data = get_train_test_data()
     for name, data in intra_intent_data:
         print('Intent: ', name)
         print_train_dev_test_stats(data)
-    pass
+
+    # Write utterances to file
+    f = open('data/snips/slot_based_clusters/utterances.txt', 'w')
+    intents = set(u[1][:u[1].find('_')] for u in inter_intent_data)
+    for intent in intents:
+        data = [u for u in inter_intent_data if u[1].startswith(intent)]
+        sets = set(u[1] for u in data)
+        print('======== Intent:', intent, '========', file=f)
+        sets = [s for s in sets if s.endswith('TRAIN')] + [s for s in sets if s.endswith('DEV')] + [s for s in sets if
+                                                                                                    s.endswith('TEST')]
+        for s in sets:
+            utrs = [u[0] for u in data if u[1] == s]
+            print('Feature:', s[s.find('_') + 1:], file=f)
+            print(utrs, file=f)
+            print(file=f)
+
+    f.close()
