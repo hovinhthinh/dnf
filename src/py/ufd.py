@@ -222,7 +222,8 @@ class Pipeline(object):
                                              n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
     def fine_tune_slot_recognition(self, n_train_epochs=-1, n_train_steps=-1):
-        sbert.fine_tune_slot_recognition([u[0] for u in self.utterances], [u[3] for u in self.utterances],
+        sbert.fine_tune_slot_recognition([u[0] for u in self.utterances if u[2] == 'TRAIN'],
+                                         [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                                          n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
     def get_test_clustering_quality(self, k=None):
