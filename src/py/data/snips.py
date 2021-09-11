@@ -914,18 +914,19 @@ if __name__ == '__main__':
         print_train_dev_test_stats(data)
 
     # Write utterances to file
-    f = open('data/snips/slot_based_clusters/utterances.txt', 'w')
-    intents = set(u[1][:u[1].find('_')] for u in inter_intent_data)
-    for intent in intents:
-        data = [u for u in inter_intent_data if u[1].startswith(intent)]
-        sets = set(u[1] for u in data)
-        print('======== Intent:', intent, '========', file=f)
-        sets = [s for s in sets if s.endswith('TRAIN')] + [s for s in sets if s.endswith('DEV')] + [s for s in sets if
-                                                                                                    s.endswith('TEST')]
-        for s in sets:
-            utrs = [u[0] for u in data if u[1] == s]
-            print('Feature:', s[s.find('_') + 1:], file=f)
-            print(utrs, file=f)
-            print(file=f)
-
-    f.close()
+    if False:
+        f = open('data/snips/slot_based_clusters/utterances.txt', 'w')
+        intents = set(u[1][:u[1].find('_')] for u in inter_intent_data)
+        for intent in intents:
+            data = [u for u in inter_intent_data if u[1].startswith(intent)]
+            sets = set(u[1] for u in data)
+            print('======== Intent:', intent, '========', file=f)
+            sets = [s for s in sets if s.endswith('TRAIN')] + \
+                   [s for s in sets if s.endswith('DEV')] + \
+                   [s for s in sets if s.endswith('TEST')]
+            for s in sets:
+                utrs = [u[0] for u in data if u[1] == s]
+                print('Feature:', s[s.find('_') + 1:], file=f)
+                print(utrs, file=f)
+                print(file=f)
+        f.close()
