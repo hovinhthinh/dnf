@@ -596,7 +596,9 @@ def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train
                                                               us_negative_sampling_rate_from_unseen=0.5,
                                                               ):
     # Prepare for slot recognition
-    train_texts_sr, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts[:len(train_slots)], train_slots)
+    train_texts_sr = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
+    train_slots = [s for s in train_slots if s is not None]
+    train_texts_sr, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts_sr, train_slots)
     unique_tags = set(tag for doc in train_tags for tag in doc)
     tag2id = {tag: id for id, tag in enumerate(unique_tags)}
     id2tag = {id: tag for tag, id in tag2id.items()}
