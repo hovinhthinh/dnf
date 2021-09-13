@@ -636,7 +636,11 @@ def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train
             n_train_steps = 2000
         n_train_epochs = max(ceil(n_train_steps / min(len(sr_train_dataset), len(us_train_dataset))), 3)
 
-    model.train()  # Switch mode
+    tagger.to(device)
+    estimator.to(device)
+
+    tagger.train()  # Switch mode
+    estimator.train()
 
     train_ids_len = len(us_train_loader) + len(sr_train_loader)
 
@@ -668,7 +672,8 @@ def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train
                 loss.backward()
                 sr_optim.step()
 
-    model.eval()  # Switch mode
+    tagger.eval()  # Switch mode
+    estimator.eval()
 
 
 if __name__ == '__main__':
