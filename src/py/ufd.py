@@ -324,9 +324,9 @@ class Pipeline(object):
                       output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
 
             test_quality = self.get_test_clustering_quality()
-            print('Finetune-slot-recognition+utterance-similarity:', test_quality)
+            print('Finetune-slot-recognition+utterance-similarity test quality:', test_quality)
             if stats_file is not None:
-                stats_file.write('Finetune-slot-recognition+utterance-similarity: {}\n'.format(test_quality))
+                stats_file.write('Finetune-slot-recognition+utterance-similarity test quality: {}\n'.format(test_quality))
 
         if 'SR' in steps:
             print('==================== Step: finetune-slot-recognition ====================')
