@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss, MSELoss
 from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, set_seed
+from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, set_seed, AdamW
 
 set_seed(12993)
 
@@ -589,6 +589,85 @@ def fine_tune_slot_recognition(train_texts, train_slots,
         print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
 
 
+# train_cluster_labels is None means unseen cluster
+def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train_slots, train_cluster_labels,
+                                                              n_train_epochs=-1, n_train_steps=-1,
+                                                              US_negative_sampling_rate_from_seen=2,
+                                                              US_negative_sampling_rate_from_unseen=0.5,
+                                                              ):
+    # Prepare for slot recognition
+    train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
+    unique_tags = set(tag for doc in train_tags for tag in doc)
+    tag2id = {tag: id for id, tag in enumerate(unique_tags)}
+    id2tag = {id: tag for tag, id in tag2id.items()}
+
+    train_encodings = tokenizer(train_texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
+                                truncation=True, return_tensors='pt')
+    train_slot_labels = _encode_tags(train_tags, train_encodings, tag2id)
+    train_encodings.pop("offset_mapping")
+    sr_train_dataset = SlotRecognitionDataset(train_encodings, train_slot_labels)
+    sr_train_loader = DataLoader(sr_train_dataset, batch_size=16, shuffle=True)
+    tagger = SlotRecognitionModel(model, len(unique_tags))
+    sr_optim = AdamW(tagger.parameters(), lr=5e-5)
+
+    # Prepare for utterance similarity
+    label_set = set(train_cluster_labels)
+    label_map = {None: -1}
+    label_count = 0
+    for l in label_set:
+        if l is not None:
+            label_map[l] = label_count
+            label_count += 1
+
+    train_cluster_labels = [label_map[l] for l in train_cluster_labels]
+    us_train_dataset = UtteranceSimilarityDataset(train_encodings, train_cluster_labels,
+                                                  negative_sampling_rate_from_seen=US_negative_sampling_rate_from_seen,
+                                                  negative_sampling_rate_from_unseen=US_negative_sampling_rate_from_unseen)
+    us_train_loader = DataLoader(us_train_dataset, batch_size=16, shuffle=True)
+    estimator = UtteranceSimilarityModel(model)
+    us_optim = AdamW(estimator.parameters(), lr=5e-5)
+
+    # Compute optimal n_epochs
+    if n_train_epochs == -1:
+        if n_train_steps == -1:
+            n_train_steps = 2000
+        n_train_epochs = max(ceil(n_train_steps / min(len(sr_train_dataset), len(us_train_dataset))), 3)
+
+    model.train()  # Switch mode
+
+    train_ids_len = len(us_train_loader) + len(sr_train_loader)
+
+    cur = 0
+    for epoch in range(n_train_epochs):
+        train_ids = list(range(train_ids_len))
+        random.shuffle(train_ids)
+        us_train_loader_iter = iter(us_train_loader)
+        sr_train_loader_iter = iter(sr_train_loader)
+        for idx in train_ids:
+            cur += 1
+            print('\rJoint training: {}/{} ({:.1f}%)'.format(cur, train_ids_len * n_train_epochs,
+                                                             100 * cur / (train_ids_len * n_train_epochs)),
+                  end='' if cur < train_ids_len * n_train_epochs else '\n')
+            if idx < len(us_train_loader):
+                us_optim.zero_grad()
+                batch = next(us_train_loader_iter)
+                batch = {key: val.to(device) for key, val in batch.items()}
+                outputs = estimator(**batch)
+                loss = outputs[0]
+                loss.backward()
+                us_optim.step()
+            else:
+                sr_optim.zero_grad()
+                batch = next(sr_train_loader_iter)
+                batch = {key: val.to(device) for key, val in batch.items()}
+                outputs = tagger(**batch)
+                loss = outputs[0]
+                loss.backward()
+                sr_optim.step()
+
+    model.eval()  # Switch mode
+
+
 if __name__ == '__main__':
     load('sentence-transformers/paraphrase-mpnet-base-v2')
 
@@ -606,3 +685,10 @@ if __name__ == '__main__':
     #       [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
     #        {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}, ]
     # fine_tune_slot_recognition(train_texts, train_slots)
+
+    train_texts, train_slots, train_labels \
+        = ['this is first sentence', 'this is second with oov word qwertyuiop asdfghjkl', 'test'], \
+          [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
+           {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}, {}], \
+          [0, 1, None]
+    fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train_slots, train_labels)
