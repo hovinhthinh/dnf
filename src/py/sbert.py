@@ -349,7 +349,7 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
     if n_train_epochs == -1:
         if n_train_steps == -1:
             n_train_steps = 2000
-        n_train_epochs = ceil(n_train_steps / len(train_dataset))
+        n_train_epochs = max(ceil(n_train_steps / len(train_dataset)), 2)
 
     trainer = Trainer(
         model=estimator,
