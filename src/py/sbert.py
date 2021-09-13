@@ -261,14 +261,13 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
         item = {}
         if idx < self.positive_bound:
             idx, idx2 = self._get_positive_pair(idx)
-            item['labels'] = 1.0
+            item['labels'] = torch.tensor(1.0)
         elif idx < self.negative_from_seen_bound:
             idx, idx2 = self._get_negative_pair_from_seen(idx % self.n_seen_utterances)
-            item['labels'] = -1.0
+            item['labels'] = torch.tensor(-1.0)
         else:
             idx, idx2 = self._get_negative_pair_from_unseen()
-            item['labels'] = -1.0
-
+            item['labels'] = torch.tensor(-1.0)
         for key, val in self.encodings.items():
             item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
 
