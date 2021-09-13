@@ -225,6 +225,14 @@ class Pipeline(object):
                                          [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                                          n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
+    def fine_tune_joint_slot_recognition_and_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
+        cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
+        sbert.fine_tune_joint_slot_recognition_and_utterance_similarity(
+            self.utterances,
+            [u[3] for u in self.utterances if u[2] == 'TRAIN'],
+            cluster_indices,
+            n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+
     def get_test_clustering_quality(self, k=None):
         if self.use_dev:
             # Use KMeans. we haven't seen the testing utterances yet, so we use normal KMeans here.
@@ -253,19 +261,9 @@ class Pipeline(object):
 
         # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
 
-    def run(self, report_folder=None, config={}, steps=[
-        'no-finetune',
-        'finetune-slot-recognition',
-        'finetune-utterance-similarity',
-        'finetune-pseudo-classification',
-    ]):
+    def run(self, report_folder=None, config={}, steps=['no', 'SR+US', 'PC']):
         for s in steps:
-            if s not in [
-                'no-finetune',
-                'finetune-slot-recognition',
-                'finetune-utterance-similarity',
-                'finetune-pseudo-classification',
-            ]:
+            if s not in ['no', 'SR+US', 'SR', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
 
         sbert.load()
@@ -275,11 +273,11 @@ class Pipeline(object):
             os.makedirs(report_folder, exist_ok=True)
             stats_file = open(os.path.join(report_folder, 'stats.txt'), 'w')
 
-        if 'no-finetune' in steps:
+        if 'no' in steps:
             print('==================== Step: no-finetune ====================')
             folder = None
             if report_folder is not None:
-                folder = os.path.join(report_folder, 'no-finetune')
+                folder = os.path.join(report_folder, 'no')
                 os.makedirs(folder, exist_ok=True)
 
             # Testing
@@ -295,11 +293,46 @@ class Pipeline(object):
             if stats_file is not None:
                 stats_file.write('No-finetune test quality: {}\n'.format(test_quality))
 
-        if 'finetune-slot-recognition' in steps:
+        if 'SR+US' in steps:
+            print('==================== Step: finetune-slot-recognition+utterance-similarity ====================')
+            folder = None
+            if report_folder is not None:
+                folder = os.path.join(report_folder, 'SR+US')
+                os.makedirs(folder, exist_ok=True)
+
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
+            print('Clustering DEV(unseen) before fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)[0]))
+            # Fine-tuning
+            self.fine_tune_joint_slot_recognition_and_utterance_similarity()
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
+
+            print('Clustering DEV(unseen) after fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)[0]))
+
+            # Testing
+            self.update_test_embeddings()
+            self.plot(show_test_only=True,
+                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+
+            test_quality = self.get_test_clustering_quality()
+            print('Finetune-slot-recognition+utterance-similarity:', test_quality)
+            if stats_file is not None:
+                stats_file.write('Finetune-slot-recognition+utterance-similarity: {}\n'.format(test_quality))
+
+        if 'SR' in steps:
             print('==================== Step: finetune-slot-recognition ====================')
             folder = None
             if report_folder is not None:
-                folder = os.path.join(report_folder, 'finetune-slot-recognition')
+                folder = os.path.join(report_folder, 'SR')
                 os.makedirs(folder, exist_ok=True)
 
             self.update_embeddings()
@@ -330,11 +363,11 @@ class Pipeline(object):
             if stats_file is not None:
                 stats_file.write('Finetune-slot-recognition test quality: {}\n'.format(test_quality))
 
-        if 'finetune-utterance-similarity' in steps:
+        if 'US' in steps:
             print('==================== Step: finetune-utterance-similarity ====================')
             folder = None
             if report_folder is not None:
-                folder = os.path.join(report_folder, 'finetune-utterance-similarity')
+                folder = os.path.join(report_folder, 'US')
                 os.makedirs(folder, exist_ok=True)
 
             self.update_embeddings()
@@ -365,11 +398,11 @@ class Pipeline(object):
             if stats_file is not None:
                 stats_file.write('Finetune-utterance-similarity test quality: {}\n'.format(test_quality))
 
-        if 'finetune-pseudo-classification' in steps:
+        if 'PC' in steps:
             print('==================== Step: finetune-pseudo-classification ====================')
             folder = None
             if report_folder is not None:
-                folder = os.path.join(report_folder, 'finetune-pseudo-classification')
+                folder = os.path.join(report_folder, 'PC')
                 os.makedirs(folder, exist_ok=True)
 
             self.update_embeddings()
