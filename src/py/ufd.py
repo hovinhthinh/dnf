@@ -228,7 +228,7 @@ class Pipeline(object):
     def fine_tune_joint_slot_recognition_and_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         sbert.fine_tune_joint_slot_recognition_and_utterance_similarity(
-            self.utterances,
+            [u[0] for u in self.utterances],
             [u[3] for u in self.utterances if u[2] == 'TRAIN'],
             cluster_indices,
             n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
