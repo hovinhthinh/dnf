@@ -592,8 +592,8 @@ def fine_tune_slot_recognition(train_texts, train_slots,
 # train_cluster_labels is None means unseen cluster
 def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train_slots, train_cluster_labels,
                                                               n_train_epochs=-1, n_train_steps=-1,
-                                                              US_negative_sampling_rate_from_seen=2,
-                                                              US_negative_sampling_rate_from_unseen=0.5,
+                                                              us_negative_sampling_rate_from_seen=2,
+                                                              us_negative_sampling_rate_from_unseen=0.5,
                                                               ):
     # Prepare for slot recognition
     train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
@@ -621,8 +621,8 @@ def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train
 
     train_cluster_labels = [label_map[l] for l in train_cluster_labels]
     us_train_dataset = UtteranceSimilarityDataset(train_encodings, train_cluster_labels,
-                                                  negative_sampling_rate_from_seen=US_negative_sampling_rate_from_seen,
-                                                  negative_sampling_rate_from_unseen=US_negative_sampling_rate_from_unseen)
+                                                  negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
+                                                  negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen)
     us_train_loader = DataLoader(us_train_dataset, batch_size=16, shuffle=True)
     estimator = UtteranceSimilarityModel(model)
     us_optim = AdamW(estimator.parameters(), lr=5e-5)
