@@ -11,7 +11,7 @@ from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, set_seed
 
-set_seed(0)
+set_seed(12993)
 
 tokenizer = None
 model = None

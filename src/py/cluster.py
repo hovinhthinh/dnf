@@ -7,7 +7,7 @@ from sklearn.cluster._kmeans import _tolerance
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score, adjusted_mutual_info_score, \
     fowlkes_mallows_score
 
-random.seed(0)
+random.seed(6993)
 
 
 # Disjoint set
