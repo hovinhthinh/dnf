@@ -596,16 +596,16 @@ def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train
                                                               us_negative_sampling_rate_from_unseen=0.5,
                                                               ):
     # Prepare for slot recognition
-    train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
+    train_texts_sr, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts[:len(train_slots)], train_slots)
     unique_tags = set(tag for doc in train_tags for tag in doc)
     tag2id = {tag: id for id, tag in enumerate(unique_tags)}
     id2tag = {id: tag for tag, id in tag2id.items()}
 
-    train_encodings = tokenizer(train_texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
-                                truncation=True, return_tensors='pt')
-    train_slot_labels = _encode_tags(train_tags, train_encodings, tag2id)
-    train_encodings.pop("offset_mapping")
-    sr_train_dataset = SlotRecognitionDataset(train_encodings, train_slot_labels)
+    train_encodings_sr = tokenizer(train_texts_sr, is_split_into_words=True, return_offsets_mapping=True,
+                                   padding=True, truncation=True, return_tensors='pt')
+    train_slot_labels = _encode_tags(train_tags, train_encodings_sr, tag2id)
+    train_encodings_sr.pop("offset_mapping")
+    sr_train_dataset = SlotRecognitionDataset(train_encodings_sr, train_slot_labels)
     sr_train_loader = DataLoader(sr_train_dataset, batch_size=16, shuffle=True)
     tagger = SlotRecognitionModel(model, len(unique_tags))
     sr_optim = AdamW(tagger.parameters(), lr=5e-5)
@@ -620,7 +620,8 @@ def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train
             label_count += 1
 
     train_cluster_labels = [label_map[l] for l in train_cluster_labels]
-    us_train_dataset = UtteranceSimilarityDataset(train_encodings, train_cluster_labels,
+    train_encodings_us = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
+    us_train_dataset = UtteranceSimilarityDataset(train_encodings_us, train_cluster_labels,
                                                   negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
                                                   negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen)
     us_train_loader = DataLoader(us_train_dataset, batch_size=16, shuffle=True)
@@ -689,6 +690,6 @@ if __name__ == '__main__':
     train_texts, train_slots, train_labels \
         = ['this is first sentence', 'this is second with oov word qwertyuiop asdfghjkl', 'test'], \
           [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
-           {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}, {}], \
+           {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}], \
           [0, 1, None]
     fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train_slots, train_labels)
