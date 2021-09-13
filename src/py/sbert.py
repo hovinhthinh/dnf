@@ -92,8 +92,8 @@ class ClassificationHead(nn.Module):
             self.out_proj.bias.data.zero_()
 
     def forward(self, mean_pooling, **kwargs):
-        x = torch.tanh(mean_pooling)
-        x = self.dropout(x)
+        # mean_pooling = torch.tanh(mean_pooling)
+        x = self.dropout(mean_pooling)
         # x = self.dense(x)
         # x = torch.tanh(x)
         # x = self.dropout(x)
