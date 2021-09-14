@@ -79,7 +79,7 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
 class Pipeline(object):
 
     def __init__(self, utterances: List[Tuple[str, any, str, dict]],  # (utterance, cluster_label, sample_type, slots)
-                 dataset_name=None, normalize_embeddings=False):
+                 dataset_name=None, normalize_embeddings=False, squashing_train_dev=False):
         self.dataset_name = dataset_name
         self.normalize_embeddings = normalize_embeddings
         self.use_dev = 'DEV' in [u[2] for u in utterances]
@@ -108,6 +108,14 @@ class Pipeline(object):
             if u in self.label_plotting_order:
                 continue
             self.label_plotting_order.append(u)
+
+        # Squashing TRAIN and DEV. This will disable negative sampling and also take into account the labels/slots of
+        # DEV utterances during training.
+        if squashing_train_dev:
+            if not self.use_dev:
+                raise Exception('squashing_train_dev is only possible when use_dev is True')
+            for u in self.utterances:
+                u[2] = 'TRAIN'
 
         # pseudo-scatter for getting colors.
         ax = plt.figure().add_subplot()
@@ -326,7 +334,8 @@ class Pipeline(object):
             test_quality = self.get_test_clustering_quality()
             print('Finetune-slot-recognition+utterance-similarity test quality:', test_quality)
             if stats_file is not None:
-                stats_file.write('Finetune-slot-recognition+utterance-similarity test quality: {}\n'.format(test_quality))
+                stats_file.write(
+                    'Finetune-slot-recognition+utterance-similarity test quality: {}\n'.format(test_quality))
 
         if 'SR' in steps:
             print('==================== Step: finetune-slot-recognition ====================')
