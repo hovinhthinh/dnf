@@ -114,8 +114,7 @@ class Pipeline(object):
         if squashing_train_dev:
             if not self.use_dev:
                 raise Exception('squashing_train_dev is only possible when use_dev is True')
-            for u in self.utterances:
-                u[2] = 'TRAIN'
+            self.utterances = [(u, c, 'TRAIN', s) for (u, c, _, s) in self.utterances]
 
         # pseudo-scatter for getting colors.
         ax = plt.figure().add_subplot()
