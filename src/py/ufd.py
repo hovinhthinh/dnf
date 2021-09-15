@@ -233,9 +233,9 @@ class Pipeline(object):
                                      n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
     def fine_tune_slot_multiclass_classification(self, n_train_epochs=-1, n_train_steps=-1):
-        sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
-                                     [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                                     n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+        sbert.fine_tune_slot_multiclass_classification([u[0] for u in self.utterances if u[2] == 'TRAIN'],
+                                                       [u[3] for u in self.utterances if u[2] == 'TRAIN'],
+                                                       n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
     def fine_tune_joint_slot_tagging_and_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
