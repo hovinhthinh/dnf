@@ -232,6 +232,11 @@ class Pipeline(object):
                                      [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                                      n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
+    def fine_tune_slot_multiclass_classification(self, n_train_epochs=-1, n_train_steps=-1):
+        sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
+                                     [u[3] for u in self.utterances if u[2] == 'TRAIN'],
+                                     n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+
     def fine_tune_joint_slot_tagging_and_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
@@ -270,7 +275,7 @@ class Pipeline(object):
 
     def run(self, report_folder=None, config={}, steps=['no', 'ST+US', 'PC']):
         for s in steps:
-            if s not in ['no', 'ST+US', 'ST', 'US', 'PC']:
+            if s not in ['no', 'ST+US', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
 
         sbert.load()
@@ -370,6 +375,41 @@ class Pipeline(object):
             print('Finetune-slot-tagging test quality:', test_quality)
             if stats_file is not None:
                 stats_file.write('Finetune-slot-tagging test quality: {}\n'.format(test_quality))
+
+        if 'SMC' in steps:
+            print('==================== Step: finetune-slot-multiclass-classification ====================')
+            folder = None
+            if report_folder is not None:
+                folder = os.path.join(report_folder, 'SMC')
+                os.makedirs(folder, exist_ok=True)
+
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
+            print('Clustering DEV(unseen) before fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)[0]))
+            # Fine-tuning
+            self.fine_tune_slot_multiclass_classification()
+            self.update_embeddings()
+            self.plot(show_train_dev_only=True,
+                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
+
+            print('Clustering DEV(unseen) after fine-tuning:',
+                  get_clustering_quality(self.get_true_clusters(including_train=False),
+                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                                  including_train=False)[0]))
+
+            # Testing
+            self.update_test_embeddings()
+            self.plot(show_test_only=True,
+                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+
+            test_quality = self.get_test_clustering_quality()
+            print('Finetune-slot-multiclass-classification test quality:', test_quality)
+            if stats_file is not None:
+                stats_file.write('Finetune-slot-multiclass-classification test quality: {}\n'.format(test_quality))
 
         if 'US' in steps:
             print('==================== Step: finetune-utterance-similarity ====================')
