@@ -1,0 +1,1 @@
+Finetune-pseudo-classification test quality: {'NMI': 0.413, 'ARI': 0.215, 'ACC': 0.344}
