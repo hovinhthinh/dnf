@@ -750,6 +750,89 @@ def fine_tune_slot_multiclass_classification(train_texts, train_slots,
         print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
 
 
+# train_cluster_labels is None means unseen cluster
+def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
+        train_texts, train_slots, train_cluster_labels,
+        n_train_epochs=-1, n_train_steps=-1,
+        us_negative_sampling_rate_from_seen=2,
+        us_negative_sampling_rate_from_unseen=0.5,
+):
+    # Prepare for slot multiclass classification
+    train_texts_smc = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
+    train_slots = [s for s in train_slots if s is not None]
+    unique_tags = set(tag for doc in train_slots for tag in doc.keys())
+
+    train_encodings_smc = tokenizer(train_texts_smc, padding=True, truncation=True, return_tensors='pt')
+    train_slot_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in train_slots]
+    smc_train_dataset = ClassificationDataset(train_encodings_smc, train_slot_labels)
+    smc_train_loader = DataLoader(smc_train_dataset, batch_size=16, shuffle=True)
+    classifier = SlotMulticlassClassificationModel(model, len(unique_tags))
+    smc_optim = AdamW(classifier.parameters(), lr=5e-5)
+
+    # Prepare for utterance similarity
+    label_set = set(train_cluster_labels)
+    label_map = {None: -1}
+    label_count = 0
+    for l in label_set:
+        if l is not None:
+            label_map[l] = label_count
+            label_count += 1
+
+    train_cluster_labels = [label_map[l] for l in train_cluster_labels]
+    train_encodings_us = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
+    us_train_dataset = UtteranceSimilarityDataset(train_encodings_us, train_cluster_labels,
+                                                  negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
+                                                  negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen)
+    us_train_loader = DataLoader(us_train_dataset, batch_size=16, shuffle=True)
+    estimator = UtteranceSimilarityModel(model)
+    us_optim = AdamW(estimator.parameters(), lr=5e-5)
+
+    # Compute optimal n_epochs
+    if n_train_epochs == -1:
+        if n_train_steps == -1:
+            n_train_steps = 2000
+        n_train_epochs = max(ceil(n_train_steps / min(len(smc_train_dataset), len(us_train_dataset))), 3)
+
+    classifier.to(device)
+    estimator.to(device)
+
+    classifier.train()  # Switch mode
+    estimator.train()
+
+    train_ids_len = len(us_train_loader) + len(smc_train_loader)
+
+    cur = 0
+    for epoch in range(n_train_epochs):
+        train_ids = list(range(train_ids_len))
+        random.shuffle(train_ids)
+        us_train_loader_iter = iter(us_train_loader)
+        smc_train_loader_iter = iter(smc_train_loader)
+        for idx in train_ids:
+            cur += 1
+            print('\rJoint training: {}/{} ({:.1f}%)'.format(cur, train_ids_len * n_train_epochs,
+                                                             100 * cur / (train_ids_len * n_train_epochs)),
+                  end='' if cur < train_ids_len * n_train_epochs else '\n')
+            if idx < len(us_train_loader):
+                us_optim.zero_grad()
+                batch = next(us_train_loader_iter)
+                batch = {key: val.to(device) for key, val in batch.items()}
+                outputs = estimator(**batch)
+                loss = outputs[0]
+                loss.backward()
+                us_optim.step()
+            else:
+                smc_optim.zero_grad()
+                batch = next(smc_train_loader_iter)
+                batch = {key: val.to(device) for key, val in batch.items()}
+                outputs = classifier(**batch)
+                loss = outputs[0]
+                loss.backward()
+                smc_optim.step()
+
+    classifier.eval()  # Switch mode
+    estimator.eval()
+
+
 if __name__ == '__main__':
     load('sentence-transformers/paraphrase-mpnet-base-v2')
 
@@ -774,4 +857,5 @@ if __name__ == '__main__':
     #       [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
     #        {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}], \
     #       [0, 1, None]
+    # fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(train_texts, train_slots, train_labels)
     # fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slots, train_labels)
