@@ -4,13 +4,12 @@ from data import snips
 from data.snips import print_train_dev_test_stats
 from ufd import Pipeline
 
-report_folder = './reports/global/snips_ST+US_PS/'
+report_folder = './reports/global/snips_SMC/'
 
 intra_intent_data, inter_intent_data = snips.get_train_test_data(use_dev=True)
 
 pipeline_steps = [
-    'ST+US',
-    'PC',
+    'SMC',
 ]
 
 # Processing intra-intents
@@ -20,14 +19,14 @@ for intent_name, intent_data in intra_intent_data:
     print_train_dev_test_stats(intent_data)
     p = Pipeline(intent_data, dataset_name=intent_name)
     intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
-    p.run(report_folder=intent_report_folder, steps=pipeline_steps, config={'classification_sample_weights': True})
+    p.run(report_folder=intent_report_folder, steps=pipeline_steps)
 
 # Processing inter-intents
 print('======================================== Inter-intent ======================================')
 print_train_dev_test_stats(inter_intent_data)
 p = Pipeline(inter_intent_data, dataset_name='inter-intent')
 intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
-p.run(report_folder=intent_report_folder, steps=pipeline_steps, config={'classification_sample_weights': True})
+p.run(report_folder=intent_report_folder, steps=pipeline_steps)
 
 # Apply back to intra-intent
 print('======== Apply inter-intent model back to intra-intent ========')
