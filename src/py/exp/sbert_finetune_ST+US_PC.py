@@ -4,13 +4,13 @@ from data import snips
 from data.snips import print_train_dev_test_stats
 from ufd import Pipeline
 
-report_folder = './reports/global/snips_SR+US_PS/'
+report_folder = './reports/global/snips_ST+US_PS/'
 
 intra_intent_data, inter_intent_data = snips.get_train_test_data(use_dev=True)
 
 pipeline_steps = [
     'no',
-    'SR+US',
+    'ST+US',
     'PC',
 ]
 

@@ -376,7 +376,7 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
         print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
 
 
-class SlotRecognitionDataset(torch.utils.data.Dataset):
+class SlotTaggingDataset(torch.utils.data.Dataset):
     def __init__(self, encodings, labels):
         self.encodings = encodings
         self.labels = labels
@@ -410,7 +410,7 @@ class TaggerHead(nn.Module):
         return x
 
 
-class SlotRecognitionModel(nn.Module):
+class SlotTaggingModel(nn.Module):
 
     def __init__(self, base_model, num_labels):
         super().__init__()
@@ -516,9 +516,9 @@ def _encode_tags(tags, encodings, tag2id):
     return encoded_labels
 
 
-def fine_tune_slot_recognition(train_texts, train_slots,
-                               val_texts=None, val_slots=None, test_texts=None, test_slots=None,
-                               n_train_epochs=-1, n_train_steps=-1):
+def fine_tune_slot_tagging(train_texts, train_slots,
+                           val_texts=None, val_slots=None, test_texts=None, test_slots=None,
+                           n_train_epochs=-1, n_train_steps=-1):
     train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
 
     if val_texts is not None:
@@ -552,11 +552,11 @@ def fine_tune_slot_recognition(train_texts, train_slots,
     if test_texts is not None:
         test_encodings.pop("offset_mapping")
 
-    train_dataset = SlotRecognitionDataset(train_encodings, train_labels)
-    val_dataset = SlotRecognitionDataset(val_encodings, val_labels) if val_texts is not None else None
-    test_dataset = SlotRecognitionDataset(test_encodings, test_labels) if test_texts is not None else None
+    train_dataset = SlotTaggingDataset(train_encodings, train_labels)
+    val_dataset = SlotTaggingDataset(val_encodings, val_labels) if val_texts is not None else None
+    test_dataset = SlotTaggingDataset(test_encodings, test_labels) if test_texts is not None else None
 
-    tagger = SlotRecognitionModel(model, len(unique_tags))
+    tagger = SlotTaggingModel(model, len(unique_tags))
 
     if n_train_epochs == -1:
         if n_train_steps == -1:
@@ -590,12 +590,12 @@ def fine_tune_slot_recognition(train_texts, train_slots,
 
 
 # train_cluster_labels is None means unseen cluster
-def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train_slots, train_cluster_labels,
-                                                              n_train_epochs=-1, n_train_steps=-1,
-                                                              us_negative_sampling_rate_from_seen=2,
-                                                              us_negative_sampling_rate_from_unseen=0.5,
-                                                              ):
-    # Prepare for slot recognition
+def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slots, train_cluster_labels,
+                                                          n_train_epochs=-1, n_train_steps=-1,
+                                                          us_negative_sampling_rate_from_seen=2,
+                                                          us_negative_sampling_rate_from_unseen=0.5,
+                                                          ):
+    # Prepare for slot tagging
     train_texts_sr = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
     train_slots = [s for s in train_slots if s is not None]
     train_texts_sr, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts_sr, train_slots)
@@ -607,9 +607,9 @@ def fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train
                                    padding=True, truncation=True, return_tensors='pt')
     train_slot_labels = _encode_tags(train_tags, train_encodings_sr, tag2id)
     train_encodings_sr.pop("offset_mapping")
-    sr_train_dataset = SlotRecognitionDataset(train_encodings_sr, train_slot_labels)
+    sr_train_dataset = SlotTaggingDataset(train_encodings_sr, train_slot_labels)
     sr_train_loader = DataLoader(sr_train_dataset, batch_size=16, shuffle=True)
-    tagger = SlotRecognitionModel(model, len(unique_tags))
+    tagger = SlotTaggingModel(model, len(unique_tags))
     sr_optim = AdamW(tagger.parameters(), lr=5e-5)
 
     # Prepare for utterance similarity
@@ -692,11 +692,11 @@ if __name__ == '__main__':
     #     = ['this is first sentence', 'this is second with oov word qwertyuiop asdfghjkl'], \
     #       [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
     #        {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}, ]
-    # fine_tune_slot_recognition(train_texts, train_slots)
+    # fine_tune_slot_tagging(train_texts, train_slots)
 
     train_texts, train_slots, train_labels \
         = ['this is first sentence', 'this is second with oov word qwertyuiop asdfghjkl', 'test'], \
           [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
            {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}], \
           [0, 1, None]
-    fine_tune_joint_slot_recognition_and_utterance_similarity(train_texts, train_slots, train_labels)
+    fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slots, train_labels)
