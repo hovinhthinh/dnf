@@ -285,7 +285,8 @@ class Pipeline(object):
 
         # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
 
-    def run(self, report_folder=None, config={}, steps=['no', 'SMC+US', 'PC']):
+    def run(self, report_folder=None, config={'pseudo_classification_sample_weights': True},
+            steps=['no', 'SMC+US', 'PC']):
         for s in steps:
             if s not in ['no', 'ST+US', 'SMC+US', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
@@ -514,7 +515,7 @@ class Pipeline(object):
             for it in range(5):
                 print('Iter: #{}'.format(it + 1))
                 self.fine_tune_pseudo_classification(
-                    use_sample_weights=(('classification_sample_weights', True) in config.items()))
+                    use_sample_weights=(('pseudo_classification_sample_weights', True) in config.items()))
                 self.update_embeddings()
                 self.plot(show_train_dev_only=True,
                           output_file_path=os.path.join(folder,
@@ -540,7 +541,7 @@ class Pipeline(object):
 
 
 def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
-                    config={'classification_sample_weights': True},
+                    config={'pseudo_classification_sample_weights': True},
                     report_folder=None):
     # Processing intra-intents
     if intra_intent_data is not None:
@@ -554,7 +555,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 continue
 
             print_train_dev_test_stats(intent_data)
-            p = Pipeline(intent_data, dataset_name=intent_name)
+            p = Pipeline(intent_data, dataset_name=intent_name,
+                         squashing_train_dev=(('squashing_train_dev', True) in config.items()))
             intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
             p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config)
 
@@ -562,7 +564,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
     if inter_intent_data is not None:
         print('======================================== Inter-intent ======================================')
         print_train_dev_test_stats(inter_intent_data)
-        p = Pipeline(inter_intent_data, dataset_name='inter_intent')
+        p = Pipeline(intent_data, dataset_name=intent_name,
+                     squashing_train_dev=(('squashing_train_dev', True) in config.items()))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
         p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config)
 
