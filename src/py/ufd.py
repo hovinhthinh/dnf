@@ -286,7 +286,7 @@ class Pipeline(object):
         # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
 
     def run(self, report_folder=None, config={'pseudo_classification_sample_weights': True},
-            steps=['no', 'SMC+US', 'PC']):
+            steps=['no', 'SMC+US', 'PC'], save_model=True):
         for s in steps:
             if s not in ['no', 'ST+US', 'SMC+US', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
@@ -538,6 +538,9 @@ class Pipeline(object):
 
         if stats_file is not None:
             stats_file.close()
+
+        if save_model and report_folder is not None:
+            sbert.save(os.path.join(report_folder, 'trained_model'))
 
 
 def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
