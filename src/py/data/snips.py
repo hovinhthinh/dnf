@@ -863,7 +863,6 @@ def get_train_test_data(generate_data=False, use_dev=True):
              for text, cluster, sample_type, slots in cluster_data])
 
     print('======== Cluster information ========')
-    intra_intent_data_filtered = []
     for intent_name, cluster_data in intra_intent_data:
         print("====", intent_name)
         clusters = set(u[1] for u in cluster_data)
@@ -889,12 +888,7 @@ def get_train_test_data(generate_data=False, use_dev=True):
             print('Dev:', dev_clusters)
         print('Test:', test_clusters)
 
-        if len(train_clusters) < 1 or len(test_clusters) < 1 or (use_dev and len(dev_clusters) < 1):
-            print('Ignore this intent for intra-intent setting')
-        else:
-            intra_intent_data_filtered.append((intent_name, cluster_data))
-
-    return intra_intent_data_filtered, inter_intent_data
+    return intra_intent_data, inter_intent_data
 
 
 def print_train_dev_test_stats(intent_data):

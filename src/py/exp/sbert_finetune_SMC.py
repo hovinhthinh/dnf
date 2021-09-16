@@ -16,6 +16,12 @@ pipeline_steps = [
 for intent_name, intent_data in intra_intent_data:
     print('======================================== Intra-intent:', intent_name,
           '========================================')
+
+    if len([u for u in intent_data if u[1].endswith('_TRAIN')]) == 0 or len(
+            [u for u in intent_data if u[1].endswith('_TEST')]) == 0:
+        print('Ignore this intent for intra-intent setting')
+        continue
+
     print_train_dev_test_stats(intent_data)
     p = Pipeline(intent_data, dataset_name=intent_name)
     intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
@@ -38,6 +44,9 @@ if report_folder is not None:
     stats_file.write('======== Apply inter-intent model back to intra-intent ========\n')
 
 for intent_name, intent_data in intra_intent_data:
+    if len([u for u in intent_data if u[1].endswith('_TEST')]) == 0:
+        continue
+
     p = Pipeline(intent_data)
     p.update_test_embeddings()
     test_quality = p.get_test_clustering_quality()
