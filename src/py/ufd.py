@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
+from data.snips import print_train_dev_test_stats
 
 
 def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=False, plot_3d=False,
@@ -536,3 +537,57 @@ class Pipeline(object):
 
         if stats_file is not None:
             stats_file.close()
+
+
+def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
+                    config={'classification_sample_weights': True},
+                    report_folder=None):
+    # Processing intra-intents
+    if intra_intent_data is not None:
+        for intent_name, intent_data in intra_intent_data:
+            print('======================================== Intra-intent:', intent_name,
+                  '========================================')
+
+            if len([u for u in intent_data if u[1].endswith('_TRAIN')]) == 0 or len(
+                    [u for u in intent_data if u[1].endswith('_TEST')]) == 0:
+                print('Ignore this intent for intra-intent setting')
+                continue
+
+            print_train_dev_test_stats(intent_data)
+            p = Pipeline(intent_data, dataset_name=intent_name)
+            intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
+            p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config)
+
+    # Processing inter-intents
+    if inter_intent_data is not None:
+        print('======================================== Inter-intent ======================================')
+        print_train_dev_test_stats(inter_intent_data)
+        p = Pipeline(inter_intent_data, dataset_name='inter_intent')
+        intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
+        p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config)
+
+        if intra_intent_data is not None:
+            # Apply back to intra-intent
+            print('======== Apply inter-intent model back to intra-intent ========')
+            folder = None
+            if report_folder is not None:
+                folder = os.path.join(report_folder, 'inter_intent', 'apply_to_intra_intent')
+                os.makedirs(folder, exist_ok=True)
+
+            stats_file = None
+            if folder is not None:
+                stats_file = open(os.path.join(folder, 'stats.txt'), 'w')
+                stats_file.write('======== Apply inter-intent model back to intra-intent ========\n')
+
+            for intent_name, intent_data in intra_intent_data:
+                p = Pipeline(intent_data)
+                p.update_test_embeddings()
+                p.plot(show_test_only=True,
+                       output_file_path=os.path.join(folder, intent_name + '.pdf') if folder is not None else None)
+                test_quality = p.get_test_clustering_quality()
+                print('Clustering test quality [{}]: {}'.format(intent_name, test_quality))
+                if stats_file is not None:
+                    stats_file.write('Clustering test quality [{}]: {}\n'.format(intent_name, test_quality))
+
+            if stats_file is not None:
+                stats_file.close()
