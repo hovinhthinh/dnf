@@ -274,6 +274,8 @@ class Pipeline(object):
 
             return get_clustering_quality(test_true_clusters, test_predicted_clusters)
         else:
+            if self.embeddings is None:
+                self.update_embeddings()
             # Use COP-KMeans. In this setting, we cluster the testing set, coupling with constraints from the train set.
             # So we use COP-KMeans here, which is similar to pseudo-classification.
             test_predicted_clusters = self.get_pseudo_clusters(
