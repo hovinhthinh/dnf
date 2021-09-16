@@ -6,7 +6,6 @@ report_folder = './reports/global/snips_US_PC/'
 intra_intent_data, inter_intent_data = snips.get_train_test_data(use_dev=True)
 
 pipeline_steps = [
-    'no',
     'US',
     'PC',
 ]

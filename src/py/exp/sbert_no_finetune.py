@@ -5,8 +5,6 @@ report_folder = './reports/global/snips_no/'
 
 intra_intent_data, inter_intent_data = snips.get_train_test_data(use_dev=True)
 
-pipeline_steps = [
-    'no',
-]
+pipeline_steps = []
 
 run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data, report_folder=report_folder)

@@ -1,3 +1,7 @@
+from mpl_toolkits.mplot3d import Axes3D
+
+Axes3D = Axes3D
+
 import os
 from math import pow
 from typing import List, Tuple
@@ -285,10 +289,13 @@ class Pipeline(object):
 
         # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
 
-    def run(self, report_folder=None, config={'pseudo_classification_sample_weights': True},
-            steps=['no', 'SMC+US', 'PC'], save_model=True):
+    def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True,
+            config={
+                'pseudo_classification_sample_weights': True,
+                'pseudo_classification_iterations': 5
+            }):
         for s in steps:
-            if s not in ['no', 'ST+US', 'SMC+US', 'ST', 'SMC', 'US', 'PC']:
+            if s not in ['ST+US', 'SMC+US', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
 
         sbert.load()
@@ -298,45 +305,69 @@ class Pipeline(object):
             os.makedirs(report_folder, exist_ok=True)
             stats_file = open(os.path.join(report_folder, 'stats.txt'), 'w')
 
-        if 'no' in steps:
-            print('==================== Step: no-finetune ====================')
-            folder = None
-            if report_folder is not None:
-                folder = os.path.join(report_folder, 'no')
-                os.makedirs(folder, exist_ok=True)
+        # No-fine-tuning
+        print('==================== Step: no-finetune ====================')
+        folder_3d = None
+        if report_folder is not None:
+            folder_3d = os.path.join(report_folder, '3d')
+            os.makedirs(folder_3d, exist_ok=True)
 
-            # Testing
-            self.update_embeddings()
-            self.update_test_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            self.plot(show_test_only=True,
-                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+        # Testing for no-fine-tuning
+        self.update_embeddings()
+        self.update_test_embeddings()
+        self.plot(show_train_dev_only=True,
+                  output_file_path=os.path.join(report_folder, '0.pdf') if report_folder is not None else None)
+        self.plot(show_test_only=True,
+                  output_file_path=os.path.join(report_folder, '0_test.pdf') if report_folder is not None else None)
 
-            test_quality = self.get_test_clustering_quality()
-            print('No-finetune test quality:', test_quality)
-            if stats_file is not None:
-                stats_file.write('No-finetune test quality: {}\n'.format(test_quality))
+        self.plot(show_train_dev_only=True, plot_3d=True,
+                  output_file_path=os.path.join(folder_3d, '0.pdf') if folder_3d is not None else None)
+        self.plot(show_test_only=True, plot_3d=True,
+                  output_file_path=os.path.join(folder_3d, '0_test.pdf') if folder_3d is not None else None)
 
-        if 'ST+US' in steps:
-            print('==================== Step: finetune-slot-tagging+utterance-similarity ====================')
-            folder = None
-            if report_folder is not None:
-                folder = os.path.join(report_folder, 'ST+US')
-                os.makedirs(folder, exist_ok=True)
+        print('Clustering DEV(unseen) no-fine-tuning:',
+              get_clustering_quality(self.get_true_clusters(including_train=False),
+                                     self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
+                                                              including_train=False)[0]))
 
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            print('Clustering DEV(unseen) before fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
+        test_quality = self.get_test_clustering_quality()
+        print('No-fine-tune test quality:', test_quality)
+        if stats_file is not None:
+            stats_file.write('No-fine-tune test quality: {}\n'.format(test_quality))
+
+        # Fine-tuning each step
+        for i, step in enumerate(steps):
+            print('==================== Step: finetune-{} ===================='.format(step))
+
             # Fine-tuning
-            self.fine_tune_joint_slot_tagging_and_utterance_similarity()
+            if step == 'ST+US':
+                self.fine_tune_joint_slot_tagging_and_utterance_similarity()
+            elif step == 'SMC+US':
+                self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity()
+            elif step == 'ST':
+                self.fine_tune_slot_tagging()
+            elif step == 'SMC':
+                self.fine_tune_slot_multiclass_classification()
+            elif step == 'US':
+                self.fine_tune_utterance_similarity()
+            elif step == 'PC':
+                for it in range(config.get('pseudo_classification_iterations', 5)):
+                    print('Iter: #{}'.format(it + 1))
+                    if it > 0:
+                        self.update_embeddings()
+                    self.fine_tune_pseudo_classification(
+                        use_sample_weights=(('pseudo_classification_sample_weights', True) in config.items()))
+            else:
+                raise Exception('Invalid step name:', step)
+
             self.update_embeddings()
+
             self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
+                      output_file_path=os.path.join(report_folder, '{}_{}.pdf'.format(i + 1, step))
+                      if report_folder is not None else None)
+            self.plot(show_train_dev_only=True, plot_3d=True,
+                      output_file_path=os.path.join(folder_3d, '{}_{}.pdf'.format(i + 1, step))
+                      if folder_3d is not None else None)
 
             print('Clustering DEV(unseen) after fine-tuning:',
                   get_clustering_quality(self.get_true_clusters(including_train=False),
@@ -346,195 +377,16 @@ class Pipeline(object):
             # Testing
             self.update_test_embeddings()
             self.plot(show_test_only=True,
-                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
+                      output_file_path=os.path.join(report_folder, '{}_{}_test.pdf'.format(i + 1, step))
+                      if report_folder is not None else None)
+            self.plot(show_test_only=True, plot_3d=True,
+                      output_file_path=os.path.join(folder_3d, '{}_{}_test.pdf'.format(i + 1, step))
+                      if folder_3d is not None else None)
 
             test_quality = self.get_test_clustering_quality()
-            print('Finetune-slot-tagging+utterance-similarity test quality:', test_quality)
+            print('Finetune-{} test quality: {}'.format(step, test_quality))
             if stats_file is not None:
-                stats_file.write(
-                    'Finetune-slot-tagging+utterance-similarity test quality: {}\n'.format(test_quality))
-
-        if 'SMC+US' in steps:
-            print(
-                '==================== Step: finetune-slot-multiclass-classification+utterance-similarity ====================')
-            folder = None
-            if report_folder is not None:
-                folder = os.path.join(report_folder, 'SMC+US')
-                os.makedirs(folder, exist_ok=True)
-
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            print('Clustering DEV(unseen) before fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-            # Fine-tuning
-            self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity()
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
-
-            print('Clustering DEV(unseen) after fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-
-            # Testing
-            self.update_test_embeddings()
-            self.plot(show_test_only=True,
-                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
-
-            test_quality = self.get_test_clustering_quality()
-            print('Finetune-slot-multiclass-classification+utterance-similarity test quality:', test_quality)
-            if stats_file is not None:
-                stats_file.write(
-                    'Finetune-slot-multiclass-classification+utterance-similarity test quality: {}\n'.format(
-                        test_quality))
-
-        if 'ST' in steps:
-            print('==================== Step: finetune-slot-tagging ====================')
-            folder = None
-            if report_folder is not None:
-                folder = os.path.join(report_folder, 'ST')
-                os.makedirs(folder, exist_ok=True)
-
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            print('Clustering DEV(unseen) before fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-            # Fine-tuning
-            self.fine_tune_slot_tagging()
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
-
-            print('Clustering DEV(unseen) after fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-
-            # Testing
-            self.update_test_embeddings()
-            self.plot(show_test_only=True,
-                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
-
-            test_quality = self.get_test_clustering_quality()
-            print('Finetune-slot-tagging test quality:', test_quality)
-            if stats_file is not None:
-                stats_file.write('Finetune-slot-tagging test quality: {}\n'.format(test_quality))
-
-        if 'SMC' in steps:
-            print('==================== Step: finetune-slot-multiclass-classification ====================')
-            folder = None
-            if report_folder is not None:
-                folder = os.path.join(report_folder, 'SMC')
-                os.makedirs(folder, exist_ok=True)
-
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            print('Clustering DEV(unseen) before fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-            # Fine-tuning
-            self.fine_tune_slot_multiclass_classification()
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
-
-            print('Clustering DEV(unseen) after fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-
-            # Testing
-            self.update_test_embeddings()
-            self.plot(show_test_only=True,
-                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
-
-            test_quality = self.get_test_clustering_quality()
-            print('Finetune-slot-multiclass-classification test quality:', test_quality)
-            if stats_file is not None:
-                stats_file.write('Finetune-slot-multiclass-classification test quality: {}\n'.format(test_quality))
-
-        if 'US' in steps:
-            print('==================== Step: finetune-utterance-similarity ====================')
-            folder = None
-            if report_folder is not None:
-                folder = os.path.join(report_folder, 'US')
-                os.makedirs(folder, exist_ok=True)
-
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            print('Clustering DEV(unseen) before fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-            # Fine-tuning
-            self.fine_tune_utterance_similarity()
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '1.pdf') if folder is not None else None)
-
-            print('Clustering DEV(unseen) after fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-
-            # Testing
-            self.update_test_embeddings()
-            self.plot(show_test_only=True,
-                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
-
-            test_quality = self.get_test_clustering_quality()
-            print('Finetune-utterance-similarity test quality:', test_quality)
-            if stats_file is not None:
-                stats_file.write('Finetune-utterance-similarity test quality: {}\n'.format(test_quality))
-
-        if 'PC' in steps:
-            print('==================== Step: finetune-pseudo-classification ====================')
-            folder = None
-            if report_folder is not None:
-                folder = os.path.join(report_folder, 'PC')
-                os.makedirs(folder, exist_ok=True)
-
-            self.update_embeddings()
-            self.plot(show_train_dev_only=True,
-                      output_file_path=os.path.join(folder, '0.pdf') if folder is not None else None)
-            print('Clustering DEV(unseen) before fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-            # Fine-tuning
-            for it in range(5):
-                print('Iter: #{}'.format(it + 1))
-                self.fine_tune_pseudo_classification(
-                    use_sample_weights=(('pseudo_classification_sample_weights', True) in config.items()))
-                self.update_embeddings()
-                self.plot(show_train_dev_only=True,
-                          output_file_path=os.path.join(folder,
-                                                        '{}.pdf'.format(it + 1)) if folder is not None else None)
-
-            print('Clustering DEV(unseen) after fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
-
-            # Testing
-            self.update_test_embeddings()
-            self.plot(show_test_only=True,
-                      output_file_path=os.path.join(folder, 'test.pdf') if folder is not None else None)
-
-            test_quality = self.get_test_clustering_quality()
-            print('Finetune-pseudo-classification test quality:', test_quality)
-            if stats_file is not None:
-                stats_file.write('Finetune-pseudo-classification test quality: {}\n'.format(test_quality))
+                stats_file.write('Finetune-{} test quality: {}\n'.format(step, test_quality))
 
         if stats_file is not None:
             stats_file.close()
@@ -544,8 +396,11 @@ class Pipeline(object):
 
 
 def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
-                    config={'pseudo_classification_sample_weights': True},
-                    report_folder=None):
+                    report_folder=None,
+                    config={
+                        'pseudo_classification_sample_weights': True,
+                        'pseudo_classification_iterations': 5
+                    }):
     # Processing intra-intents
     if intra_intent_data is not None:
         for intent_name, intent_data in intra_intent_data:
@@ -576,9 +431,12 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
             # Apply back to intra-intent
             print('======== Apply inter-intent model back to intra-intent ========')
             folder = None
+            folder_3d = None
             if report_folder is not None:
                 folder = os.path.join(report_folder, 'inter_intent', 'apply_to_intra_intent')
                 os.makedirs(folder, exist_ok=True)
+                folder_3d = os.path.join(folder, '3d')
+                os.makedirs(folder_3d, exist_ok=True)
 
             stats_file = None
             if folder is not None:
@@ -590,6 +448,9 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 p.update_test_embeddings()
                 p.plot(show_test_only=True,
                        output_file_path=os.path.join(folder, intent_name + '.pdf') if folder is not None else None)
+                p.plot(show_test_only=True, plot_3d=True,
+                       output_file_path=
+                       os.path.join(folder_3d, intent_name + '.pdf') if folder_3d is not None else None)
                 test_quality = p.get_test_clustering_quality()
                 print('Clustering test quality [{}]: {}'.format(intent_name, test_quality))
                 if stats_file is not None:
