@@ -289,7 +289,7 @@ class Pipeline(object):
 
         # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
 
-    def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True,
+    def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
                 'pseudo_classification_sample_weights': True,
                 'pseudo_classification_iterations': 5
@@ -308,7 +308,7 @@ class Pipeline(object):
         # No-fine-tuning
         print('==================== Step: no-finetune ====================')
         folder_3d = None
-        if report_folder is not None:
+        if plot_3d and report_folder is not None:
             folder_3d = os.path.join(report_folder, '3d')
             os.makedirs(folder_3d, exist_ok=True)
 
@@ -320,10 +320,9 @@ class Pipeline(object):
         self.plot(show_test_only=True,
                   output_file_path=os.path.join(report_folder, '0_test.pdf') if report_folder is not None else None)
 
-        self.plot(show_train_dev_only=True, plot_3d=True,
-                  output_file_path=os.path.join(folder_3d, '0.pdf') if folder_3d is not None else None)
-        self.plot(show_test_only=True, plot_3d=True,
-                  output_file_path=os.path.join(folder_3d, '0_test.pdf') if folder_3d is not None else None)
+        if folder_3d is not None:
+            self.plot(show_train_dev_only=True, plot_3d=True, output_file_path=os.path.join(folder_3d, '0.pdf'))
+            self.plot(show_test_only=True, plot_3d=True, output_file_path=os.path.join(folder_3d, '0_test.pdf'))
 
         print('Clustering DEV(unseen) no-fine-tuning:',
               get_clustering_quality(self.get_true_clusters(including_train=False),
@@ -365,9 +364,9 @@ class Pipeline(object):
             self.plot(show_train_dev_only=True,
                       output_file_path=os.path.join(report_folder, '{}_{}.pdf'.format(i + 1, step))
                       if report_folder is not None else None)
-            self.plot(show_train_dev_only=True, plot_3d=True,
-                      output_file_path=os.path.join(folder_3d, '{}_{}.pdf'.format(i + 1, step))
-                      if folder_3d is not None else None)
+            if folder_3d is not None:
+                self.plot(show_train_dev_only=True, plot_3d=True,
+                          output_file_path=os.path.join(folder_3d, '{}_{}.pdf'.format(i + 1, step)))
 
             print('Clustering DEV(unseen) after fine-tuning:',
                   get_clustering_quality(self.get_true_clusters(including_train=False),
@@ -379,9 +378,9 @@ class Pipeline(object):
             self.plot(show_test_only=True,
                       output_file_path=os.path.join(report_folder, '{}_{}_test.pdf'.format(i + 1, step))
                       if report_folder is not None else None)
-            self.plot(show_test_only=True, plot_3d=True,
-                      output_file_path=os.path.join(folder_3d, '{}_{}_test.pdf'.format(i + 1, step))
-                      if folder_3d is not None else None)
+            if folder_3d is not None:
+                self.plot(show_test_only=True, plot_3d=True,
+                          output_file_path=os.path.join(folder_3d, '{}_{}_test.pdf'.format(i + 1, step)))
 
             test_quality = self.get_test_clustering_quality()
             print('Finetune-{} test quality: {}'.format(step, test_quality))
@@ -396,7 +395,7 @@ class Pipeline(object):
 
 
 def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
-                    report_folder=None,
+                    report_folder=None, plot_3d=False,
                     config={
                         'pseudo_classification_sample_weights': True,
                         'pseudo_classification_iterations': 5
@@ -416,7 +415,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
             p = Pipeline(intent_data, dataset_name=intent_name,
                          squashing_train_dev=(('squashing_train_dev', True) in config.items()))
             intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
-            p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config)
+            p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
 
     # Processing inter-intents
     if inter_intent_data is not None:
@@ -425,7 +424,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
         p = Pipeline(intent_data, dataset_name=intent_name,
                      squashing_train_dev=(('squashing_train_dev', True) in config.items()))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
-        p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config)
+        p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
 
         if intra_intent_data is not None:
             # Apply back to intra-intent
@@ -435,8 +434,9 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
             if report_folder is not None:
                 folder = os.path.join(report_folder, 'inter_intent', 'apply_to_intra_intent')
                 os.makedirs(folder, exist_ok=True)
-                folder_3d = os.path.join(folder, '3d')
-                os.makedirs(folder_3d, exist_ok=True)
+                if plot_3d:
+                    folder_3d = os.path.join(folder, '3d')
+                    os.makedirs(folder_3d, exist_ok=True)
 
             stats_file = None
             if folder is not None:
@@ -448,9 +448,9 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 p.update_test_embeddings()
                 p.plot(show_test_only=True,
                        output_file_path=os.path.join(folder, intent_name + '.pdf') if folder is not None else None)
-                p.plot(show_test_only=True, plot_3d=True,
-                       output_file_path=
-                       os.path.join(folder_3d, intent_name + '.pdf') if folder_3d is not None else None)
+                if folder_3d is not None:
+                    p.plot(show_test_only=True, plot_3d=True,
+                           output_file_path=os.path.join(folder_3d, intent_name + '.pdf'))
                 test_quality = p.get_test_clustering_quality()
                 print('Clustering test quality [{}]: {}'.format(intent_name, test_quality))
                 if stats_file is not None:
