@@ -1,3 +1,4 @@
+import os
 import random
 from math import ceil
 from typing import List
@@ -12,6 +13,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, set_seed, AdamW
 
 set_seed(12993)
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 tokenizer = None
 model = None
