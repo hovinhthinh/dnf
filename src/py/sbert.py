@@ -12,7 +12,6 @@ from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, set_seed, AdamW
 
-set_seed(12993)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 tokenizer = None
@@ -836,6 +835,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
 
 
 if __name__ == '__main__':
+    set_seed(12993)
     load('sentence-transformers/paraphrase-mpnet-base-v2')
 
     # train_texts, train_labels, train_labels_weights \

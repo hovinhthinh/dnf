@@ -1,4 +1,5 @@
 from mpl_toolkits.mplot3d import Axes3D
+from transformers import set_seed
 
 Axes3D = Axes3D
 
@@ -294,6 +295,7 @@ class Pipeline(object):
                 'pseudo_classification_sample_weights': True,
                 'pseudo_classification_iterations': 5
             }):
+        set_seed(12993)
         for s in steps:
             if s not in ['ST+US', 'SMC+US', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
