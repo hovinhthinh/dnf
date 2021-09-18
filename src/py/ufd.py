@@ -1,3 +1,5 @@
+import tempfile
+
 from mpl_toolkits.mplot3d import Axes3D
 from transformers import set_seed
 
@@ -12,7 +14,6 @@ import numpy
 import umap
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
-from sklearn.preprocessing import StandardScaler
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
@@ -101,7 +102,8 @@ class Pipeline(object):
             else:
                 raise Exception('Invalid sample type')
 
-        self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(dict.fromkeys([u[1] for u in self.utterances])))
+        self.cluster_label_2_index_map = dict(
+            (n, i) for i, n in enumerate(dict.fromkeys([u[1] for u in self.utterances])))
 
         self.embeddings = None
         self.test_embeddings = None
@@ -144,7 +146,7 @@ class Pipeline(object):
             return [self.cluster_label_2_index_map[u[1]] for u in self.utterances if u[2] != 'TRAIN']
 
     # Returns pseudo clusters and assignment confidences
-    def get_pseudo_clusters(self, method='cop-kmeans', k=-1, including_train=True):
+    def get_pseudo_clusters(self, k=None):
         train_clusters = [[] for _ in range(len(self.cluster_label_2_index_map))]
         for i, u in enumerate(self.utterances):
             if u[2] == 'TRAIN':
@@ -164,35 +166,17 @@ class Pipeline(object):
                     continue
                 cl.append((train_clusters[i][0], train_clusters[j][0]))
 
-        if method == 'cop-kmeans':
-            if k <= 0:
-                raise Exception('Invalid k={}'.format(k))
-
-            print('Clustering:', method)
-
-            if self.normalize_embeddings:
-                scaler = StandardScaler()
-                scaler.fit(self.embeddings)
-                embeddings = scaler.transform(self.embeddings)
+        clusters, centers = cop_kmeans(dataset=self.embeddings,
+                                       k=k if k is not None else len(self.cluster_label_2_index_map), ml=ml, cl=cl)
+        assignment_conf = []
+        distance_matrix = pairwise_distances(self.embeddings, centers)
+        for i, u in enumerate(self.utterances):
+            if u[2] == 'TRAIN':
+                assignment_conf.append(1.0)
             else:
-                embeddings = self.embeddings
-            clusters, centers = cop_kmeans(dataset=embeddings, k=k, ml=ml, cl=cl)
-
-            assignment_conf = []
-            distance_matrix = pairwise_distances(embeddings, centers)
-            for i, u in enumerate(self.utterances):
-                if u[2] == 'TRAIN':
-                    assignment_conf.append(1.0)
-                else:
-                    scaled_dist = [1 / (1 + pow(d, 2)) for d in distance_matrix[i]]
-                    assignment_conf.append(scaled_dist[clusters[i]] / sum(scaled_dist))
-
-            if not including_train:
-                clusters = [c for i, c in enumerate(clusters) if self.utterances[i][2] != 'TRAIN']
-                assignment_conf = [c for i, c in enumerate(assignment_conf) if self.utterances[i][2] != 'TRAIN']
-            return clusters, assignment_conf
-        else:
-            raise Exception('Method {} not supported'.format(method))
+                scaled_dist = [1 / (1 + pow(d, 2)) for d in distance_matrix[i]]
+                assignment_conf.append(scaled_dist[clusters[i]] / sum(scaled_dist))
+        return clusters, assignment_conf
 
     def plot(self, show_train_dev_only=False, show_test_only=False, show_labels=True, show_sample_type=True,
              plot_3d=False, output_file_path=None):
@@ -220,18 +204,53 @@ class Pipeline(object):
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
                       label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
 
-    def fine_tune_pseudo_classification(self, k=None, use_sample_weights=False):
-        pseudo_clusters, weights = self.get_pseudo_clusters(
-            k=k if k is not None else len(self.cluster_label_2_index_map))
-        print('Pseudo-cluster quality:',
-              get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
-        sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
-                                              train_sample_weights=weights if use_sample_weights else None)
+    def get_validation_score(self):
+        self.update_embeddings()
+        return self.get_dev_clustering_quality()['NMI']
 
-    def fine_tune_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
+    def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None,
+                                        early_stopping_eval_patience=0):
+        if iterations is None:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                best_iter = None
+                best_eval = None
+                it = 0
+                while True:
+                    print('==== Iteration: {}'.format(it + 1))
+                    # self.update_embeddings() # No need to update, already called in self.get_validation_score()
+                    pseudo_clusters, weights = self.get_pseudo_clusters()
+                    print('Pseudo-cluster quality:', get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
+                    sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
+                                                          train_sample_weights=weights if use_sample_weights else None)
+                    eval = self.get_validation_score()
+                    print('Validation score: {:.3f}'.format(eval), end='')
+                    if best_eval is None or eval > best_eval:
+                        best_eval = eval
+                        best_iter = it
+                        print(' -> Save model')
+                        sbert.save(temp_dir)
+                    else:
+                        if it > best_iter + early_stopping_eval_patience:
+                            print(' -> Stop')
+                            sbert.load(temp_dir)
+                            break
+                        else:
+                            print(' -> Be patient')
+                    it += 1
+        else:
+            for it in range(iterations):
+                print('Iter: {}'.format(it + 1))
+                if it > 0:
+                    self.update_embeddings()
+                pseudo_clusters, weights = self.get_pseudo_clusters()
+                print('Pseudo-cluster quality:', get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
+                sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
+                                                      train_sample_weights=weights if use_sample_weights else None)
+
+    def fine_tune_utterance_similarity(self):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices,
-                                             n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+                                             early_stopping_eval_callback=self.get_validation_score)
 
     def fine_tune_slot_tagging(self, n_train_epochs=-1, n_train_steps=-1):
         sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
@@ -260,40 +279,25 @@ class Pipeline(object):
             cluster_indices,
             n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
 
+    def get_dev_clustering_quality(self):
+        dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
+        dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map), random_state=42).fit(
+            dev_embeddings).labels_
+        return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
+
     def get_test_clustering_quality(self, k=None):
-        if self.use_dev:
-            # Use KMeans. we haven't seen the testing utterances yet, so we use normal KMeans here.
-            # The model is fully trained, and we don't want to touch the train set anymore.
-            test_cluster_label_2_index_map = dict(
-                (l, i) for i, l in enumerate(dict.fromkeys([u[1] for u in self.test_utterances])))
-            test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
-
-            if self.normalize_embeddings:
-                scaler = StandardScaler()
-                scaler.fit(self.test_embeddings)
-                embeddings = scaler.transform(self.test_embeddings)
-            else:
-                embeddings = self.test_embeddings
-
-            test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map),
-                                             random_state=0).fit(embeddings).labels_
-
-            return get_clustering_quality(test_true_clusters, test_predicted_clusters)
-        else:
-            if self.embeddings is None:
-                self.update_embeddings()
-            # Use COP-KMeans. In this setting, we cluster the testing set, coupling with constraints from the train set.
-            # So we use COP-KMeans here, which is similar to pseudo-classification.
-            test_predicted_clusters = self.get_pseudo_clusters(
-                k=k if k is not None else len(self.cluster_label_2_index_map), including_train=False)[0]
-            return get_clustering_quality(self.get_true_clusters(including_train=False), test_predicted_clusters)
-
-        # TODO: other clustering algorithms could be also applied here as well, e.g., C-DBScan, HAC.
+        test_cluster_label_2_index_map = dict(
+            (l, i) for i, l in enumerate(dict.fromkeys([u[1] for u in self.test_utterances])))
+        test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
+        test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map),
+                                         random_state=42).fit(self.test_embeddings).labels_
+        return get_clustering_quality(test_true_clusters, test_predicted_clusters)
+        # TODO: other clustering algorithms could be also applied here as well, e.g., DBScan, HAC.
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
                 'pseudo_classification_sample_weights': True,
-                'pseudo_classification_iterations': 5
+                'pseudo_classification_iterations': None
             }):
         set_seed(12993)
         for s in steps:
@@ -326,10 +330,7 @@ class Pipeline(object):
             self.plot(show_train_dev_only=True, plot_3d=True, output_file_path=os.path.join(folder_3d, '0.pdf'))
             self.plot(show_test_only=True, plot_3d=True, output_file_path=os.path.join(folder_3d, '0_test.pdf'))
 
-        print('Clustering DEV(unseen) no-fine-tuning:',
-              get_clustering_quality(self.get_true_clusters(including_train=False),
-                                     self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                              including_train=False)[0]))
+        print('Clustering DEV no-fine-tuning:', self.get_dev_clustering_quality())
 
         test_quality = self.get_test_clustering_quality()
         print('No-fine-tune test quality:', test_quality)
@@ -352,12 +353,10 @@ class Pipeline(object):
             elif step == 'US':
                 self.fine_tune_utterance_similarity()
             elif step == 'PC':
-                for it in range(config.get('pseudo_classification_iterations', 5)):
-                    print('Iter: #{}'.format(it + 1))
-                    if it > 0:
-                        self.update_embeddings()
-                    self.fine_tune_pseudo_classification(
-                        use_sample_weights=(('pseudo_classification_sample_weights', True) in config.items()))
+                self.fine_tune_pseudo_classification(
+                    use_sample_weights=config.get('pseudo_classification_sample_weights', True),
+                    iterations=config.get('pseudo_classification_iterations', None)
+                )
             else:
                 raise Exception('Invalid step name:', step)
 
@@ -370,10 +369,7 @@ class Pipeline(object):
                 self.plot(show_train_dev_only=True, plot_3d=True,
                           output_file_path=os.path.join(folder_3d, '{}_{}.pdf'.format(i + 1, step)))
 
-            print('Clustering DEV(unseen) after fine-tuning:',
-                  get_clustering_quality(self.get_true_clusters(including_train=False),
-                                         self.get_pseudo_clusters(k=len(self.cluster_label_2_index_map),
-                                                                  including_train=False)[0]))
+            print('Clustering DEV after fine-tuning {}: {}'.format(step, self.get_dev_clustering_quality()))
 
             # Testing
             self.update_test_embeddings()
@@ -387,7 +383,7 @@ class Pipeline(object):
             test_quality = self.get_test_clustering_quality()
             print('Finetune-{} test quality: {}'.format(step, test_quality))
             if stats_file is not None:
-                stats_file.write('Finetune-{} test quality: {}\n'.format(step, test_quality))
+                stats_file.write('Finetune-{} TEST quality: {}\n'.format(step, test_quality))
 
         if stats_file is not None:
             stats_file.close()
@@ -399,8 +395,7 @@ class Pipeline(object):
 def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                     report_folder=None, plot_3d=False,
                     config={
-                        'pseudo_classification_sample_weights': True,
-                        'pseudo_classification_iterations': 5
+                        'squashing_train_dev': False,
                     }):
     # Processing intra-intents
     if intra_intent_data is not None:
@@ -415,7 +410,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
 
             print_train_dev_test_stats(intent_data)
             p = Pipeline(intent_data, dataset_name=intent_name,
-                         squashing_train_dev=(('squashing_train_dev', True) in config.items()))
+                         squashing_train_dev=config.get('squashing_train_dev', False))
             intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
             p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
 
@@ -424,7 +419,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
         print('======================================== Inter-intent ======================================')
         print_train_dev_test_stats(inter_intent_data)
         p = Pipeline(intent_data, dataset_name=intent_name,
-                     squashing_train_dev=(('squashing_train_dev', True) in config.items()))
+                     squashing_train_dev=config.get('squashing_train_dev', False))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
         p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
 
@@ -454,9 +449,9 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                     p.plot(show_test_only=True, plot_3d=True,
                            output_file_path=os.path.join(folder_3d, intent_name + '.pdf'))
                 test_quality = p.get_test_clustering_quality()
-                print('Clustering test quality [{}]: {}'.format(intent_name, test_quality))
+                print('Clustering TEST quality [{}]: {}'.format(intent_name, test_quality))
                 if stats_file is not None:
-                    stats_file.write('Clustering test quality [{}]: {}\n'.format(intent_name, test_quality))
+                    stats_file.write('Clustering TEST quality [{}]: {}\n'.format(intent_name, test_quality))
 
             if stats_file is not None:
                 stats_file.close()

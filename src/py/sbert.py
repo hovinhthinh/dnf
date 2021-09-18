@@ -1,11 +1,11 @@
 import os
 import random
+import tempfile
 from math import ceil
-from typing import List
+from typing import List, Callable
 
 import numpy
 import torch
-# from datasets import load_metric
 from torch import nn
 from torch.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
 from torch.nn.functional import cosine_similarity
@@ -132,65 +132,35 @@ class PseudoClassificationModel(nn.Module):
         return (loss,) + output
 
 
-def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=None,
-                                    val_texts=None, val_labels=None, test_texts=None, test_labels=None):
+def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=None):
     label_set = dict.fromkeys(train_labels)
-    if val_labels is not None:
-        label_set.update(dict.fromkeys(val_labels))
-    if test_labels is not None:
-        label_set.update(dict.fromkeys(test_labels))
     label_map = {l: i for i, l in enumerate(label_set)}
-
     train_labels = [label_map[l] for l in train_labels]
-    if val_labels is not None:
-        val_labels = [label_map[l] for l in val_labels]
-    if test_labels is not None:
-        test_labels = [label_map[l] for l in test_labels]
-
-    # metric_accuracy = load_metric("accuracy")
-    #
-    # def compute_accuracy(eval_pred):
-    #     logits, labels = eval_pred
-    #     predictions = numpy.argmax(logits, axis=-1)
-    #     return metric_accuracy.compute(predictions=predictions, references=labels)
-
     train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
-    val_encodings = tokenizer(val_texts, truncation=True, padding=True,
-                              return_tensors='pt') if val_texts is not None else None
-    test_encodings = tokenizer(test_texts, truncation=True, padding=True,
-                               return_tensors='pt') if test_texts is not None else None
-
     train_dataset = ClassificationDataset(train_encodings, train_labels, train_sample_weights)
-    val_dataset = ClassificationDataset(val_encodings, val_labels) if val_texts is not None else None
-    test_dataset = ClassificationDataset(test_encodings, test_labels) if test_texts is not None else None
-
     classifier = PseudoClassificationModel(model, len(label_set))
 
     # print(classifier(**train_encodings))
 
-    trainer = Trainer(
-        model=classifier,
-        args=TrainingArguments(
-            output_dir='./results',
-            num_train_epochs=1,
-            per_device_train_batch_size=16,
-            per_device_eval_batch_size=64,
-            warmup_steps=500,
-            weight_decay=0.01,
-            logging_dir='./logs',
-            evaluation_strategy='epoch' if val_dataset is not None else 'no'
-        ),
-        train_dataset=train_dataset,
-        eval_dataset=val_dataset,
-        # compute_metrics=compute_accuracy,
-    )
-    if test_dataset is not None:
-        print('Evaluate test_dataset (before):', trainer.evaluate(test_dataset))
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    optim = AdamW(classifier.parameters(), lr=5e-5)
 
-    trainer.train()
+    classifier.to(device)
 
-    if test_dataset is not None:
-        print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
+    classifier.train()  # Switch mode
+    cur = 0
+    for batch in train_loader:
+        cur += 1
+        print('\rNum examples: {} Batch: {}/{} ({:.1f}%)'
+              .format(len(train_dataset), cur, len(train_loader), 100 * cur / len(train_loader)),
+              end='' if cur < len(train_loader) else '\n')
+        optim.zero_grad()
+        batch = {key: val.to(device) for key, val in batch.items()}
+        outputs = classifier(**batch)
+        loss = outputs[0]
+        loss.backward()
+        optim.step()
+    classifier.eval()
 
 
 class UtteranceSimilarityDataset(torch.utils.data.Dataset):
@@ -296,77 +266,88 @@ class UtteranceSimilarityModel(nn.Module):
 
 # labels: None means unseen
 def fine_tune_utterance_similarity(train_texts, train_labels,
-                                   val_texts=None, val_labels=None, test_texts=None, test_labels=None,
                                    n_train_epochs=-1, n_train_steps=-1,
-                                   negative_sampling_rate_from_seen=2, negative_sampling_rate_from_unseen=0.5):
+                                   negative_sampling_rate_from_seen=2, negative_sampling_rate_from_unseen=0.5,
+                                   early_stopping_eval_callback: Callable[..., float] = None,
+                                   early_stopping_eval_patience=0
+                                   ):
     label_set = dict.fromkeys(train_labels)
-    if val_labels is not None:
-        label_set.update(dict.fromkeys(val_labels))
-    if test_labels is not None:
-        label_set.update(dict.fromkeys(test_labels))
-
     label_map = {None: -1}
     label_count = 0
     for l in label_set:
         if l is not None:
             label_map[l] = label_count
             label_count += 1
-
     train_labels = [label_map[l] for l in train_labels]
-    if val_labels is not None:
-        val_labels = [label_map[l] for l in val_labels]
-    if test_labels is not None:
-        test_labels = [label_map[l] for l in test_labels]
 
     train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
-    val_encodings = tokenizer(val_texts, truncation=True, padding=True,
-                              return_tensors='pt') if val_texts is not None else None
-    test_encodings = tokenizer(test_texts, truncation=True, padding=True,
-                               return_tensors='pt') if test_texts is not None else None
-
     train_dataset = UtteranceSimilarityDataset(train_encodings, train_labels,
                                                negative_sampling_rate_from_seen=negative_sampling_rate_from_seen,
                                                negative_sampling_rate_from_unseen=negative_sampling_rate_from_unseen)
-    val_dataset = UtteranceSimilarityDataset(val_encodings, val_labels,
-                                             negative_sampling_rate_from_seen=negative_sampling_rate_from_seen,
-                                             negative_sampling_rate_from_unseen=negative_sampling_rate_from_unseen) if val_texts is not None else None
-    test_dataset = UtteranceSimilarityDataset(test_encodings, test_labels,
-                                              negative_sampling_rate_from_seen=negative_sampling_rate_from_seen,
-                                              negative_sampling_rate_from_unseen=negative_sampling_rate_from_unseen) if test_texts is not None else None
 
     estimator = UtteranceSimilarityModel(model)
 
-    # print(estimator(**train_encodings))
+    if early_stopping_eval_callback is None:
+        if n_train_epochs == -1:
+            n_train_epochs = max(ceil((n_train_steps if n_train_steps != -1 else 2000) / len(train_dataset)), 2)
+        Trainer(
+            model=estimator,
+            args=TrainingArguments(
+                save_strategy='no',
+                output_dir='./results',
+                num_train_epochs=n_train_epochs,
+                per_device_train_batch_size=16,
+                per_device_eval_batch_size=64,
+                warmup_steps=500,
+                weight_decay=0.01,
+                logging_strategy='no',
+                logging_dir='./logs',
+                evaluation_strategy='no'
+            ),
+            train_dataset=train_dataset,
+        ).train()
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+        optim = AdamW(estimator.parameters(), lr=5e-5)
 
-    if n_train_epochs == -1:
-        if n_train_steps == -1:
-            n_train_steps = 2000
-        n_train_epochs = max(ceil(n_train_steps / len(train_dataset)), 2)
+        estimator.to(device)
 
-    trainer = Trainer(
-        model=estimator,
-        args=TrainingArguments(
-            save_strategy='no',
-            output_dir='./results',
-            num_train_epochs=n_train_epochs,
-            per_device_train_batch_size=16,
-            per_device_eval_batch_size=64,
-            warmup_steps=500,
-            weight_decay=0.01,
-            logging_strategy='no',
-            logging_dir='./logs',
-            evaluation_strategy='epoch' if val_dataset is not None else 'no'
-        ),
-        train_dataset=train_dataset,
-        eval_dataset=val_dataset,
-    )
-    if test_dataset is not None:
-        print('Evaluate test_dataset (before):', trainer.evaluate(test_dataset))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            best_epoch = None
+            best_eval = None
+            epoch = 0
+            while True:
+                epoch += 1
 
-    trainer.train()
+                estimator.train()  # Switch mode
+                cur = 0
+                for batch in train_loader:
+                    cur += 1
+                    print('\r==== Epoch: {} Num examples: {} Batch: {}/{} ({:.1f}%)'
+                          .format(epoch, len(train_dataset), cur, len(train_loader), 100 * cur / len(train_loader)),
+                          end='' if cur < len(train_loader) else '\n')
+                    optim.zero_grad()
+                    batch = {key: val.to(device) for key, val in batch.items()}
+                    outputs = estimator(**batch)
+                    loss = outputs[0]
+                    loss.backward()
+                    optim.step()
+                estimator.eval()
 
-    if test_dataset is not None:
-        print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
+                eval = early_stopping_eval_callback()
+                print('Validation score: {:.3f}'.format(eval), end='')
+                if best_eval is None or eval > best_eval:
+                    best_eval = eval
+                    best_epoch = epoch
+                    print(' -> Save model')
+                    save(temp_dir)
+                else:
+                    if epoch > best_epoch + early_stopping_eval_patience:
+                        print(' -> Stop')
+                        load(temp_dir)
+                        break
+                    else:
+                        print(' -> Be patient')
 
 
 class SlotTaggingDataset(torch.utils.data.Dataset):
@@ -840,11 +821,9 @@ if __name__ == '__main__':
 
     # train_texts, train_labels, train_labels_weights \
     #     = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-    # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
     # fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=train_labels_weights)
 
     # train_texts, train_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, None, None]
-    # val_texts, val_labels = ['i', 'j', 'k', 'l'], [1, 0, 1, 0]
     # fine_tune_utterance_similarity(train_texts, train_labels)
 
     # train_texts, train_slots \
