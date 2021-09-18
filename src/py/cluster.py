@@ -150,7 +150,7 @@ def _initialize_centers(dataset, k, method):
 
 
 def _compute_centers(clusters, dataset, k, ml_info):
-    cluster_ids = set(clusters)
+    cluster_ids = dict.fromkeys(clusters)
     k_new = len(cluster_ids)
     id_map = dict(zip(cluster_ids, range(k_new)))
     clusters = [id_map[x] for x in clusters]
