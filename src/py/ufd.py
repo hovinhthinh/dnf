@@ -23,7 +23,7 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
               label_plotting_order=None, output_file_path=None):
     if show_labels:
         plt.rcParams["figure.figsize"] = (10, 4)
-    embeddings = umap.UMAP(n_components=3 if plot_3d else 2).fit_transform(embeddings)
+    embeddings = umap.UMAP(n_components=3 if plot_3d else 2, random_state=42).fit_transform(embeddings)
     ax = plt.figure().add_subplot(projection='3d' if plot_3d else None)
 
     u_labels = set(labels)
