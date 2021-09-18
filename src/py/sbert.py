@@ -836,7 +836,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
 
 if __name__ == '__main__':
     set_seed(12993)
-    load('sentence-transformers/paraphrase-mpnet-base-v2')
+    load()
 
     # train_texts, train_labels, train_labels_weights \
     #     = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], [1, 0, 1, 0, 1, 0, 1, 0], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
