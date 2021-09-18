@@ -134,11 +134,11 @@ class PseudoClassificationModel(nn.Module):
 
 def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=None,
                                     val_texts=None, val_labels=None, test_texts=None, test_labels=None):
-    label_set = set(train_labels)
+    label_set = dict.fromkeys(train_labels)
     if val_labels is not None:
-        label_set.update(val_labels)
+        label_set.update(dict.fromkeys(val_labels))
     if test_labels is not None:
-        label_set.update(test_labels)
+        label_set.update(dict.fromkeys(test_labels))
     label_map = {l: i for i, l in enumerate(label_set)}
 
     train_labels = [label_map[l] for l in train_labels]
@@ -299,11 +299,11 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
                                    val_texts=None, val_labels=None, test_texts=None, test_labels=None,
                                    n_train_epochs=-1, n_train_steps=-1,
                                    negative_sampling_rate_from_seen=2, negative_sampling_rate_from_unseen=0.5):
-    label_set = set(train_labels)
+    label_set = dict.fromkeys(train_labels)
     if val_labels is not None:
-        label_set.update(val_labels)
+        label_set.update(dict.fromkeys(val_labels))
     if test_labels is not None:
-        label_set.update(test_labels)
+        label_set.update(dict.fromkeys(test_labels))
 
     label_map = {None: -1}
     label_count = 0
@@ -515,11 +515,11 @@ def fine_tune_slot_tagging(train_texts, train_slots,
         test_texts, test_tags = _split_text_and_slots_into_tokens_and_tags(test_texts, test_slots)
 
     # Tag set
-    unique_tags = set(tag for doc in train_tags for tag in doc)
+    unique_tags = dict.fromkeys(tag for doc in train_tags for tag in doc)
     if val_texts is not None:
-        unique_tags.update(tag for doc in val_tags for tag in doc)
+        unique_tags.update(dict.fromkeys(tag for doc in val_tags for tag in doc))
     if test_texts is not None:
-        unique_tags.update(tag for doc in test_tags for tag in doc)
+        unique_tags.update(dict.fromkeys(tag for doc in test_tags for tag in doc))
     tag2id = {tag: id for id, tag in enumerate(unique_tags)}
     id2tag = {id: tag for tag, id in tag2id.items()}
 
@@ -587,7 +587,7 @@ def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slo
     train_texts_sr = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
     train_slots = [s for s in train_slots if s is not None]
     train_texts_sr, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts_sr, train_slots)
-    unique_tags = set(tag for doc in train_tags for tag in doc)
+    unique_tags = dict.fromkeys(tag for doc in train_tags for tag in doc)
     tag2id = {tag: id for id, tag in enumerate(unique_tags)}
     id2tag = {id: tag for tag, id in tag2id.items()}
 
@@ -601,7 +601,7 @@ def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slo
     sr_optim = AdamW(tagger.parameters(), lr=5e-5)
 
     # Prepare for utterance similarity
-    label_set = set(train_cluster_labels)
+    label_set = dict.fromkeys(train_cluster_labels)
     label_map = {None: -1}
     label_count = 0
     for l in label_set:
@@ -696,11 +696,11 @@ def fine_tune_slot_multiclass_classification(train_texts, train_slots,
                                              val_texts=None, val_slots=None, test_texts=None, test_slots=None,
                                              n_train_epochs=-1, n_train_steps=-1):
     # Tag set
-    unique_tags = set(tag for doc in train_slots for tag in doc.keys())
+    unique_tags = dict.fromkeys(tag for doc in train_slots for tag in doc.keys())
     if val_texts is not None:
-        unique_tags.update(tag for doc in val_slots for tag in doc.keys())
+        unique_tags.update(dict.fromkeys(tag for doc in val_slots for tag in doc.keys()))
     if test_texts is not None:
-        unique_tags.update(tag for doc in test_slots for tag in doc.keys())
+        unique_tags.update(dict.fromkeys(tag for doc in test_slots for tag in doc.keys()))
 
     train_encodings = tokenizer(train_texts, padding=True, truncation=True, return_tensors='pt')
     val_encodings = tokenizer(val_texts, padding=True, truncation=True, return_tensors='pt') \
@@ -761,7 +761,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
     # Prepare for slot multiclass classification
     train_texts_smc = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
     train_slots = [s for s in train_slots if s is not None]
-    unique_tags = set(tag for doc in train_slots for tag in doc.keys())
+    unique_tags = dict.fromkeys(tag for doc in train_slots for tag in doc.keys())
 
     train_encodings_smc = tokenizer(train_texts_smc, padding=True, truncation=True, return_tensors='pt')
     train_slot_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in train_slots]
@@ -771,7 +771,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
     smc_optim = AdamW(classifier.parameters(), lr=5e-5)
 
     # Prepare for utterance similarity
-    label_set = set(train_cluster_labels)
+    label_set = dict.fromkeys(train_cluster_labels)
     label_map = {None: -1}
     label_count = 0
     for l in label_set:

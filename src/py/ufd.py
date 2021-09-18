@@ -26,7 +26,7 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
     embeddings = umap.UMAP(n_components=3 if plot_3d else 2, random_state=42).fit_transform(embeddings)
     ax = plt.figure().add_subplot(projection='3d' if plot_3d else None)
 
-    u_labels = set(labels)
+    u_labels = dict.fromkeys(labels)
     if label_plotting_order is None:
         label_plotting_order = [(l, None) for l in u_labels]
 
@@ -101,7 +101,7 @@ class Pipeline(object):
             else:
                 raise Exception('Invalid sample type')
 
-        self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(set([u[1] for u in self.utterances])))
+        self.cluster_label_2_index_map = dict((n, i) for i, n in enumerate(dict.fromkeys([u[1] for u in self.utterances])))
 
         self.embeddings = None
         self.test_embeddings = None
@@ -265,7 +265,7 @@ class Pipeline(object):
             # Use KMeans. we haven't seen the testing utterances yet, so we use normal KMeans here.
             # The model is fully trained, and we don't want to touch the train set anymore.
             test_cluster_label_2_index_map = dict(
-                (l, i) for i, l in enumerate(set([u[1] for u in self.test_utterances])))
+                (l, i) for i, l in enumerate(dict.fromkeys([u[1] for u in self.test_utterances])))
             test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
 
             if self.normalize_embeddings:
