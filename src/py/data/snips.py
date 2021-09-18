@@ -78,8 +78,8 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
         print('{}: {}'.format(k, len(v)))
     print('==== Overlap ====')
 
-    overlap_ids = set()
-    clustered_ids = set()
+    overlap_ids = {}
+    clustered_ids = {}
     for u, cu in clusters.items():
         for v, cv in clusters.items():
             if u >= v:
@@ -89,14 +89,14 @@ def extract_utterances_splitted_by_features(filters: dict, utrs, intent_name, ou
 
             for x in overlap:
                 # print(x)
-                overlap_ids.add(x['id'])
+                overlap_ids[x['id']] = None
 
     for u, cu in clusters.items():
         for i in reversed(range(len(cu))):
             if cu[i]['id'] in overlap_ids:
                 cu.pop(i)
             else:
-                clustered_ids.add(cu[i]['id'])
+                clustered_ids[cu[i]['id']] = None
 
     # Add an unknown cluster
     unk_cluster = list(filter(lambda u: u['id'] not in clustered_ids, utrs))
@@ -798,7 +798,7 @@ def get_train_test_data(generate_data=False, use_dev=True):
         intra_intent_data = []
         # Prepare data
         for data, predefined_clusters in intent_data:
-            clusters = list(set([u['cluster'] for u in data]))
+            clusters = dict.fromkeys([u['cluster'] for u in data]).keys()
 
             if predefined_clusters is not None:
                 train_clusters = predefined_clusters['TRAIN']
@@ -865,7 +865,7 @@ def get_train_test_data(generate_data=False, use_dev=True):
     print('======== Cluster information ========')
     for intent_name, cluster_data in intra_intent_data:
         print("====", intent_name)
-        clusters = set(u[1] for u in cluster_data)
+        clusters = dict.fromkeys(u[1] for u in cluster_data)
         all_clusters = []
         train_clusters = []
         dev_clusters = []
@@ -910,10 +910,10 @@ if __name__ == '__main__':
     # Write utterances to file
     if False:
         f = open('data/snips/slot_based_clusters/utterances.txt', 'w')
-        intents = set(u[1][:u[1].find('_')] for u in inter_intent_data)
+        intents = dict.fromkeys(u[1][:u[1].find('_')] for u in inter_intent_data)
         for intent in intents:
             data = [u for u in inter_intent_data if u[1].startswith(intent)]
-            sets = set(u[1] for u in data)
+            sets = dict.fromkeys(u[1] for u in data)
             print('======== Intent:', intent, '========', file=f)
             sets = [s for s in sets if s.endswith('TRAIN')] + \
                    [s for s in sets if s.endswith('DEV')] + \
