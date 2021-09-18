@@ -252,32 +252,31 @@ class Pipeline(object):
         sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices,
                                              early_stopping_eval_callback=self.get_validation_score)
 
-    def fine_tune_slot_tagging(self, n_train_epochs=-1, n_train_steps=-1):
+    def fine_tune_slot_tagging(self):
         sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                      [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                                     n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+                                     early_stopping_eval_callback=self.get_validation_score)
 
-    def fine_tune_slot_multiclass_classification(self, n_train_epochs=-1, n_train_steps=-1):
+    def fine_tune_slot_multiclass_classification(self):
         sbert.fine_tune_slot_multiclass_classification([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                                        [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                                                       n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+                                                       early_stopping_eval_callback=self.get_validation_score)
 
-    def fine_tune_joint_slot_tagging_and_utterance_similarity(self, n_train_epochs=-1, n_train_steps=-1):
+    def fine_tune_joint_slot_tagging_and_utterance_similarity(self):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
             [u[0] for u in self.utterances],
             [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
             cluster_indices,
-            n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+            early_stopping_eval_callback=self.get_validation_score)
 
-    def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
-            self, n_train_epochs=-1, n_train_steps=-1):
+    def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self):
         cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
             [u[0] for u in self.utterances],
             [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
             cluster_indices,
-            n_train_epochs=n_train_epochs, n_train_steps=n_train_steps)
+            early_stopping_eval_callback=self.get_validation_score)
 
     def get_dev_clustering_quality(self):
         dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']

@@ -60,6 +60,184 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
     return numpy.concatenate(batches)
 
 
+def _finetune_model(finetune_model, train_dataset, n_train_epochs=-1, n_train_steps=-1,
+                    early_stopping_eval_callback: Callable[..., float] = None,
+                    early_stopping_eval_patience=0):
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    optim = AdamW(finetune_model.parameters(), lr=5e-5)
+
+    finetune_model.to(device)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if early_stopping_eval_callback is None:
+            if n_train_epochs == -1:
+                n_train_epochs = ceil((n_train_steps if n_train_steps != -1 else 2000) / len(train_dataset))
+            Trainer(
+                model=finetune_model,
+                args=TrainingArguments(
+                    save_strategy='no',
+                    output_dir=os.path.join(temp_dir, 'results'),
+                    num_train_epochs=n_train_epochs,
+                    per_device_train_batch_size=16,
+                    per_device_eval_batch_size=64,
+                    warmup_steps=500,
+                    weight_decay=0.01,
+                    logging_strategy='no',
+                    evaluation_strategy='no'
+                ),
+                train_dataset=train_dataset,
+            ).train()
+        else:
+            best_epoch = None
+            best_eval = None
+            epoch = 0
+            while True:
+                epoch += 1
+
+                finetune_model.train()  # Switch mode
+                cur = 0
+                for batch in train_loader:
+                    cur += 1
+                    print('\r==== Epoch: {} Num examples: {} Batch: {}/{} ({:.1f}%)'
+                          .format(epoch, len(train_dataset), cur, len(train_loader), 100 * cur / len(train_loader)),
+                          end='' if cur < len(train_loader) else '\n')
+                    optim.zero_grad()
+                    batch = {key: val.to(device) for key, val in batch.items()}
+                    outputs = finetune_model(**batch)
+                    loss = outputs[0]
+                    loss.backward()
+                    optim.step()
+                finetune_model.eval()
+
+                eval = early_stopping_eval_callback()
+                print('Validation score: {:.3f}'.format(eval), end='')
+                if best_eval is None or eval > best_eval:
+                    best_eval = eval
+                    best_epoch = epoch
+                    print(' -> Save model')
+                    save(temp_dir)
+                else:
+                    if epoch > best_epoch + early_stopping_eval_patience:
+                        print(' -> Stop')
+                        load(temp_dir)
+                        break
+                    else:
+                        print(' -> Be patient')
+
+
+def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, train_dataset_2,
+                          n_train_epochs=-1, n_train_steps=-1,
+                          early_stopping_eval_callback: Callable[..., float] = None,
+                          early_stopping_eval_patience=0):
+    train_loader_1 = DataLoader(train_dataset_1, batch_size=16, shuffle=True)
+    train_loader_2 = DataLoader(train_dataset_2, batch_size=16, shuffle=True)
+    optim_1 = AdamW(finetune_model_1.parameters(), lr=5e-5)
+    optim_2 = AdamW(finetune_model_2.parameters(), lr=5e-5)
+
+    finetune_model_1.to(device)
+    finetune_model_2.to(device)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if early_stopping_eval_callback is None:
+            if n_train_epochs == -1:
+                n_train_epochs = ceil(
+                    (n_train_steps if n_train_steps != -1 else 2000) / min(len(train_dataset_1), len(train_dataset_2)))
+
+            finetune_model_1.train()  # Switch mode
+            finetune_model_2.train()
+
+            train_ids_len = len(train_loader_1) + len(train_loader_2)
+            cur = 0
+            for epoch in range(n_train_epochs):
+                train_ids = list(range(train_ids_len))
+                random.shuffle(train_ids)
+                train_loader_1_iter = iter(train_loader_1)
+                train_loader_2_iter = iter(train_loader_2)
+                for idx in train_ids:
+                    cur += 1
+                    print('\rJoint training: {}/{} ({:.1f}%)'.format(cur, train_ids_len * n_train_epochs,
+                                                                     100 * cur / (train_ids_len * n_train_epochs)),
+                          end='' if cur < train_ids_len * n_train_epochs else '\n')
+                    if idx < len(train_loader_1):
+                        optim_1.zero_grad()
+                        batch = next(train_loader_1_iter)
+                        batch = {key: val.to(device) for key, val in batch.items()}
+                        outputs = finetune_model_1(**batch)
+                        loss = outputs[0]
+                        loss.backward()
+                        optim_1.step()
+                    else:
+                        optim_2.zero_grad()
+                        batch = next(train_loader_2_iter)
+                        batch = {key: val.to(device) for key, val in batch.items()}
+                        outputs = finetune_model_2(**batch)
+                        loss = outputs[0]
+                        loss.backward()
+                        optim_2.step()
+
+            finetune_model_1.eval()  # Switch mode
+            finetune_model_2.eval()
+        else:
+            best_epoch = None
+            best_eval = None
+            epoch = 0
+            while True:
+                epoch += 1
+
+                train_ids = list(range(len(train_loader_1) + len(train_loader_2)))
+                random.shuffle(train_ids)
+                train_loader_1_iter = iter(train_loader_1)
+                train_loader_2_iter = iter(train_loader_2)
+
+                finetune_model_1.train()  # Switch mode
+                finetune_model_2.train()
+
+                cur_1 = 0
+                cur_2 = 0
+                for idx in train_ids:
+                    if idx < len(train_loader_1):
+                        cur_1 += 1
+                    else:
+                        cur_2 += 1
+                    print('\r==== Joint training: Epoch: {} Batch: {}+{}/{} ({:.1f}%)'
+                          .format(epoch, cur_1, cur_2, len(train_ids), 100 * (cur_1 + cur_2) / len(train_ids)),
+                          end='' if cur_1 + cur_2 < len(train_ids) else '\n')
+                    if idx < len(train_loader_1):
+                        optim_1.zero_grad()
+                        batch = next(train_loader_1_iter)
+                        batch = {key: val.to(device) for key, val in batch.items()}
+                        outputs = finetune_model_1(**batch)
+                        loss = outputs[0]
+                        loss.backward()
+                        optim_1.step()
+                    else:
+                        optim_2.zero_grad()
+                        batch = next(train_loader_2_iter)
+                        batch = {key: val.to(device) for key, val in batch.items()}
+                        outputs = finetune_model_2(**batch)
+                        loss = outputs[0]
+                        loss.backward()
+                        optim_2.step()
+
+                finetune_model_1.eval()  # Switch mode
+                finetune_model_2.eval()
+
+                eval = early_stopping_eval_callback()
+                print('Validation score: {:.3f}'.format(eval), end='')
+                if best_eval is None or eval > best_eval:
+                    best_eval = eval
+                    best_epoch = epoch
+                    print(' -> Save model')
+                    save(temp_dir)
+                else:
+                    if epoch > best_epoch + early_stopping_eval_patience:
+                        print(' -> Stop')
+                        load(temp_dir)
+                        break
+                    else:
+                        print(' -> Be patient')
+
+
 class ClassificationDataset(torch.utils.data.Dataset):
     # labels \in {0,1,2,3,...} (for single-class) or tuple[Literal[0.0,1.0]] (for multi-class)
     def __init__(self, encodings, labels, sample_weights=None):
@@ -269,8 +447,7 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
                                    n_train_epochs=-1, n_train_steps=-1,
                                    negative_sampling_rate_from_seen=2, negative_sampling_rate_from_unseen=0.5,
                                    early_stopping_eval_callback: Callable[..., float] = None,
-                                   early_stopping_eval_patience=0
-                                   ):
+                                   early_stopping_eval_patience=0):
     label_set = dict.fromkeys(train_labels)
     label_map = {None: -1}
     label_count = 0
@@ -287,67 +464,9 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
 
     estimator = UtteranceSimilarityModel(model)
 
-    if early_stopping_eval_callback is None:
-        if n_train_epochs == -1:
-            n_train_epochs = max(ceil((n_train_steps if n_train_steps != -1 else 2000) / len(train_dataset)), 2)
-        Trainer(
-            model=estimator,
-            args=TrainingArguments(
-                save_strategy='no',
-                output_dir='./results',
-                num_train_epochs=n_train_epochs,
-                per_device_train_batch_size=16,
-                per_device_eval_batch_size=64,
-                warmup_steps=500,
-                weight_decay=0.01,
-                logging_strategy='no',
-                logging_dir='./logs',
-                evaluation_strategy='no'
-            ),
-            train_dataset=train_dataset,
-        ).train()
-    else:
-        train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-        optim = AdamW(estimator.parameters(), lr=5e-5)
-
-        estimator.to(device)
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            best_epoch = None
-            best_eval = None
-            epoch = 0
-            while True:
-                epoch += 1
-
-                estimator.train()  # Switch mode
-                cur = 0
-                for batch in train_loader:
-                    cur += 1
-                    print('\r==== Epoch: {} Num examples: {} Batch: {}/{} ({:.1f}%)'
-                          .format(epoch, len(train_dataset), cur, len(train_loader), 100 * cur / len(train_loader)),
-                          end='' if cur < len(train_loader) else '\n')
-                    optim.zero_grad()
-                    batch = {key: val.to(device) for key, val in batch.items()}
-                    outputs = estimator(**batch)
-                    loss = outputs[0]
-                    loss.backward()
-                    optim.step()
-                estimator.eval()
-
-                eval = early_stopping_eval_callback()
-                print('Validation score: {:.3f}'.format(eval), end='')
-                if best_eval is None or eval > best_eval:
-                    best_eval = eval
-                    best_epoch = epoch
-                    print(' -> Save model')
-                    save(temp_dir)
-                else:
-                    if epoch > best_epoch + early_stopping_eval_patience:
-                        print(' -> Stop')
-                        load(temp_dir)
-                        break
-                    else:
-                        print(' -> Be patient')
+    _finetune_model(estimator, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
+                    early_stopping_eval_callback=early_stopping_eval_callback,
+                    early_stopping_eval_patience=early_stopping_eval_patience)
 
 
 class SlotTaggingDataset(torch.utils.data.Dataset):
@@ -394,30 +513,8 @@ class SlotTaggingModel(nn.Module):
         self.tagger = TaggerHead(base_model.config, num_labels)
         self.loss_fct = CrossEntropyLoss()
 
-    def forward(
-            self,
-            input_ids=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            labels=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None,
-    ):
-        outputs = self.base_model(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
+    def forward(self, input_ids=None, attention_mask=None, labels=None):
+        outputs = self.base_model(input_ids, attention_mask=attention_mask)
 
         sequence_output = outputs[0]
 
@@ -485,77 +582,27 @@ def _encode_tags(tags, encodings, tag2id):
     return encoded_labels
 
 
-def fine_tune_slot_tagging(train_texts, train_slots,
-                           val_texts=None, val_slots=None, test_texts=None, test_slots=None,
-                           n_train_epochs=-1, n_train_steps=-1):
+def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=-1, n_train_steps=-1,
+                           early_stopping_eval_callback: Callable[..., float] = None,
+                           early_stopping_eval_patience=0):
     train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
-
-    if val_texts is not None:
-        val_texts, val_tags = _split_text_and_slots_into_tokens_and_tags(val_texts, val_slots)
-    if test_texts is not None:
-        test_texts, test_tags = _split_text_and_slots_into_tokens_and_tags(test_texts, test_slots)
 
     # Tag set
     unique_tags = dict.fromkeys(tag for doc in train_tags for tag in doc)
-    if val_texts is not None:
-        unique_tags.update(dict.fromkeys(tag for doc in val_tags for tag in doc))
-    if test_texts is not None:
-        unique_tags.update(dict.fromkeys(tag for doc in test_tags for tag in doc))
     tag2id = {tag: id for id, tag in enumerate(unique_tags)}
-    id2tag = {id: tag for tag, id in tag2id.items()}
-
     train_encodings = tokenizer(train_texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
                                 truncation=True, return_tensors='pt')
-    val_encodings = tokenizer(val_texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
-                              truncation=True, return_tensors='pt') if val_texts is not None else None
-    test_encodings = tokenizer(test_texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
-                               truncation=True, return_tensors='pt') if test_texts is not None else None
-
     train_labels = _encode_tags(train_tags, train_encodings, tag2id)
-    val_labels = _encode_tags(val_tags, val_encodings, tag2id) if val_texts is not None else None
-    test_labels = _encode_tags(test_tags, test_encodings, tag2id) if test_texts is not None else None
 
     train_encodings.pop("offset_mapping")
-    if val_texts is not None:
-        val_encodings.pop("offset_mapping")
-    if test_texts is not None:
-        test_encodings.pop("offset_mapping")
 
     train_dataset = SlotTaggingDataset(train_encodings, train_labels)
-    val_dataset = SlotTaggingDataset(val_encodings, val_labels) if val_texts is not None else None
-    test_dataset = SlotTaggingDataset(test_encodings, test_labels) if test_texts is not None else None
 
     tagger = SlotTaggingModel(model, len(unique_tags))
 
-    if n_train_epochs == -1:
-        if n_train_steps == -1:
-            n_train_steps = 2000
-        n_train_epochs = max(ceil(n_train_steps / len(train_dataset)), 3)
-
-    trainer = Trainer(
-        model=tagger,
-        args=TrainingArguments(
-            save_strategy='no',
-            output_dir='./results',
-            num_train_epochs=n_train_epochs,
-            per_device_train_batch_size=16,
-            per_device_eval_batch_size=64,
-            warmup_steps=500,
-            weight_decay=0.01,
-            logging_strategy='no',
-            logging_dir='./logs',
-            evaluation_strategy='epoch' if val_dataset is not None else 'no'
-        ),
-        train_dataset=train_dataset,
-        eval_dataset=val_dataset,
-    )
-    if test_dataset is not None:
-        print('Evaluate test_dataset (before):', trainer.evaluate(test_dataset))
-
-    trainer.train()
-
-    if test_dataset is not None:
-        print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
+    _finetune_model(tagger, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
+                    early_stopping_eval_callback=early_stopping_eval_callback,
+                    early_stopping_eval_patience=early_stopping_eval_patience)
 
 
 # train_cluster_labels is None means unseen cluster
@@ -563,23 +610,21 @@ def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slo
                                                           n_train_epochs=-1, n_train_steps=-1,
                                                           us_negative_sampling_rate_from_seen=2,
                                                           us_negative_sampling_rate_from_unseen=0.5,
-                                                          ):
+                                                          early_stopping_eval_callback: Callable[..., float] = None,
+                                                          early_stopping_eval_patience=0):
     # Prepare for slot tagging
     train_texts_sr = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
     train_slots = [s for s in train_slots if s is not None]
     train_texts_sr, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts_sr, train_slots)
     unique_tags = dict.fromkeys(tag for doc in train_tags for tag in doc)
     tag2id = {tag: id for id, tag in enumerate(unique_tags)}
-    id2tag = {id: tag for tag, id in tag2id.items()}
 
     train_encodings_sr = tokenizer(train_texts_sr, is_split_into_words=True, return_offsets_mapping=True,
                                    padding=True, truncation=True, return_tensors='pt')
     train_slot_labels = _encode_tags(train_tags, train_encodings_sr, tag2id)
     train_encodings_sr.pop("offset_mapping")
     sr_train_dataset = SlotTaggingDataset(train_encodings_sr, train_slot_labels)
-    sr_train_loader = DataLoader(sr_train_dataset, batch_size=16, shuffle=True)
     tagger = SlotTaggingModel(model, len(unique_tags))
-    sr_optim = AdamW(tagger.parameters(), lr=5e-5)
 
     # Prepare for utterance similarity
     label_set = dict.fromkeys(train_cluster_labels)
@@ -595,54 +640,12 @@ def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slo
     us_train_dataset = UtteranceSimilarityDataset(train_encodings_us, train_cluster_labels,
                                                   negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
                                                   negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen)
-    us_train_loader = DataLoader(us_train_dataset, batch_size=16, shuffle=True)
     estimator = UtteranceSimilarityModel(model)
-    us_optim = AdamW(estimator.parameters(), lr=5e-5)
 
-    # Compute optimal n_epochs
-    if n_train_epochs == -1:
-        if n_train_steps == -1:
-            n_train_steps = 2000
-        n_train_epochs = max(ceil(n_train_steps / min(len(sr_train_dataset), len(us_train_dataset))), 3)
-
-    tagger.to(device)
-    estimator.to(device)
-
-    tagger.train()  # Switch mode
-    estimator.train()
-
-    train_ids_len = len(us_train_loader) + len(sr_train_loader)
-
-    cur = 0
-    for epoch in range(n_train_epochs):
-        train_ids = list(range(train_ids_len))
-        random.shuffle(train_ids)
-        us_train_loader_iter = iter(us_train_loader)
-        sr_train_loader_iter = iter(sr_train_loader)
-        for idx in train_ids:
-            cur += 1
-            print('\rJoint training: {}/{} ({:.1f}%)'.format(cur, train_ids_len * n_train_epochs,
-                                                             100 * cur / (train_ids_len * n_train_epochs)),
-                  end='' if cur < train_ids_len * n_train_epochs else '\n')
-            if idx < len(us_train_loader):
-                us_optim.zero_grad()
-                batch = next(us_train_loader_iter)
-                batch = {key: val.to(device) for key, val in batch.items()}
-                outputs = estimator(**batch)
-                loss = outputs[0]
-                loss.backward()
-                us_optim.step()
-            else:
-                sr_optim.zero_grad()
-                batch = next(sr_train_loader_iter)
-                batch = {key: val.to(device) for key, val in batch.items()}
-                outputs = tagger(**batch)
-                loss = outputs[0]
-                loss.backward()
-                sr_optim.step()
-
-    tagger.eval()  # Switch mode
-    estimator.eval()
+    _joint_finetune_model(tagger, estimator, sr_train_dataset, us_train_dataset,
+                          n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
+                          early_stopping_eval_callback=early_stopping_eval_callback,
+                          early_stopping_eval_patience=early_stopping_eval_patience)
 
 
 class SlotMulticlassClassificationModel(nn.Module):
@@ -673,63 +676,22 @@ class SlotMulticlassClassificationModel(nn.Module):
         return (loss,) + output
 
 
-def fine_tune_slot_multiclass_classification(train_texts, train_slots,
-                                             val_texts=None, val_slots=None, test_texts=None, test_slots=None,
-                                             n_train_epochs=-1, n_train_steps=-1):
+def fine_tune_slot_multiclass_classification(train_texts, train_slots, n_train_epochs=-1, n_train_steps=-1,
+                                             early_stopping_eval_callback: Callable[..., float] = None,
+                                             early_stopping_eval_patience=0):
     # Tag set
     unique_tags = dict.fromkeys(tag for doc in train_slots for tag in doc.keys())
-    if val_texts is not None:
-        unique_tags.update(dict.fromkeys(tag for doc in val_slots for tag in doc.keys()))
-    if test_texts is not None:
-        unique_tags.update(dict.fromkeys(tag for doc in test_slots for tag in doc.keys()))
 
     train_encodings = tokenizer(train_texts, padding=True, truncation=True, return_tensors='pt')
-    val_encodings = tokenizer(val_texts, padding=True, truncation=True, return_tensors='pt') \
-        if val_texts is not None else None
-    test_encodings = tokenizer(test_texts, padding=True, truncation=True, return_tensors='pt') \
-        if test_texts is not None else None
-
     train_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in train_slots]
-    val_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in val_slots] \
-        if val_texts is not None else None
-    test_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in test_slots] \
-        if test_texts is not None else None
 
     train_dataset = ClassificationDataset(train_encodings, train_labels)
-    val_dataset = ClassificationDataset(val_encodings, val_labels) if val_texts is not None else None
-    test_dataset = ClassificationDataset(test_encodings, test_labels) if test_texts is not None else None
 
     classifier = SlotMulticlassClassificationModel(model, len(unique_tags))
 
-    if n_train_epochs == -1:
-        if n_train_steps == -1:
-            n_train_steps = 2000
-        n_train_epochs = max(ceil(n_train_steps / len(train_dataset)), 3)
-
-    trainer = Trainer(
-        model=classifier,
-        args=TrainingArguments(
-            save_strategy='no',
-            output_dir='./results',
-            num_train_epochs=n_train_epochs,
-            per_device_train_batch_size=16,
-            per_device_eval_batch_size=64,
-            warmup_steps=500,
-            weight_decay=0.01,
-            logging_strategy='no',
-            logging_dir='./logs',
-            evaluation_strategy='epoch' if val_dataset is not None else 'no'
-        ),
-        train_dataset=train_dataset,
-        eval_dataset=val_dataset,
-    )
-    if test_dataset is not None:
-        print('Evaluate test_dataset (before):', trainer.evaluate(test_dataset))
-
-    trainer.train()
-
-    if test_dataset is not None:
-        print('Evaluate test_dataset (after):', trainer.evaluate(test_dataset))
+    _finetune_model(classifier, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
+                    early_stopping_eval_callback=early_stopping_eval_callback,
+                    early_stopping_eval_patience=early_stopping_eval_patience)
 
 
 # train_cluster_labels is None means unseen cluster
@@ -738,6 +700,8 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
         n_train_epochs=-1, n_train_steps=-1,
         us_negative_sampling_rate_from_seen=2,
         us_negative_sampling_rate_from_unseen=0.5,
+        early_stopping_eval_callback: Callable[..., float] = None,
+        early_stopping_eval_patience=0
 ):
     # Prepare for slot multiclass classification
     train_texts_smc = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
@@ -747,9 +711,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
     train_encodings_smc = tokenizer(train_texts_smc, padding=True, truncation=True, return_tensors='pt')
     train_slot_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in train_slots]
     smc_train_dataset = ClassificationDataset(train_encodings_smc, train_slot_labels)
-    smc_train_loader = DataLoader(smc_train_dataset, batch_size=16, shuffle=True)
     classifier = SlotMulticlassClassificationModel(model, len(unique_tags))
-    smc_optim = AdamW(classifier.parameters(), lr=5e-5)
 
     # Prepare for utterance similarity
     label_set = dict.fromkeys(train_cluster_labels)
@@ -765,54 +727,12 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
     us_train_dataset = UtteranceSimilarityDataset(train_encodings_us, train_cluster_labels,
                                                   negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
                                                   negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen)
-    us_train_loader = DataLoader(us_train_dataset, batch_size=16, shuffle=True)
     estimator = UtteranceSimilarityModel(model)
-    us_optim = AdamW(estimator.parameters(), lr=5e-5)
 
-    # Compute optimal n_epochs
-    if n_train_epochs == -1:
-        if n_train_steps == -1:
-            n_train_steps = 2000
-        n_train_epochs = max(ceil(n_train_steps / min(len(smc_train_dataset), len(us_train_dataset))), 3)
-
-    classifier.to(device)
-    estimator.to(device)
-
-    classifier.train()  # Switch mode
-    estimator.train()
-
-    train_ids_len = len(us_train_loader) + len(smc_train_loader)
-
-    cur = 0
-    for epoch in range(n_train_epochs):
-        train_ids = list(range(train_ids_len))
-        random.shuffle(train_ids)
-        us_train_loader_iter = iter(us_train_loader)
-        smc_train_loader_iter = iter(smc_train_loader)
-        for idx in train_ids:
-            cur += 1
-            print('\rJoint training: {}/{} ({:.1f}%)'.format(cur, train_ids_len * n_train_epochs,
-                                                             100 * cur / (train_ids_len * n_train_epochs)),
-                  end='' if cur < train_ids_len * n_train_epochs else '\n')
-            if idx < len(us_train_loader):
-                us_optim.zero_grad()
-                batch = next(us_train_loader_iter)
-                batch = {key: val.to(device) for key, val in batch.items()}
-                outputs = estimator(**batch)
-                loss = outputs[0]
-                loss.backward()
-                us_optim.step()
-            else:
-                smc_optim.zero_grad()
-                batch = next(smc_train_loader_iter)
-                batch = {key: val.to(device) for key, val in batch.items()}
-                outputs = classifier(**batch)
-                loss = outputs[0]
-                loss.backward()
-                smc_optim.step()
-
-    classifier.eval()  # Switch mode
-    estimator.eval()
+    _joint_finetune_model(classifier, estimator, smc_train_dataset, us_train_dataset,
+                          n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
+                          early_stopping_eval_callback=early_stopping_eval_callback,
+                          early_stopping_eval_patience=early_stopping_eval_patience)
 
 
 if __name__ == '__main__':
