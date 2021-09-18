@@ -5,7 +5,7 @@ from typing import List
 
 import numpy
 import torch
-from datasets import load_metric
+# from datasets import load_metric
 from torch import nn
 from torch.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
 from torch.nn.functional import cosine_similarity
@@ -147,12 +147,12 @@ def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weig
     if test_labels is not None:
         test_labels = [label_map[l] for l in test_labels]
 
-    metric_accuracy = load_metric("accuracy")
-
-    def compute_accuracy(eval_pred):
-        logits, labels = eval_pred
-        predictions = numpy.argmax(logits, axis=-1)
-        return metric_accuracy.compute(predictions=predictions, references=labels)
+    # metric_accuracy = load_metric("accuracy")
+    #
+    # def compute_accuracy(eval_pred):
+    #     logits, labels = eval_pred
+    #     predictions = numpy.argmax(logits, axis=-1)
+    #     return metric_accuracy.compute(predictions=predictions, references=labels)
 
     train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
     val_encodings = tokenizer(val_texts, truncation=True, padding=True,
@@ -182,7 +182,7 @@ def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weig
         ),
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        compute_metrics=compute_accuracy,
+        # compute_metrics=compute_accuracy,
     )
     if test_dataset is not None:
         print('Evaluate test_dataset (before):', trainer.evaluate(test_dataset))
