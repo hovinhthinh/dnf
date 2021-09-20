@@ -86,9 +86,11 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
 class Pipeline(object):
 
     def __init__(self, utterances: List[Tuple[str, any, str, dict]],  # (utterance, cluster_label, sample_type, slots)
-                 dataset_name=None, normalize_embeddings=False, squashing_train_dev=False):
+                 dataset_name=None,
+                 squashing_train_dev=False,  # TODO: This parameter is deprecated, and has to be removed.
+                 use_unseen_in_training=True):
         self.dataset_name = dataset_name
-        self.normalize_embeddings = normalize_embeddings
+        self.use_unseen_in_training = use_unseen_in_training
         self.use_dev = 'DEV' in [u[2] for u in utterances]
         self.utterances = []  # TRAIN + DEV, if DEV is not provided, use DEV = TEST instead.
         self.test_utterances = []
@@ -139,11 +141,9 @@ class Pipeline(object):
             indices = [i for i, u in enumerate(self.utterances) if u[2] == 'TEST']
             self.test_embeddings = self.embeddings[indices]
 
-    def get_true_clusters(self, including_train=True):
-        if including_train:
-            return [self.cluster_label_2_index_map[u[1]] for u in self.utterances]
-        else:
-            return [self.cluster_label_2_index_map[u[1]] for u in self.utterances if u[2] != 'TRAIN']
+    def get_true_clusters(self, including_train=True, including_dev=True):
+        return [self.cluster_label_2_index_map[u[1]] for u in self.utterances if
+                (including_train and u[2] == 'TRAIN') or (including_dev and u[2] != 'TRAIN')]
 
     # Returns pseudo clusters and assignment confidences
     def get_pseudo_clusters(self, k=None):
@@ -219,7 +219,14 @@ class Pipeline(object):
                     print('==== Iteration: {}'.format(it + 1))
                     # self.update_embeddings() # No need to update, already called in self.get_validation_score()
                     pseudo_clusters, weights = self.get_pseudo_clusters()
-                    print('Pseudo-cluster quality:', get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
+
+                    if not self.use_unseen_in_training:
+                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                        weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                    print('Pseudo-cluster quality:',
+                          get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
+                                                 pseudo_clusters))
                     sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
                                                           train_sample_weights=weights if use_sample_weights else None)
                     eval = self.get_validation_score()
@@ -243,14 +250,26 @@ class Pipeline(object):
                 if it > 0:
                     self.update_embeddings()
                 pseudo_clusters, weights = self.get_pseudo_clusters()
-                print('Pseudo-cluster quality:', get_clustering_quality(self.get_true_clusters(), pseudo_clusters))
+
+                if not self.use_unseen_in_training:
+                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                    weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                print('Pseudo-cluster quality:',
+                      get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
+                                             pseudo_clusters))
                 sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
                                                       train_sample_weights=weights if use_sample_weights else None)
 
     def fine_tune_utterance_similarity(self):
-        cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
-        sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances], cluster_indices,
-                                             early_stopping_eval_callback=self.get_validation_score)
+        if self.use_unseen_in_training:
+            sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances],
+                                                 [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
+                                                 early_stopping_eval_callback=self.get_validation_score)
+        else:
+            sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances if u[2] == 'TRAIN'],
+                                                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
+                                                 early_stopping_eval_callback=self.get_validation_score)
 
     def fine_tune_slot_tagging(self):
         sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
@@ -263,20 +282,32 @@ class Pipeline(object):
                                                        early_stopping_eval_callback=self.get_validation_score)
 
     def fine_tune_joint_slot_tagging_and_utterance_similarity(self):
-        cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
-        sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
-            [u[0] for u in self.utterances],
-            [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
-            cluster_indices,
-            early_stopping_eval_callback=self.get_validation_score)
+        if self.use_unseen_in_training:
+            sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
+                [u[0] for u in self.utterances],
+                [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
+                [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
+                early_stopping_eval_callback=self.get_validation_score)
+        else:
+            sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
+                [u[0] for u in self.utterances if u[2] == 'TRAIN'],
+                [u[3] for u in self.utterances if u[2] == 'TRAIN'],
+                [u[1] for u in self.utterances if u[2] == 'TRAIN'],
+                early_stopping_eval_callback=self.get_validation_score)
 
     def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self):
-        cluster_indices = [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
-        sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
-            [u[0] for u in self.utterances],
-            [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
-            cluster_indices,
-            early_stopping_eval_callback=self.get_validation_score)
+        if self.use_unseen_in_training:
+            sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
+                [u[0] for u in self.utterances],
+                [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
+                [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
+                early_stopping_eval_callback=self.get_validation_score)
+        else:
+            sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
+                [u[0] for u in self.utterances if u[2] == 'TRAIN'],
+                [u[3] for u in self.utterances if u[2] == 'TRAIN'],
+                [u[1] for u in self.utterances if u[2] == 'TRAIN'],
+                early_stopping_eval_callback=self.get_validation_score)
 
     def get_dev_clustering_quality(self):
         dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
@@ -396,6 +427,7 @@ class Pipeline(object):
 def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                     report_folder=None, plot_3d=False,
                     config={
+                        'use_unseen_in_training': True,
                         'squashing_train_dev': False,
                     }):
     # Processing intra-intents
@@ -411,6 +443,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
 
             print_train_dev_test_stats(intent_data)
             p = Pipeline(intent_data, dataset_name=intent_name,
+                         use_unseen_in_training=config.get('use_unseen_in_training', True),
                          squashing_train_dev=config.get('squashing_train_dev', False))
             intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
             p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
@@ -420,6 +453,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
         print('======================================== Inter-intent ======================================')
         print_train_dev_test_stats(inter_intent_data)
         p = Pipeline(inter_intent_data, dataset_name='inter_intent',
+                     use_unseen_in_training=config.get('use_unseen_in_training', True),
                      squashing_train_dev=config.get('squashing_train_dev', False))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
         p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
