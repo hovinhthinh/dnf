@@ -759,8 +759,8 @@ def get_train_test_data(generate_data=False, use_dev=True):
                 'TEST': ['GetWeatherInALocationAtATimeRange'],
             }),
             (split_by_features_AddToPlaylist(), {
-                'TRAIN': ['AddCurrentArtistToAPlaylist', 'AddASongToAPlaylist'],
-                'DEV': ['AddAnArtistToAPlaylist', 'AddCurrentSongToAPlaylist'],
+                'TRAIN': ['AddAnArtistToAPlaylist', 'AddCurrentSongToAPlaylist'],
+                'DEV': ['AddCurrentArtistToAPlaylist', 'AddASongToAPlaylist'],
                 'TEST': ['AddCurrentAlbumToAPlaylist'],
             }),
             (split_by_features_RateBook(), {
