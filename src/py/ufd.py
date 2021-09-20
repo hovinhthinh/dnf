@@ -419,7 +419,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
     if inter_intent_data is not None:
         print('======================================== Inter-intent ======================================')
         print_train_dev_test_stats(inter_intent_data)
-        p = Pipeline(intent_data, dataset_name=intent_name,
+        p = Pipeline(inter_intent_data, dataset_name='inter_intent',
                      squashing_train_dev=config.get('squashing_train_dev', False))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
         p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
