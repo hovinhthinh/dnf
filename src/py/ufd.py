@@ -280,6 +280,8 @@ class Pipeline(object):
 
     def get_dev_clustering_quality(self):
         dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
+        if len(dev_embeddings) == 0:
+            raise Exception('DEV set is unavailable')
         dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map), random_state=42).fit(
             dev_embeddings).labels_
         return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
