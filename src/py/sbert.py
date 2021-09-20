@@ -344,8 +344,8 @@ def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weig
 class UtteranceSimilarityDataset(torch.utils.data.Dataset):
     # labels \in {-1,0,1,2,3,...}, -1 means unseen
     def __init__(self, encodings, labels,
-                 negative_sampling_rate_from_seen: int = 2,
-                 negative_sampling_rate_from_unseen: float = 0.5):
+                 negative_sampling_rate_from_seen: int = 3,
+                 negative_sampling_rate_from_unseen: float = 0.0):
         self.unseen_indices = []
         self.n_seen_utterances = 0
         self.seen_indices = [[] for _ in range(max(labels) + 1)]
@@ -445,7 +445,7 @@ class UtteranceSimilarityModel(nn.Module):
 # labels: None means unseen
 def fine_tune_utterance_similarity(train_texts, train_labels,
                                    n_train_epochs=-1, n_train_steps=-1,
-                                   negative_sampling_rate_from_seen=2, negative_sampling_rate_from_unseen=0.5,
+                                   negative_sampling_rate_from_seen=3, negative_sampling_rate_from_unseen=0.0,
                                    early_stopping_eval_callback: Callable[..., float] = None,
                                    early_stopping_eval_patience=0):
     label_set = dict.fromkeys(train_labels)
@@ -608,8 +608,8 @@ def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=-1, n_train_
 # train_cluster_labels is None means unseen cluster
 def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slots, train_cluster_labels,
                                                           n_train_epochs=-1, n_train_steps=-1,
-                                                          us_negative_sampling_rate_from_seen=2,
-                                                          us_negative_sampling_rate_from_unseen=0.5,
+                                                          us_negative_sampling_rate_from_seen=3,
+                                                          us_negative_sampling_rate_from_unseen=0.0,
                                                           early_stopping_eval_callback: Callable[..., float] = None,
                                                           early_stopping_eval_patience=0):
     # Prepare for slot tagging
@@ -698,8 +698,8 @@ def fine_tune_slot_multiclass_classification(train_texts, train_slots, n_train_e
 def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
         train_texts, train_slots, train_cluster_labels,
         n_train_epochs=-1, n_train_steps=-1,
-        us_negative_sampling_rate_from_seen=2,
-        us_negative_sampling_rate_from_unseen=0.5,
+        us_negative_sampling_rate_from_seen=3,
+        us_negative_sampling_rate_from_unseen=0.0,
         early_stopping_eval_callback: Callable[..., float] = None,
         early_stopping_eval_patience=0
 ):

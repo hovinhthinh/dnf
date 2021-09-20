@@ -387,7 +387,8 @@ class Pipeline(object):
             elif step == 'PC':
                 self.fine_tune_pseudo_classification(
                     use_sample_weights=config.get('pseudo_classification_sample_weights', True),
-                    iterations=config.get('pseudo_classification_iterations', None)
+                    iterations=config.get('pseudo_classification_iterations', None),
+                    early_stopping_eval_patience=3
                 )
             else:
                 raise Exception('Invalid step name:', step)
