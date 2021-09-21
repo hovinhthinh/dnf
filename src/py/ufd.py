@@ -336,7 +336,8 @@ class Pipeline(object):
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
                 'pseudo_classification_sample_weights': True,
-                'pseudo_classification_iterations': None
+                'pseudo_classification_iterations': None,
+                'pseudo_classification_max_iterations': 10,
             }):
         set_seed(12993)
         for s in steps:
@@ -395,7 +396,8 @@ class Pipeline(object):
                 self.fine_tune_pseudo_classification(
                     use_sample_weights=config.get('pseudo_classification_sample_weights', True),
                     iterations=config.get('pseudo_classification_iterations', None),
-                    early_stopping_eval_patience=3, min_iterations=1, max_iterations=10
+                    early_stopping_eval_patience=3,
+                    min_iterations=1, max_iterations=config.get('pseudo_classification_max_iterations', 10),
                 )
             else:
                 raise Exception('Invalid step name:', step)
@@ -484,7 +486,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 stats_file.write('======== Apply inter-intent model back to intra-intent ========\n')
 
             for intent_name, intent_data in intra_intent_data:
-                p = Pipeline(intent_data)
+                p = Pipeline(intent_data, dataset_name=intent_name)
                 p.update_test_embeddings()
                 p.plot(show_test_only=True,
                        output_file_path=os.path.join(folder, intent_name + '.pdf') if folder is not None else None)
