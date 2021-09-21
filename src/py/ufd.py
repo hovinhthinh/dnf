@@ -263,15 +263,17 @@ class Pipeline(object):
                 sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
                                                       train_sample_weights=weights if use_sample_weights else None)
 
-    def fine_tune_utterance_similarity(self):
+    def fine_tune_utterance_similarity(self, n_train_epochs=None):
         if self.use_unseen_in_training:
             sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances],
                                                  [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
-                                                 early_stopping_eval_callback=self.get_validation_score)
+                                                 n_train_epochs=n_train_epochs,
+                                                 early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
         else:
             sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                                  [u[1] for u in self.utterances if u[2] == 'TRAIN'],
-                                                 early_stopping_eval_callback=self.get_validation_score)
+                                                 n_train_epochs=n_train_epochs,
+                                                 early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
 
     def fine_tune_slot_tagging(self):
         sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],

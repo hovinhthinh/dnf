@@ -60,7 +60,7 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
     return numpy.concatenate(batches)
 
 
-def _finetune_model(finetune_model, train_dataset, n_train_epochs=-1, n_train_steps=-1,
+def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_steps=None,
                     early_stopping_eval_callback: Callable[..., float] = None,
                     early_stopping_eval_patience=0):
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
@@ -70,8 +70,8 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=-1, n_train_st
 
     with tempfile.TemporaryDirectory() as temp_dir:
         if early_stopping_eval_callback is None:
-            if n_train_epochs == -1:
-                n_train_epochs = ceil((n_train_steps if n_train_steps != -1 else 2000) / len(train_dataset))
+            if n_train_epochs is None:
+                n_train_epochs = ceil((n_train_steps if n_train_steps is not None else 2000) / len(train_dataset))
             Trainer(
                 model=finetune_model,
                 args=TrainingArguments(
@@ -126,7 +126,7 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=-1, n_train_st
 
 
 def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, train_dataset_2,
-                          n_train_epochs=-1, n_train_steps=-1,
+                          n_train_epochs=None, n_train_steps=None,
                           early_stopping_eval_callback: Callable[..., float] = None,
                           early_stopping_eval_patience=0):
     train_loader_1 = DataLoader(train_dataset_1, batch_size=16, shuffle=True)
@@ -139,9 +139,10 @@ def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, t
 
     with tempfile.TemporaryDirectory() as temp_dir:
         if early_stopping_eval_callback is None:
-            if n_train_epochs == -1:
+            if n_train_epochs is None:
                 n_train_epochs = ceil(
-                    (n_train_steps if n_train_steps != -1 else 2000) / min(len(train_dataset_1), len(train_dataset_2)))
+                    (n_train_steps if n_train_steps is not None else 2000) / min(len(train_dataset_1),
+                                                                                 len(train_dataset_2)))
 
             finetune_model_1.train()  # Switch mode
             finetune_model_2.train()
@@ -444,7 +445,7 @@ class UtteranceSimilarityModel(nn.Module):
 
 # labels: None means unseen
 def fine_tune_utterance_similarity(train_texts, train_labels,
-                                   n_train_epochs=-1, n_train_steps=-1,
+                                   n_train_epochs=None, n_train_steps=None,
                                    negative_sampling_rate_from_seen=3, negative_sampling_rate_from_unseen=0.0,
                                    early_stopping_eval_callback: Callable[..., float] = None,
                                    early_stopping_eval_patience=0):
@@ -582,7 +583,7 @@ def _encode_tags(tags, encodings, tag2id):
     return encoded_labels
 
 
-def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=-1, n_train_steps=-1,
+def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=None, n_train_steps=None,
                            early_stopping_eval_callback: Callable[..., float] = None,
                            early_stopping_eval_patience=0):
     train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
@@ -607,7 +608,7 @@ def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=-1, n_train_
 
 # train_cluster_labels is None means unseen cluster
 def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slots, train_cluster_labels,
-                                                          n_train_epochs=-1, n_train_steps=-1,
+                                                          n_train_epochs=None, n_train_steps=None,
                                                           us_negative_sampling_rate_from_seen=3,
                                                           us_negative_sampling_rate_from_unseen=0.0,
                                                           early_stopping_eval_callback: Callable[..., float] = None,
@@ -676,7 +677,7 @@ class SlotMulticlassClassificationModel(nn.Module):
         return (loss,) + output
 
 
-def fine_tune_slot_multiclass_classification(train_texts, train_slots, n_train_epochs=-1, n_train_steps=-1,
+def fine_tune_slot_multiclass_classification(train_texts, train_slots, n_train_epochs=None, n_train_steps=None,
                                              early_stopping_eval_callback: Callable[..., float] = None,
                                              early_stopping_eval_patience=0):
     # Tag set
@@ -697,7 +698,7 @@ def fine_tune_slot_multiclass_classification(train_texts, train_slots, n_train_e
 # train_cluster_labels is None means unseen cluster
 def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
         train_texts, train_slots, train_cluster_labels,
-        n_train_epochs=-1, n_train_steps=-1,
+        n_train_epochs=None, n_train_steps=None,
         us_negative_sampling_rate_from_seen=3,
         us_negative_sampling_rate_from_unseen=0.0,
         early_stopping_eval_callback: Callable[..., float] = None,
