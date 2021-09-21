@@ -337,9 +337,10 @@ class Pipeline(object):
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
-                'pseudo_classification_sample_weights': True,
-                'pseudo_classification_iterations': None,
-                'pseudo_classification_max_iterations': 10,
+                'PC_sample_weights': True,
+                'PC_iterations': None,
+                'PC_max_iterations': 10,
+                'US_n_train_epochs': None
             }):
         set_seed(12993)
         for s in steps:
@@ -393,13 +394,13 @@ class Pipeline(object):
             elif step == 'SMC':
                 self.fine_tune_slot_multiclass_classification()
             elif step == 'US':
-                self.fine_tune_utterance_similarity()
+                self.fine_tune_utterance_similarity(n_train_epochs=config.get('US_n_train_epochs', None))
             elif step == 'PC':
                 self.fine_tune_pseudo_classification(
-                    use_sample_weights=config.get('pseudo_classification_sample_weights', True),
-                    iterations=config.get('pseudo_classification_iterations', None),
+                    use_sample_weights=config.get('PC_sample_weights', True),
+                    iterations=config.get('PC_iterations', None),
                     early_stopping_eval_patience=3,
-                    min_iterations=1, max_iterations=config.get('pseudo_classification_max_iterations', 10),
+                    min_iterations=1, max_iterations=config.get('PC_max_iterations', 10),
                 )
             else:
                 raise Exception('Invalid step name:', step)
