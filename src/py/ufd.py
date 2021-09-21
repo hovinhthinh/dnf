@@ -104,6 +104,10 @@ class Pipeline(object):
             else:
                 raise Exception('Invalid sample type')
 
+        # For squashing train/dev. TODO: remove.
+        self.squashing_train_dev = squashing_train_dev
+        self.dev_indices = [i for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
+
         self.cluster_label_2_index_map = dict(
             (n, i) for i, n in enumerate(dict.fromkeys([u[1] for u in self.utterances])))
 
@@ -314,12 +318,19 @@ class Pipeline(object):
                 early_stopping_eval_callback=self.get_validation_score)
 
     def get_dev_clustering_quality(self):
-        dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
-        if len(dev_embeddings) == 0:
-            raise Exception('DEV set is unavailable')
-        dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map)).fit(
-            dev_embeddings).labels_
-        return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
+        if self.squashing_train_dev:  # TODO: remove this case.
+            dev_embeddings = [self.embeddings[i] for i in self.dev_indices]
+            dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map)).fit(
+                dev_embeddings).labels_
+            dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i][1]] for i in self.dev_indices]
+            return get_clustering_quality(dev_true_clusters, dev_predicted_clusters)
+        else:
+            dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
+            if len(dev_embeddings) == 0:
+                raise Exception('DEV set is unavailable')
+            dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map)).fit(
+                dev_embeddings).labels_
+            return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
     def get_test_clustering_quality(self, k=None, evaluating_clusters=None):
         test_cluster_label_2_index_map = dict(
