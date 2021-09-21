@@ -1,6 +1,0 @@
-======== Apply inter-intent model back to intra-intent ========
-Clustering test quality [GetWeather]: {'NMI': 0.053, 'ARI': 0.106, 'ACC': 0.62}
-Clustering test quality [AddToPlaylist]: {'NMI': 0.404, 'ARI': 0.344, 'ACC': 0.47}
-Clustering test quality [PlayMusic]: {'NMI': 0.577, 'ARI': 0.428, 'ACC': 0.512}
-Clustering test quality [SearchCreativeWork]: {'NMI': 0.702, 'ARI': 0.64, 'ACC': 0.782}
-Clustering test quality [SearchScreeningEvent]: {'NMI': 0.612, 'ARI': 0.468, 'ACC': 0.592}

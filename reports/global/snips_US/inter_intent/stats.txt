@@ -1,1 +1,0 @@
-Finetune-utterance-similarity test quality: {'NMI': 0.725, 'ARI': 0.424, 'ACC': 0.482}

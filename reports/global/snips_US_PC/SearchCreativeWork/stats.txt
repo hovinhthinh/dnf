@@ -1,3 +1,0 @@
-No-finetune test quality: {'NMI': 0.554, 'ARI': 0.491, 'ACC': 0.644}
-Finetune-utterance-similarity test quality: {'NMI': 0.682, 'ARI': 0.57, 'ACC': 0.712}
-Finetune-pseudo-classification test quality: {'NMI': 0.542, 'ARI': 0.369, 'ACC': 0.533}
