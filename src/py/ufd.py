@@ -209,14 +209,15 @@ class Pipeline(object):
         return self.get_dev_clustering_quality()['NMI']
 
     def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None,
-                                        early_stopping_eval_patience=0):
+                                        early_stopping_eval_patience=0, min_iterations=None, max_iterations=None):
         if iterations is None:
             with tempfile.TemporaryDirectory() as temp_dir:
                 best_iter = None
                 best_eval = None
                 it = 0
                 while True:
-                    print('==== Iteration: {}'.format(it + 1))
+                    it += 1
+                    print('==== Iteration: {}'.format(it))
                     # self.update_embeddings() # No need to update, already called in self.get_validation_score()
                     pseudo_clusters, weights = self.get_pseudo_clusters()
 
@@ -234,16 +235,17 @@ class Pipeline(object):
                     if best_eval is None or eval > best_eval:
                         best_eval = eval
                         best_iter = it
-                        print(' -> Save model')
+                        print(' -> Save model', end='')
                         sbert.save(temp_dir)
+
+                    if (it > best_iter + early_stopping_eval_patience and (
+                            min_iterations is None or it >= min_iterations)) \
+                            or (max_iterations is not None and it == max_iterations):
+                        print(' -> Stop')
+                        sbert.load(temp_dir)
+                        break
                     else:
-                        if it > best_iter + early_stopping_eval_patience:
-                            print(' -> Stop')
-                            sbert.load(temp_dir)
-                            break
-                        else:
-                            print(' -> Be patient')
-                    it += 1
+                        print()
         else:
             for it in range(iterations):
                 print('Iter: {}'.format(it + 1))
@@ -313,16 +315,21 @@ class Pipeline(object):
         dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
         if len(dev_embeddings) == 0:
             raise Exception('DEV set is unavailable')
-        dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map), random_state=42).fit(
+        dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map)).fit(
             dev_embeddings).labels_
         return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
-    def get_test_clustering_quality(self, k=None):
+    def get_test_clustering_quality(self, k=None, evaluating_clusters=None):
         test_cluster_label_2_index_map = dict(
             (l, i) for i, l in enumerate(dict.fromkeys([u[1] for u in self.test_utterances])))
         test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
-        test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map),
-                                         random_state=42).fit(self.test_embeddings).labels_
+        test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map)).fit(
+            self.test_embeddings).labels_
+        if evaluating_clusters is not None:
+            test_true_clusters = [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
+                                  u[1] in evaluating_clusters]
+            test_predicted_clusters = [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                                       u[1] in evaluating_clusters]
         return get_clustering_quality(test_true_clusters, test_predicted_clusters)
         # TODO: other clustering algorithms could be also applied here as well, e.g., DBScan, HAC.
 
@@ -388,7 +395,7 @@ class Pipeline(object):
                 self.fine_tune_pseudo_classification(
                     use_sample_weights=config.get('pseudo_classification_sample_weights', True),
                     iterations=config.get('pseudo_classification_iterations', None),
-                    early_stopping_eval_patience=3
+                    early_stopping_eval_patience=3, min_iterations=1, max_iterations=10
                 )
             else:
                 raise Exception('Invalid step name:', step)
