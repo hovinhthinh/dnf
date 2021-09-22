@@ -332,8 +332,7 @@ class Pipeline(object):
                 dev_embeddings).labels_
             return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
-    def get_test_clustering_quality(self, k=None, log_file_by_predicted_clusters=None, log_file_by_true_clusters=None,
-                                    evaluating_clusters=None):
+    def get_test_clustering_quality(self, k=None, log_file_by_predicted_clusters=None, log_file_by_true_clusters=None):
         test_index_2_cluster_label_map = dict(
             (i, l) for i, l in enumerate(dict.fromkeys([u[1] for u in self.test_utterances])))
         test_cluster_label_2_index_map = dict(
@@ -382,12 +381,17 @@ class Pipeline(object):
                             [self.test_utterances[idx][0] for idx in indices if test_predicted_clusters[idx] == pl]))
                     f.write('\n')
 
-        if evaluating_clusters is not None:
-            test_true_clusters = [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
-                                  u[1] in evaluating_clusters]
-            test_predicted_clusters = [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                                       u[1] in evaluating_clusters]
-        return get_clustering_quality(test_true_clusters, test_predicted_clusters)
+        return {
+            'all': get_clustering_quality(test_true_clusters, test_predicted_clusters),
+            'train_dev': get_clustering_quality(
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u[1].endswith('_TRAIN') or u[1].endswith('_DEV')],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u[1].endswith('_TRAIN') or u[1].endswith('_DEV')]),
+            'test': get_clustering_quality(
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if u[1].endswith('_TEST')],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if u[1].endswith('_TEST')])
+        }
         # TODO: other clustering algorithms could be also applied here as well, e.g., DBScan, HAC.
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
