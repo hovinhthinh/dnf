@@ -332,12 +332,56 @@ class Pipeline(object):
                 dev_embeddings).labels_
             return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
-    def get_test_clustering_quality(self, k=None, evaluating_clusters=None):
+    def get_test_clustering_quality(self, k=None, log_file_by_predicted_clusters=None, log_file_by_true_clusters=None,
+                                    evaluating_clusters=None):
+        test_index_2_cluster_label_map = dict(
+            (i, l) for i, l in enumerate(dict.fromkeys([u[1] for u in self.test_utterances])))
         test_cluster_label_2_index_map = dict(
             (l, i) for i, l in enumerate(dict.fromkeys([u[1] for u in self.test_utterances])))
         test_true_clusters = [test_cluster_label_2_index_map[u[1]] for u in self.test_utterances]
         test_predicted_clusters = KMeans(n_clusters=k if k is not None else len(test_cluster_label_2_index_map)).fit(
             self.test_embeddings).labels_
+
+        if log_file_by_predicted_clusters is not None:
+            with open(log_file_by_predicted_clusters, 'w') as f:
+                for c in sorted(set(test_predicted_clusters)):
+                    indices = [i for i, l in enumerate(test_predicted_clusters) if l == c]
+                    f.write('==== Cluster: {} | {}/{} ({:.1f}%)\n'
+                            .format(c, len(indices), len(self.test_utterances),
+                                    len(indices) / len(self.test_utterances) * 100))
+
+                    true_label_2_count = {}
+                    for idx in indices:
+                        tl = test_true_clusters[idx]
+                        true_label_2_count[tl] = true_label_2_count.get(tl, 0) + 1
+
+                    for tl, cnt in sorted(true_label_2_count.items(), key=lambda o: o[1], reverse=True):
+                        f.write('Feature: {} | {} ({:.1f}%)\n'
+                                .format(test_index_2_cluster_label_map[tl], cnt, cnt / len(indices) * 100))
+                        f.write('    {}\n'.format(
+                            [self.test_utterances[idx][0] for idx in indices if test_true_clusters[idx] == tl]))
+                    f.write('\n')
+
+        if log_file_by_true_clusters is not None:
+            with open(log_file_by_true_clusters, 'w') as f:
+                for c in dict.fromkeys(test_true_clusters):
+                    indices = [i for i, l in enumerate(test_true_clusters) if l == c]
+                    f.write('==== Feature: {} | {}/{} ({:.1f}%)\n'
+                            .format(test_index_2_cluster_label_map[c], len(indices), len(self.test_utterances),
+                                    len(indices) / len(self.test_utterances) * 100))
+
+                    predicted_label_2_count = {}
+                    for idx in indices:
+                        pl = test_predicted_clusters[idx]
+                        predicted_label_2_count[pl] = predicted_label_2_count.get(pl, 0) + 1
+
+                    for pl, cnt in sorted(predicted_label_2_count.items(), key=lambda o: o[1], reverse=True):
+                        f.write('Cluster: {} | {} ({:.1f}%)\n'
+                                .format(pl, cnt, cnt / len(indices) * 100))
+                        f.write('    {}\n'.format(
+                            [self.test_utterances[idx][0] for idx in indices if test_predicted_clusters[idx] == pl]))
+                    f.write('\n')
+
         if evaluating_clusters is not None:
             test_true_clusters = [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
                                   u[1] in evaluating_clusters]
@@ -386,7 +430,11 @@ class Pipeline(object):
 
         print('Clustering DEV no-fine-tuning:', self.get_dev_clustering_quality())
 
-        test_quality = self.get_test_clustering_quality()
+        test_quality = self.get_test_clustering_quality(
+            log_file_by_predicted_clusters=
+            os.path.join(report_folder, '0_test.predicted_clusters.log') if report_folder is not None else None,
+            log_file_by_true_clusters=
+            os.path.join(report_folder, '0_test.true_clusters.log') if report_folder is not None else None)
         print('No-fine-tune test quality:', test_quality)
         if stats_file is not None:
             stats_file.write('No-fine-tune test quality: {}\n'.format(test_quality))
@@ -436,7 +484,13 @@ class Pipeline(object):
                 self.plot(show_test_only=True, plot_3d=True,
                           output_file_path=os.path.join(folder_3d, '{}_{}_test.pdf'.format(i + 1, step)))
 
-            test_quality = self.get_test_clustering_quality()
+            test_quality = self.get_test_clustering_quality(
+                log_file_by_predicted_clusters=
+                os.path.join(report_folder, '{}_{}_test.predicted_clusters.log'.format(i + 1, step))
+                if report_folder is not None else None,
+                log_file_by_true_clusters=
+                os.path.join(report_folder, '{}_{}_test.true_clusters.log'.format(i + 1, step))
+                if report_folder is not None else None)
             print('Finetune-{} test quality: {}'.format(step, test_quality))
             if stats_file is not None:
                 stats_file.write('Finetune-{} TEST quality: {}\n'.format(step, test_quality))
@@ -507,7 +561,11 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 if folder_3d is not None:
                     p.plot(show_test_only=True, plot_3d=True,
                            output_file_path=os.path.join(folder_3d, intent_name + '.pdf'))
-                test_quality = p.get_test_clustering_quality()
+                test_quality = p.get_test_clustering_quality(
+                    log_file_by_predicted_clusters=os.path.join(folder, intent_name + '.predicted_clusters.log')
+                    if folder is not None else None,
+                    log_file_by_true_clusters=os.path.join(folder, intent_name + '.true_clusters.log')
+                    if folder is not None else None)
                 print('Clustering TEST quality [{}]: {}'.format(intent_name, test_quality))
                 if stats_file is not None:
                     stats_file.write('Clustering TEST quality [{}]: {}\n'.format(intent_name, test_quality))
