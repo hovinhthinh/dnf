@@ -1,0 +1,264 @@
+==== Cluster: 0 | 47/863 (5.4%)
+Feature: PlayOnService_TEST | 15 (31.9%)
+    ['Play some music on Lastfm', 'Play music using Last Fm', 'Play some music on Last Fm', 'Open Lastfm and start playing whatever', 'Play me something on Last Fm', 'turn on Last Fm', 'Play some music on Lastfm .', 'Play music from Lastfm and Deezer .', 'Open up music on Last Fm .', 'Please play something on Last Fm', 'Play music on Last Fm', 'Play music on Lastfm', 'Open up Lastfm and play some songs.', 'Play music from Lastfm', 'Play music from Lastfm .']
+Feature: PlayMusicByGenreOnService_TEST | 9 (19.1%)
+    ['Play some techno on Lastfm', 'Play music from the punk genre on Last Fm .', 'Play Techno on Lastfm', 'Play Slow Rock on Lastfm .', 'I want to hear gothic rock on Lastfm', 'play some Industrial music on Lastfm', 'play Lastfm pop tunes', 'Play a native us song on Last Fm', 'Play some Instrumental music on the service Lastfm']
+Feature: PlayMusicByArtistOnService_TRAIN | 9 (19.1%)
+    ['Play some Krzysztof Penderecki on Last Fm', 'Play the greatest soundtrack by Nhat Son on Last Fm .', 'Use Last Fm to play artist Kawabata Makoto from their record', 'Play a song by Tim Finn on Last Fm', 'Play some David Mallett on last fm', 'Use the service Lastfm to play artist keren peles from the most popular symphony', "Play Dave Mason 's soundtrack on Last Fm .", 'Use the service Lastfm to play music by the artist ai kago', 'Can you play a song from the newest movement by prince on Lastfm']
+Feature: PlayAlbumOnService_TEST | 6 (12.8%)
+    ['I want to listen to Lastfm , play A Drop Of The Hard Stuff by Joi Chua .', 'play Safe Rock And Roll Sucks on Lastfm', 'use Lastfm to play Attack Of The Planet Smashers', 'Open Lastfm and play a voluntad del cielo from Wax', 'play the album Winner Takes All by Takuro with Last Fm', 'Play a song off Get Up Offa That Thing by Doseone on Last Fm']
+Feature: PlayMusicByYearOnService_DEV | 4 (8.5%)
+    ['Play a fifties theme on lastfm', 'play 1981 music on Last Fm', 'play something from the twenties on Lastfm', 'Play some music from the last album of 1988 on Lastfm']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 3 (6.4%)
+    ['Play some Last Fm music like the 1992 ep from Peaches', 'Play a 1998 sound track from Sam The Kid on Last Fm', 'Play some sixties music by gaudi on last fm']
+Feature: PlayTrackOnService_DEV | 1 (2.1%)
+    ['Play Pacific Ocean Blues by John Doe on Lastfm']
+
+==== Cluster: 1 | 27/863 (3.1%)
+Feature: PlayOnService_TEST | 7 (25.9%)
+    ['play Groove Shark', 'play Groove Shark', 'Play music on Groove Shark .', 'play music using Groove Shark', 'Play music on groove shark', 'Play some music on groove shark .', 'I want to hear some music from Groove Shark']
+Feature: PlayMusicByGenreOnService_TEST | 6 (22.2%)
+    ['Play classic rock on Groove Shark', 'play Groove Shark folk-rock', 'play pop music with Groove Shark', 'Play some contemporary christian on Groove Shark .', 'play some dance on Groove Shark', 'Open Groove Shark and play native us']
+Feature: PlayMusicByArtistOnService_TRAIN | 4 (14.8%)
+    ['Play Brian Clifton off Groove Shark .', 'Play me a ballad by Dres on groove shark', 'Play a Loretta Lynn tune on Groove Shark', 'Use Groove Shark to play Krizz Kaliko']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 3 (11.1%)
+    ['I want to hear Jimmy James from the thirties , play a song on Groove Shark .', 'Play the heinz strobl ep from 2016 on Groove Shark', 'Play Shinya Yamada music from 1962 on Groove Shark']
+Feature: PlayAlbumOnService_TEST | 3 (11.1%)
+    ['Play Regulate…g Funk Era by artist Iouri Bachmet on groove shark', 'Play music from jeremy taylor on the album Dormi Amore, La Situazione Non È Buona on Groove Shark', 'Use Groove Shark to play the Today And Tomorrow album']
+Feature: PlayMusicByYearOnService_DEV | 2 (7.4%)
+    ['play chant on groove shark from 1996', 'Use Groove Shark to play music from the eighties']
+Feature: PlayTrackOnService_DEV | 2 (7.4%)
+    ['I want to hear Ding Dong Bell on groove shark', 'Play Dansevise by Ebi on Groove Shark .']
+
+==== Cluster: 2 | 30/863 (3.5%)
+Feature: PlayMusicByArtistOnService_TRAIN | 7 (23.3%)
+    ['Open Netflix and play David Frizzell', 'Play the latest ep from Lobby Loyde on Netflix', 'Play dhafer youssef top-twenty on netflix', 'Play Chris Goss on Netflix', 'Play the next ep by Video Game Pianist on netflix', 'Play the most popular ep by marcel khalife on Netflix', 'play David Banner on Netflix']
+Feature: PlayOnService_TEST | 7 (23.3%)
+    ['Play some music on Netflix', 'Please play some music for me on Netflix', 'Use Netflix to play music', 'play music on netflix', 'Play music on Netflix .', 'play music on Netflix', 'Play music off Netflix .']
+Feature: PlayAlbumOnService_TEST | 5 (16.7%)
+    ["Play Russell Morris 's The Singer And The Song on Netflix .", 'Play the album Jack Takes The Floor by Tom Lehrer on netflix', 'Play Murder The Mountains by Mana on Netflix', 'play the album Pressure Cracks with Netflix', 'Play artist stu davis from the album Dub Chamber 3 on Netflix']
+Feature: PlayMusicByYearOnService_DEV | 3 (10.0%)
+    ['Play some seventies music on Netflix .', 'Play some seventies music on netflix .', 'Play a 1964 symphony on Netflix .']
+Feature: PlayMusicByGenreOnService_TEST | 3 (10.0%)
+    ['Play some Avantgarde music on Netflix .', 'Play some noise music on Netflix .', 'I want to hear opera on Netflix']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 3 (10.0%)
+    ['Play a 1958 soundtrack by Rudolf Schenker on Netflix .', 'play an album on Netflix by chris castle from 2011', 'Play 2012 symphony music by Nardwuar The Human Serviette on Netflix .']
+Feature: PlayTrackOnService_DEV | 2 (6.7%)
+    ['Play The Galway Races on Netflix .', 'Can you play Maggie Mae on Netflix']
+
+==== Cluster: 3 | 52/863 (6.0%)
+Feature: PlayOnService_TEST | 18 (34.6%)
+    ['Play any music on Spotify', 'Open Deezer and play top 40 hits', 'play Spotify', 'Play something off Google Music', 'play Google Music tunes', 'Use Spotify to play music', 'Use Google Music to play a song', 'Play some music on spotify', 'I want to hear some music from Spotify', 'Play some Google Music .', 'Play Spotify', 'Use Spotify to play me music', 'Start playing something off Spotify', 'something on Spotify please', 'I need to hear some music from Spotify', 'Play music on Spotify .', 'Play Spotify', 'Play music on Spotify .']
+Feature: PlayMusicByArtistOnService_TRAIN | 10 (19.2%)
+    ['Play a song from Helena Iren Michaelsen on Spotify', 'open Fadl Shaker on Spotify and play a melody starting with the newest', "Play Goldie Hill 's record on Google Music .", 'Play a top fifty ballad by Linda Strawberry on Google Music', 'play some Spotify by Danni Bassan', 'Use Google Music to play some songs by Dr John', 'Play the most popular song from Chae Yeon off of Spotify', 'Play Stevan Faddy on Google Music .', 'play the most popular album on Google Music by sasu ripatti', 'Play me the new King Curtis music on Google Music .']
+Feature: PlayMusicByGenreOnService_TEST | 9 (17.3%)
+    ["Please play something that's freak folk on Google Music", 'Play some fast fusion on Spotify', 'Play Goa music on Google Music .', 'Play some jpop on Google Music .', 'open Spotify and play a couple of celtic songs', 'play some Classical music on Spotify', 'Play some space music on Google Music', 'Play opera music on google music', 'Play some indie music on spotify .']
+Feature: PlayMusicByYearOnService_DEV | 4 (7.7%)
+    ['turn on Google Music to play 1991', 'Play music from 2012 on google music', 'Please play some fourties music on Spotify', 'Play some twenties theme music on Google Music .']
+Feature: PlayTrackOnService_DEV | 4 (7.7%)
+    ['Play Furusato on Google Music .', 'Play Tooh by Eric Bazilian on Google Music .', 'Play Portsmouth by Paul Smith on Google Music .', 'Use Spotify to play Who Was In My Room Last Night ?']
+Feature: PlayAlbumOnService_TEST | 3 (5.8%)
+    ['Play The Cross And The Crucible by Angela Au Man Sze on Google Music', 'listen to Westbam alumb Allergic on Google Music', 'Play Change Has Come on Google Music .']
+Feature: PlayPlaylist_DEV | 1 (1.9%)
+    ['open the Canciones del Recuerdo playlist and play songs']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 1 (1.9%)
+    ['Play 2003 Ben Burnley on Spotify']
+Feature: PlayMusicByArtist_TRAIN | 1 (1.9%)
+    ['play Christina Milian latest music']
+Feature: PlayMusicByYear_TRAIN | 1 (1.9%)
+    ['Play the top hits of 2016']
+
+==== Cluster: 4 | 40/863 (4.6%)
+Feature: PlayOnService_TEST | 12 (30.0%)
+    ['Play music off Youtube .', 'Play music off Youtube .', 'Play me some music youtube', 'Open my music playlist on Youtube', 'Open youtube', 'Play some music on Vimeo', 'Play some music on Vimeo .', 'Play music on youtube', 'Can you play some music on Youtube', 'Open Vimeo and play music.', 'play songs from Youtube', 'Play music from Youtube .']
+Feature: PlayMusicByGenreOnService_TEST | 9 (22.5%)
+    ['Play some alternative music on Vimeo', "I'd like to listen to opera on Youtube", 'Play some rock music on Youtube', 'Play blues on Vimeo', 'Play slow rock music on Vimeo', 'Put on Vimeo and play Kacapi Suling', 'Use service Vimeo the genre slow rock', 'Can you play some Synthpop music on Youtube', 'Play music which has humour on Youtube .']
+Feature: PlayMusicByArtistOnService_TRAIN | 7 (17.5%)
+    ['play some Stephen Jones on Youtube', 'play valerij kipelov on Vimeo', 'Play top music from Charles L. Johnson on vimeo', 'play Steven Reineke greatest soundtrack on Youtube', 'Play some Katiejane Garside on Vimeo .', 'Play the best Bruce Ruffin music on Youtube .', 'Open Vimeo and play Lee Mellor good songs']
+Feature: PlayAlbumOnService_TEST | 6 (15.0%)
+    ['Play a song of I Myself And Me on Youtube', 'Plays some akb48 on Youtube', 'Open Youtube and play Connie Francis Sings Spanish And Latin American Favorites from Yukiko Iwai', 'Use service Vimeo to play music from the artist Mick track Now We Are 5', 'Play Salmonella Dub Dvd by mario rubalcaba on Vimeo', 'Open Youtube and play Iron Mountain Depot from John Lomax']
+Feature: PlayTrackOnService_DEV | 4 (10.0%)
+    ['Play Listen To The Mocking Bird by Billy Martin on Youtube', 'Play The God That Failed on Vimeo .', 'Play Fais Les Backs by Sarah Geronimo on Youtube', 'play Yo Ho from the new york pops on Youtube']
+Feature: PlayMusicByYearOnService_DEV | 2 (5.0%)
+    ['Play a twenties soundtrack on Youtube', 'Can you play me something from the eighties on Youtube']
+
+==== Cluster: 5 | 23/863 (2.7%)
+Feature: PlayMusicByArtistOnService_TRAIN | 6 (26.1%)
+    ['play Zvooq latest track by Peter Appleyard', 'Open Zvooq and play the best songs from Device', 'Play Lukasz Gottwald album on Zvooq', 'Can you pull up a track on Zvooq by Graham Mcpherson', 'Play me a sound track by Bert Mccracken on zvooq', 'Play the greatest music you can find by Ari Herstand on Zvooq']
+Feature: PlayAlbumOnService_TEST | 6 (26.1%)
+    ['play In The Arms Of God on Zvooq by Nimal Mendis', 'play Heavy Machinery by Phil Spector on Zvooq', "play Fey 's album Diamond Head on Zvooq", 'Play hanging in the balance by Nik Kershaw on Zvooq .', 'Play The Way It Has To Be by Tom G Warrior on Zvooq', 'play the album Sauna on Zvooq']
+Feature: PlayMusicByGenreOnService_TEST | 3 (13.0%)
+    ['play some latin on Zvooq', 'Play jazz music by Zvooq', 'Use the service Zvooq to play merengue music']
+Feature: PlayOnService_TEST | 3 (13.0%)
+    ['Play a song on zvooq', 'Play Zvooq', 'play Zvooq']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 2 (8.7%)
+    ['Play a 2004 song by eliel on Zvooq .', 'Play some 1970 Antero Manninen on zvooq .']
+Feature: PlayTrackOnService_DEV | 2 (8.7%)
+    ['Play The Wizard And I on Zvooq', 'Play Eternally by Marko Desantis on zvooq .']
+Feature: PlayMusicByYearOnService_DEV | 1 (4.3%)
+    ['have Zvooq play songs from the fifties']
+
+==== Cluster: 6 | 116/863 (13.4%)
+Feature: PlayMusicByArtist_TRAIN | 28 (24.1%)
+    ['Play music by Ian Haugland', 'Play some music by Mark Heard .', 'Play music from Gavin Koppell movement', 'Play music by Country Dick Montana .', 'play music by Vybz Kartel', 'Play music by Young Steff', 'play a song by Busta Rhymes', 'listen to Vertexguy track', 'Play music by artist mark ashley', 'play the most popular Miles Jones track', 'play the newest Martin Solveig sound track', 'play Peja tunes', 'Can you play a sound track by Sissieretta Jones', 'Open the playlist from Sergei Chatschatrjan', 'play a sound track by Tom Thacker', 'play music by Odd Nosdam', 'play songs by Wise', 'play latest George Ducas music', 'Please play songs by Lil Jon', 'Play any track by Flame', 'Play some music by Mutlu', 'Play the best songs by Jes Brieden', 'Play the latest music by Martin Luther Mccoy', 'play newest Robert Palmer sound track', 'play some movement by Dj Spinna', 'Play songs by Naomi Schemer', 'Play some music by Frayser Boy .', 'Play some Dj Qbert .']
+Feature: PlayPlaylist_DEV | 18 (15.5%)
+    ['Play my Under The Surface playlist.', 'Play music on the playlist Electronic Gaming', 'Play Llegando a Casa playlist', 'Play some dance music.', 'Play breathtaking music', 'Play my Trabajo Relax playlist', 'Play the playlist, Hardstyle, Baby .', 'Plpay my Disco Fever playlist.', 'Play my Top Gaming Tracks .', 'Play the playlist introspective', 'Play music from the list Indie Electronics', 'Play my entertaining playlist', 'Play White Noise .', 'Start up my nostalgic playlist.', 'Play Clásicos del Hip Hop Español', 'Play playlist Chilled R&B', 'Play Noctámbulo playlist', 'Play something off my New Boots playlist']
+Feature: PlayMusicByArtistAndYear_TEST | 13 (11.2%)
+    ['play 2007 tunes by Bunny Berigan', 'Play Dj Drama from the 1976', 'Play music by blowfly from the seventies', 'Play music from 2005 by Justin Broadrick', 'Play some 2011 music by Dan Healy .', 'Play some 2011 chant music, new first, by Shaggy .', 'Play a 2007 track from Adam Jones', 'Play all music Alan released in 1997', 'Play music from 2010 by Jason Donovan', 'Please play the most popular ep from 1998 by Mc Frontalot', 'Play some music by Jody Williams from 2001', 'Play Vic Ruggiero music from 2007', 'play dj kentaro from the year 1994']
+Feature: PlayMusicByGenre_TRAIN | 12 (10.3%)
+    ['play some synthpop', 'Play some Techno', 'Play some Drum & Bass', 'Play Punk Rock music', 'Play music from negerpunk', 'Play slow rock music', 'Play me some Terror music', 'play Techno music', 'Play some Game music.', 'Play christian gangsta rap', 'Play drum & bass music', 'Play some art punk .']
+Feature: PlayOnService_TEST | 9 (7.8%)
+    ['Play some music on Slacker', 'play Slacker tunes', 'Play me some music on Deezer', 'Play Slacker radio.', 'Play Deezer', 'Play music on Deezer .', 'Play some music on Slacker', 'Play some music using slacker', 'Play Deezer']
+Feature: PlayMusicByArtistOnService_TRAIN | 7 (6.0%)
+    ['Use Deezer to play the last song from Lee Dorrian', 'play deezer top 20 by Natasja', 'play the last Rocko music with deezer', 'Play most popular from Nil Burak on Slacker', 'Play chant music by pappu venugopala rao on Slacker .', 'Play me the most popular Peja song on Slacker', 'play good music by General Woo on Deezer']
+Feature: PlayMusicByYear_TRAIN | 7 (6.0%)
+    ['Can you play some music from 1999', 'Play 1993 theme music', 'Play music from 2002', 'Play music from 2007 .', 'Play the top movement music from 1997 .', 'Play some music from 1995', 'Play music from 2015']
+Feature: PlayAlbumOnService_TEST | 5 (4.3%)
+    ['Play me a Felix Kubin from No Light on Spotify', 'Play Grabsteinland I by Doctor Fink on slacker radio', 'play The Edge by Deezer on Vans Warped Tour Compilation 2003', "Let's play the album Handover on Deezer", 'Play Skin & Bone by Jess Stacy on Deezer']
+Feature: PlayMusicByGenreOnService_TEST | 4 (3.4%)
+    ['play some Deezer oldies music', 'play classic rock on Slacker', 'Play some rock & roll by Deezer .', 'I Need rave Slacker to play']
+Feature: PlayTrack_DEV | 4 (3.4%)
+    ['Play the track titled Faget', 'Play music off the track Child Maurice', 'play the track Asleep In The Deep', 'Play On My Own']
+Feature: PlayMusicByYearOnService_DEV | 3 (2.6%)
+    ['play music form the fourties with Slacker', 'Play music from the eighties on Slacker .', 'Can you play Deezer from 2007 ?']
+Feature: PlayAlbum_TRAIN | 3 (2.6%)
+    ['play Fill Yourself With Music by Ray Manzarek', "Play Dj Shadow 's A Love Hate Masquerade .", 'Play the album Killer Instinkt']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 3 (2.6%)
+    ["Play Dj Scratch 's eighties music on Iheart .", 'play Deezer form 2010 tune by Dave Grohl', 'play Slacker tunes by Smog from movement in 2015']
+
+==== Cluster: 7 | 60/863 (7.0%)
+Feature: PlayMusicByArtistAndYear_TEST | 16 (26.7%)
+    ['I want to hear the latest twenties album from Kyle Riabko', "I want to hear Somi 's songs from the twenties", 'I want to hear some twenties music from Billy Sheehan', "I'd like to listen to Diana Vickers best tune from the twenties", 'I want to hear Steven Harwell from the thirties', 'I want to hear a 1976 symphony by Jam Master Jay', 'I want to hear a fourties ballad by Luciano', 'I want to hear a soundtrack by dj ozma from the sixties .', 'I want to hear a Silvia Night ep from the sixties', 'I want to hear a top ten soundtrack from 1984 by Shinehead', "I want to hear Papa Mali 's songs from the fifties", 'Wish to hear a concerto by Diplo from 1952', "I want to hear some of David Gilmour 's music from 1973", 'I wish to listen to eighties music by Mike Dean .', 'I want to hear music from carman from the 1966 album', "I want to hear Nokko 's songs from the twenties"]
+Feature: PlayMusicByArtist_TRAIN | 14 (23.3%)
+    ['Can I hear a Da Brat ep ?', 'I want to hear a Sandra ep', 'I want to the latest ballad from Ira Losco', 'I want to hear the top 5 Jamie Lidell songs', 'I want to hear something from the top-fifty by Jose Pasillas', 'I want to hear popular music from Martin Lopez', 'I want to listen to a popular melody by David Bazan', 'Can I hear a tune from Vladimir Vysotski ?', 'I want to hear the Jody Williams sound track', "I'd like to hear a track by Theo Keating .", "I'd like to hear the last song fro Willa Ford .", 'I want to hear the newest music from The Railway Children', 'I want to hear some Bill Black chant music', 'Can I hear a song by David Hodges ?']
+Feature: PlayMusicByArtistOnService_TRAIN | 5 (8.3%)
+    ["Can I hear Jeremy Taggart 's newest chant on Deezer ?", 'I want hear some Junior Murvin off of Youtube', "Can I hear Anna Vissi 's new music on Pandora ?", 'I want to hear something by Joe Dolce on Google Music', 'I want to hear a top-50 track from Takahito Eguchi on Google Music']
+Feature: PlayMusicByGenre_TRAIN | 5 (8.3%)
+    ["I'm in the mood to listen to meditative music.", 'listen to acapella', "I'd like to hear some trip-hop", 'I want to hear Techno-industrial music.', 'I want to hear some psychedelic rock']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 4 (6.7%)
+    ['I want to hear something from the nineties by Alissa Musto on Groove Shark', 'I want to hear Dido from 1966 on Youtube', 'I want to hear some sixties melody from Mark Mcentee off of Google Music', 'I want to hear music by Madeleine Peyroux from 1991 on Youtube .']
+Feature: PlayAlbumOnService_TEST | 4 (6.7%)
+    ['I want to hear something off Fist For Fight by Rushton Moreve on Youtube', 'Lets hear some Dawood Sarkhosh from their The Power Of Your Love album from Groove Shark', 'I want to hear Gloryhole from Mani off of Lastfm', 'I want to listen to the album going back to the blue ridge mountains on iheart']
+Feature: PlayTrack_DEV | 3 (5.0%)
+    ['I want to hear Aki Nawaz , play the song fair annie .', 'I want to hear Box Of Rain by Skeets Mcdonald', 'I want to hear This Is The Night from Proof']
+Feature: PlayMusicByYear_TRAIN | 3 (5.0%)
+    ['I want to hear that tune from 2010', 'I would like to hear music from 1993', 'I want to hear music from 1975']
+Feature: PlayMusicByYearOnService_DEV | 1 (1.7%)
+    ['I want ohear the 1996 soundtrack from deezer']
+Feature: PlayMusicByGenreOnService_TEST | 1 (1.7%)
+    ['I need to hear some r&b music off of iheart']
+Feature: PlayPlaylist_DEV | 1 (1.7%)
+    ['I want to hear the new Latin Pop Rising list']
+Feature: PlayAlbum_TRAIN | 1 (1.7%)
+    ['I want to hear secrets on parade from Tommy Walter']
+Feature: PlayOnService_TEST | 1 (1.7%)
+    ["I'd like to hear songs from Iheart"]
+Feature: PlayTrackOnService_DEV | 1 (1.7%)
+    ['I want to listen to Born On The Bayou on Iheart']
+
+==== Cluster: 8 | 74/863 (8.6%)
+Feature: PlayMusicByArtistAndYear_TEST | 39 (52.7%)
+    ['Play music by Paulinho Da Viola from 1965', 'Play some seventies track from top Rie Tomosaka', 'Play the best 1981 sound track from Ric Fierabracci', 'Play some Sonu Niigaam from the fifties', 'Play fifties from Sirusho Harutyunyan', 'play the last song from the thirties by Airto Moreira', 'play a Samira Said ballad from the nineties', 'Play top-twenty fourties movement music by Mohammad Reza Lotfi .', 'Play the symphony by Tetsuya Ogawa from 1953', 'Play Igor Nikolayev music from the fourties', 'play some eighties by Amirbai Karnataki', 'Play some 1999 symphony from Minami Takahashi', "I'm looking for the last track by Fei Yu Ching from the fourties", 'Play a 1991 song by Anila Mirza', 'Play the newest 2016 ep from Boaz Mauda .', 'Play some Oleg Anofriyev from 1960 .', 'Play the most popular chant song by Hossein Alizadeh from around 2009', 'play the 2014 album from la lupe', 'Play best fourties from david izquierdo on album', 'Play a movement fromthe eighties by Nobuo Uematsu .', 'Play sixties music by giovanni battista guadagnini .', 'Play me a Maia Hirasawa soundtrack from 1951', 'Find a top fifty zahir howaida concerto from the seventies', 'Play some music from 1989 by Sanjeev Abhyankar .', 'listen to tei movement from most popular eighties music', 'Play the last sound track by Soko from around 1975', 'Play the theme music from 1963 by Yuki Koyanagi', 'play some twenties movement tunes from the last Olga Souza', 'Play Henrie Mutuku album from 1957', 'Play music from 1989 by Maya .', 'Play Jono El Grande from the thirties', 'Play some Paulinho Da Viola from 1965 .', 'play some songs from the fourties by yoshiki fukuyama', 'Play some Sabah from the eighties', 'play Khujo eighties track song', 'Play a record from 2005 by Ruslana Lyschytschko .', 'Play ep from Quasimoto from the nineties', 'Play some fifties music by Origa .', 'Play music year 2016 by artist Michiru Yamane']
+Feature: PlayMusicByArtist_TRAIN | 14 (18.9%)
+    ['Please anything good by Chieko Ochi', 'play Fereydoun Farrokhzad best track', 'Can you play a top 5 song by Manos Hadjidakis', 'Play the top-ten soundtrack from Kiara .', 'play a top-twenty tune by Noor Jehan', 'Play a top track by Janamanchi Seshadri Sarma', 'Play the top symphony music from Ejigayehu Shibabaw', 'Play music by Susumu Hirasawa .', 'Play me a song by Saki Nakajima', 'Play a track by Titiyo', 'Play Anweshaa by the new first.', 'Play a melody by Shada Hassoun', 'Plan an album by Roni Duani .', "Play Thelma Aoyama 's latest concerto"]
+Feature: PlayTrack_DEV | 10 (13.5%)
+    ['Please play Kabhi Jo Baadal Barse by Ruth Lorenzo', 'play Mikazuki Sunset', 'play the song Si No Te Hubiera Conocido by Haidar Salim', 'Play El Cant Dels Ocells by vini lopez .', 'Play Sense Tu from Ebi Hamedi', 'Play Ik Hou Van Jou by Elena Temnikova', 'Play Taiwan Is Good by Kotoko .', 'play This Is Colour by Panda Bear', 'play Moustapha Amar Make It Rain', 'Play Verjamem track by Hong Junyang .']
+Feature: PlayAlbum_TRAIN | 6 (8.1%)
+    ['Play Rei Momo newest album', 'Play Junun by Noam Kaniel .', 'Play the album Cara De Dios .', 'Play Yuauea by Rick Ross', 'Play Songs Of Heaven by ami koshimizu', "Play Moondog 's Chupacabra ."]
+Feature: PlayPlaylist_DEV | 3 (4.1%)
+    ['Play the playlist, A Mis Niños de 30 .', 'play playlist A Mis Niños de 30', 'Play Noctámbulo pl']
+Feature: PlayMusicByArtistOnService_TRAIN | 1 (1.4%)
+    ['play the top-twenty tune by Masaharu Fukuyama on Slacker']
+Feature: PlayAlbumOnService_TEST | 1 (1.4%)
+    ['Play a song by Electric Tones from their Kurutta Taiyō album on Last Fm']
+
+==== Cluster: 9 | 51/863 (5.9%)
+Feature: PlayMusicByArtistAndYear_TEST | 21 (41.2%)
+    ['Play some ivy anderson from around 1967', 'play some Kyle Ward from the seventies', 'play Vivian Stanshall from 1962', 'play some King Tubby from the eighties', 'play Robert Stoddard from 1988', 'Play some nineties Eliza Carthy', 'Play Eddie Meduza from the thirties', 'play wendy james from the fifties', 'Play me a 1986 Jim Root', 'play Barry Manilow from the twenties', 'play Abhijeet Bhattacharya from 1986', 'Play Niko from the fourties', 'Play some 1987 Edie Brickell .', 'Play Hasan Saltik from 2004', 'Play some Armik from the fourties', 'play some 1991 Dave Barker', 'Play Magic Sam from the thirties', 'play caitlin cary from the fourties', 'play Luis Alfonzo Larrain from 1995', 'Play Tina Cousins from 1956', 'play soem nineties Charles Thompson']
+Feature: PlayMusicByArtist_TRAIN | 12 (23.5%)
+    ["Play me Benjamin Kowalewicz 's top hits", 'Play Johnny Gimble', 'play Frankie Laine', 'Play some Laurie Anderson .', 'Play the top caleigh peters .', 'Play the newest Phil Stacey .', 'Play some Glenn Miller .', 'Play some Dave Pearce .', 'Play new Ian Mclagan', 'Play some James Cleveland .', 'Can you play a Sammy Fain ep', 'Play Moris Tepper']
+Feature: PlayAlbumOnService_TEST | 7 (13.7%)
+    ['play Make The Cowboy Robots Cry by Sabin Rai on Vimeo', 'play Courting The Squall on Slacker', 'Play Foundling by Jean Grae on Vimeo .', 'Play While We Were Waiting by Sippie Wallace on Vimeo', 'Play Kim Wilde by Mike Scott on Slacker', 'Play Paul Landers , O Rio, A Cidade, A Árvore on slacker', 'play scott la rock from Stella on Slacker']
+Feature: PlayMusicByArtistOnService_TRAIN | 4 (7.8%)
+    ['Play me Leonid Soybelman on Vimeo .', 'Please play Jim Martin on Vimeo .', 'Want to play Christina Schollin Lastfm', 'play the last Chris Douglas on Slacker']
+Feature: PlayTrack_DEV | 3 (5.9%)
+    ['Play Martha My Dear by shannon .', 'play Shake Your Head', 'play Wait Until Tomorrow']
+Feature: PlayAlbum_TRAIN | 3 (5.9%)
+    ['play steve harris False Gestures For A Devious Public album', 'Play That Stubborn Kinda Fellow by Michael Amott', 'Please play Different Slanguages by Fred Labour .']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 1 (2.0%)
+    ['Play a Martyn Bennett from 1957 on Pandora']
+
+==== Cluster: 10 | 98/863 (11.4%)
+Feature: PlayMusicByYear_TRAIN | 46 (46.9%)
+    ['I wish to listen to some fifties music.', 'play a track from the thirties', 'Play the greatest ballad from the seventies', 'Play me songs from 1955', 'Play music from the seventies', 'Please play a song for me from 1959', 'Play some songs from 1958', 'Play sixties theme music', 'play music from the twenties', 'Play a sound track from 1952 .', 'play something from the twenties', 'I want to hear some songs from the twenties', 'I need to hear a thirties soundtrack', 'play fifties track music', 'play something from the twenties', 'I want to hear music from the sixties .', 'Play any song from the eighties', 'Play me a nineties sound track', 'Play music from the seventies for me.', 'Play eighties music', 'play twenties tunes', 'Play record from the seventies', 'Ply best 1973 sound track', 'play the newest ep from the sixties', 'play songs from the sixties', 'Play sound track music from the twenties', 'Play music from 1977', 'Play some eighties music.', 'Listen to music from 1975', 'I want to hear a top-20 chant from the twenties', 'Play music from the sixties', 'Play the most popular 1956 record .', 'Play music from 1960', 'Play music from 1964', 'Play some theme based music from the thirties .', 'play anything from the twenties', 'Please play me a top nineties theme song', 'Play a record from the year 1979', 'play the top jazz record from 1951', 'Play music from 1954', 'Play fifties music', 'Play that new song from 1970', 'Play some eighties movement music', 'Play a song from 1950', 'play the best album from the seventies', 'Play fifties music']
+Feature: PlayMusicByArtistAndYear_TEST | 43 (43.9%)
+    ['play a sixties song by George Sanger', 'play Yusef Lateef songs from the fifties', 'Play fifties music by Ahmed Abdul Malik', 'Play the most popular twenties record from Leland Sklar', 'Play a Jim Mullen ep from the sixties', 'play laura love songs from 1959', 'Play some Rockwell from around 1996', 'play Phil Spalding soundtrack from the seventies', 'Can you play the latest faust soundtrack from 1967 ?', 'Play Arif music from the fourties .', 'Play the top 20 ep from the fifties by John Bundrick .', 'Play a Herbie Fields record from the sixties', 'Can you play fifties theme music by Mohsen Chavoshi', 'play the greatest 1972 album by Wes Dakus', 'Play the top-ten chant Doda songs from the twenties .', 'Play some Mark Tremonti from the thirties .', 'play Tom Jones album from the twenties', 'Play me Sun Ra songs from the fifties', 'Play theme music from the twenties by Tata Young', 'Can I hear tod ashley music from 1953 ?', 'Play Gary Chapman music from the fifties', 'Play music from Clark Kent in the year 1987', 'Play some caribou from the sixties', 'Play some Paul Stookey from the sixties', 'Play the top ten theme music from 1975 by Tom Baxter', 'Play Greg Raposo songs from the thirties', 'Play some music from 1962 from Adeyto', 'Play music from the artist Taktloss from the record in the thirties', 'play a top-fifty 1965 album by Ski', 'play music by Charlie Adams from 1954', 'Play some music from 1985 by Rolf Harris', 'Play some fifties music by Chris Brown .', 'Play a seventies Tom Thacker ballad', 'I wish to enjoy some fifties music by Johnny Paycheck .', 'Play a sixties song by Classified', 'play some fifties tunes by Mike Mccready', 'Can you play some fifties music by lavern baker', 'Play some Antony Harding songs from the eighties', "Play Randy Castillo 's music from 1952 .", "I want to hear Major Harris 's songs from the fifties", 'Play Elkie Brooks seventies sound track', "Play Trace Adkins ' music from the thirties .", 'Play top-50 eighties theme from Alain Caron']
+Feature: PlayMusicByYearOnService_DEV | 4 (4.1%)
+    ['Play some 1959 songs on Iheart', 'Please use Itunes to play something from 1986', 'Play me music from the twenties on Itunes .', 'Play fifties music on Deezer']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 4 (4.1%)
+    ['Play music from 1959 by Lenny Leblanc on Pandora .', 'Play some seventies songs from Luke Haines off of youtube', 'Play some Ray Williams music from the nineties on spotify', 'Play some Erin Harkes from the fifties on Lastfm .']
+Feature: PlayMusicByArtist_TRAIN | 1 (1.0%)
+    ['Play top-50 Peter Frampton songs']
+
+==== Cluster: 11 | 110/863 (12.7%)
+Feature: PlayMusicByArtistAndYear_TEST | 42 (38.2%)
+    ['play a tune by Syreeta Wright from twenties from the top', 'Play the good sort of 1992 theme music by Layzie Bone', 'Play some good movement music by Brian Littrell from around 2001', 'play some seventies Dj Colette', 'Play me an eighties song by Wes Dakus', 'Play me a nineties song by Joseph Genaro', 'Play paul ortiz music from 1990', 'Play me a song from 1976 by Bennie Moten', 'Play a 1969 ballad by beth nielsen chapman , new first.', 'Play me a song from the twenties by Randy Bachman', 'play a 1994 tune by Lena Horne', 'Play some sister rosetta tharpe songs from the eighties', 'PLay some fourties music from Erin Harkes', 'Want to hear a chant by Nellie Mckay from the year 2008', 'Play a top-ten chant by Kelly Groucutt from 1964', 'Play a twenties tune by Jodie Aysha .', 'Play me the last 1980 record by Brenda Kahn', 'Can you play a song from the fourties by George Martin', 'play the album by Paul Barker playing the greatest from 1978', 'Play a melody by Adassa from the twenties', 'Play me a song by Avispa Music from 1965', 'Play me some music by Prince Alla from the twenties', 'Play me a song from 1972 by Sweet Emma Barrett', 'Play Barbra Streisand music from 1997 .', 'Play a song from the seventies by Pepe Aguilar', 'Play some nineties chant music from Nicoleta Nicola', 'play something from 1971 by John Bonham', 'Play me a song by Carol Arnauld from 2003', 'Sort to the last song on playlist from 1983 a chant by Mark Oliver Everett', 'Play the latest 1973 album by Peter Derose .', 'Play a Wendy Carlos song from 2002', 'Can you play the newest record from 1966 by Tony Lee', 'Play a song by Alasdair Roberts from 1996', 'play the top nineties melody by Gus G', 'Can you play me some eighties music by Adele', 'play an eighties song by Ler Lalonde', 'play a tune from 2000 by Bronislau Kaper', 'Play me a fifties song by Chingy', 'Play an Asha Bhosle song from around 1964', 'Play me a 2003 song by Charles Neidich', 'play a top 50 tune from the twenties by Willi Williams', 'play Paula Campbell music from 1993']
+Feature: PlayMusicByArtist_TRAIN | 25 (22.7%)
+    ['Play the top five songs from Robert Lockwood Junior .', 'Play them the greatest music by Chris Frantz .', 'Play some music from Roberto Carlos', 'play James Moody ballad', 'play music by Rodney Whitaker', 'Play a tune from Space Mandino .', 'Play a Paul Davis melody', 'play a chant by Sonsee', "Play Stefon Harris 's song .", 'Play the greatest Ricky Bell music', 'Play music by Paul Mccartney', 'play Kurt Cobain ballad tunes', 'Play a new tune by louis silvers .', 'Can you play some music by andrew diamond', 'Play the artist Joe', 'Please play a song by Everlast', 'play a ballad by Chick Corea', 'Can you play a song by Ken', 'Play ballad music by Jeff Lynne .', 'Play the latest ballad by September', 'play chant music by David Cook', 'Play me a track by Steve Souza', 'Play me a popular Ronnie Wood soundtrack', 'Play me something by Funtwo', 'Play me a song by Michael Diamond']
+Feature: PlayMusicByYear_TRAIN | 10 (9.1%)
+    ['Play me a song from 2016', 'play the last chant from the fourties', 'Play a song from 2013 .', 'Play me a song from the fourties movement', 'Play a 2001 tune', 'play a 2006 chant', 'Play me an ep from 2005 .', 'Play a ballad from 1997 .', 'Play some chant music from 2008 .', 'Please play me a popular track from 1984 .']
+Feature: PlayMusicByGenre_TRAIN | 9 (8.2%)
+    ['Play some Gospel music.', 'Can you play me some Pop-folk music', 'Play some gothic rock .', 'Play celtic music', 'Play some symphonic rock .', 'play southern rock tunes', 'Play Revival music.', 'Can you play me some britpop music', 'Please play me some Satire music']
+Feature: PlayTrack_DEV | 6 (5.5%)
+    ['Play the song Drifting On A Reed by Bobby G', 'Play Red Barchetta by Blind Lemon Jefferson .', 'Play Praise The Lord And Pass The Ammunition .', 'play the song Shine A Light', 'Play the song Le Renouveau', 'play track Her Majesty']
+Feature: PlayPlaylist_DEV | 6 (5.5%)
+    ['Play the music Hands Up', 'Play rhythmic', 'play Women of Jazz', 'Play my Piano Ballads playlist.', 'Play my Still Got the Blues playlist.', 'Play Funky Heavy Bluesy']
+Feature: PlayAlbum_TRAIN | 6 (5.5%)
+    ['Play me a song from Voices & Images', 'Play me a song by Steve Hackett from Manuel', 'Play the album , Dance Hall At Louse Point .', 'play the It Could Only Happen With You album by Lawrence', 'Play the album Vibrations by Marion Elise Raven', 'Play a song off the Nicht Sprechen album']
+Feature: PlayMusicByYearOnService_DEV | 2 (1.8%)
+    ['Play me a twenties tune on Deezer', 'Play me a 1974 tune on Slacker']
+Feature: PlayMusicByArtistOnService_TRAIN | 2 (1.8%)
+    ['Play chant from Freddy Fender on iheart', 'Play the top-10 chant by Caetano Veloso on Pandora']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 1 (0.9%)
+    ['play me a Mel Draisey tune from the fourties with vimeo']
+Feature: PlayAlbumOnService_TEST | 1 (0.9%)
+    ['Play some Carmen Mcrae from Ed Robertson off of Itunes']
+
+==== Cluster: 12 | 63/863 (7.3%)
+Feature: PlayOnService_TEST | 23 (36.5%)
+    ['Play iheart', 'Play music on Itunes .', 'Play music on my Itunes', 'I want to play music off Deezer', 'Play Iheart', 'Play some music on Pandora', 'Play some music on Itunes', 'Play music on Iheart', 'Can you pull up and play something on Itunes', 'I want to hear music on my Slacker app', 'play songs on Itunes', 'Play music on pandora', 'Please open pandora for me', 'play pandora', 'Play music off Itunes .', 'Please play music from Itunes', 'Play music on Itunes', 'play Iheart', 'Use Itunes to play music', 'I want to hear music on Itunes', 'Play my Pandora app', 'Use Deezer to play music', 'Play me a song on Pandora']
+Feature: PlayAlbumOnService_TEST | 12 (19.0%)
+    ['play Itunes album mondovisione', 'Play the album Resurrection In Blood from Sleepy Brown on Itunes .', "Play a song off Ian Stuart Donaldson 's Nature Nurture album on Itunes", 'Please play Short And Sweet by Teyana Taylor from my itunes .', 'Play the album 21st Century Live by Chet Lam on Itunes .', 'Play me a song from Movies For The Blind on Pandora', 'Play breed the killers on Itunes', 'Open Itunes and play Bad Attitude', 'Play Halid 08 by video game pianist on Pandora', 'play some Annie Herring beat street on itunes', 'play Going Down To The River on Pandora', 'play Isaac Hayes on Pandora from love, sweat and beer ep']
+Feature: PlayMusicByGenreOnService_TEST | 10 (15.9%)
+    ['play a symphonic rock on Pandora', 'Use Deezer service to play Opera', 'Play bebob on Iheart', 'Play some acapella music on Iheart', 'Play some Jungle music on iheart', 'use Iheart to listen to retro', 'I want to listen to Swing music on Iheart', 'play some rap on Pandora', 'play some tango on iheart', 'play Pandora Christian Gangsta Rap']
+Feature: PlayMusicByArtistOnService_TRAIN | 5 (7.9%)
+    ["Play Shaina Magdayao 's music on Iheart", 'play Asia Nitollano using itunes', 'Play Dj Cameo on itunes .', 'Play the latest ep by Joel Hastings on Itunes .', 'Play an Alla Pougatcheva ballad on Pandora']
+Feature: PlayTrackOnService_DEV | 5 (7.9%)
+    ['Play Oliver on pandora .', 'Play Cherry Pink by Trapp Mendoza on Iheart', 'Play the song vodka by Kunal Ganjawala on Itunes', 'Play Rocket Queen on Itunes', 'play The Song Remains The Same with Pandora']
+Feature: PlayMusicByYearOnService_DEV | 4 (6.3%)
+    ['Play some music from 1993 on Itunes .', 'Play the music of melody of 1997 in Itunes', 'play Pandora tunes from the fourties', 'Play 2004 on pandora']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 2 (3.2%)
+    ['Play 2004 Guy Sebastian on Itunes', 'Play thirties symphony music from Nigga on Iheart']
+Feature: PlayMusicByArtist_TRAIN | 2 (3.2%)
+    ['Play music from Hide', 'play music by Bonobo']
+
+==== Cluster: 13 | 72/863 (8.3%)
+Feature: PlayMusicByArtistAndYear_TEST | 18 (25.0%)
+    ['play a theme from 1985 by Patrick Cowley', "Play Oliver Cheatham 's symphony from the thirties .", 'play a concerto that was most popular in 1958 by mickey hart', 'Play a top symphony sort form 1959 by Stuart Garrard .', 'Play the last 1954 ep by Povel Ramel .', 'Play the greatest Nicholaus Arson concerto from around 2000', 'Play fourties soundtrack from Hamish Maccunn', 'Play twenties from Ken Floyd', 'Play the 1991 soundtrack from Ian Mcdonald', 'Play a 2014 theme from Greg Pattillo', 'play Richard Thompson from the thirties song book', 'Play twenties symphony from Robert Walter', 'Play 1958 by wayne petti', 'play a movement from top-20 1983 by Baruch Chait', 'Play something from 1985 by Billy Werner', 'Play symphony music from 1991 by Irvin Mayfield', 'play 1960 chant music by Hermann Baumann', 'Play a top five Jonny Buckland symphony from around 1989']
+Feature: PlayTrack_DEV | 15 (20.8%)
+    ['play the track The Wizard And I', 'play No More Sorrow', 'Play me Hier Encore by greydon square', 'Play Odessa by Maartin Allcock .', 'Play teri meri by Josh White', 'play There Must Be More To Life Than This', 'Play The Cherry-tree Carol by Edwin Mccain', 'play Robin Trower Unravel', 'Play Circus Farm by Deana Carter .', 'Please play Got The Time', 'play Wow by Jon Theodore', 'Play In Every Dream Home A Heartache by vincent paul abbott', 'Play Before I Grew Up To Love You by Wafah Dufour', 'play By The Sleepy Lagoon by Greg Kurstin', 'Play That Would Be Something by Eden Ahbez']
+Feature: PlayAlbum_TRAIN | 14 (19.4%)
+    ['Play Burhøns by Ernie C .', 'Play A Chaos Of Desire from Dan Snaith', 'Play Saturday Nights & Sunday Mornings', 'Play The Tyranny Of Distance by Willy Mason .', 'Play Alone, Again from Mike Viola', "Play Brenda Kahn 's Rushall Station .", 'Play Andy Williams Sings Rodgers And Hammerstein by elica todorova', 'play the album Wayning Moments by Rabbit Brown', 'Play Pledge by Markus Grosskopf', 'play The Insoc Ep', 'Play Kool Keith Presents Thee Undatakerz by John Mccrea .', 'Play Expresión from Mickey Finn', 'Play Magic Time by Phoebus', 'play Joshua Homme Belle And Sebastian Write About Love']
+Feature: PlayMusicByArtist_TRAIN | 11 (15.3%)
+    ['Play me a symphony by Ricky Bell', 'Play something from the jonathon lee movement', 'Play top 20 from frank farian', 'Play a melody from Elmer Bernstein', 'Play something by Brian Chase .', 'play ep by Arjen Anthony Lucassen', 'Play the soundtrack that Tom Bellamy contributed to', 'Play a melody by avery storm .', 'Play movement by Duane Allman .', 'Play Lenny Kaye music.', "Play the music of Filipp Bedrossowitsch Kirkorow 's theme"]
+Feature: PlayMusicByYear_TRAIN | 5 (6.9%)
+    ['Would you please play me a symphony from 1995', 'play 1970 trunes', 'Play me a 1957 ep', 'Play a concerto from the nineties', 'Play top-five concerto music from 1992']
+Feature: PlayAlbumOnService_TEST | 5 (6.9%)
+    ['Play play Lodge by Alkabli on lastfm .', 'Play Night Electric Night on Iheart', 'Play The Eternal by Juju Mob on Vimeo .', 'Play 25 To Life by Paul Riley on Deezer .', 'Play Short Walk On A Long Pier on Slacker']
+Feature: PlayMusicByArtistAndYearOnService_TRAIN | 2 (2.8%)
+    ['Play me a 1958 adam yauch concerto on Groove Shark', 'Play me something from the thirties by Candi Staton on Vimeo']
+Feature: PlayPlaylist_DEV | 1 (1.4%)
+    ['Play ecstatic']
+Feature: PlayMusicByArtistOnService_TRAIN | 1 (1.4%)
+    ['Play new movement from Mike Oldfield on Vimeo']
+
