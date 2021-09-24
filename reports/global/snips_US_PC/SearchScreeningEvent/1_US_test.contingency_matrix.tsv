@@ -1,0 +1,11 @@
+Feature/Cluster	C_0 (22.0%)	C_1 (22.0%)	C_2 (15.4%)	C_3 (9.6%)	C_4 (9.6%)	C_5 (13.7%)	C_6 (3.3%)	C_7 (0.6%)	C_8 (3.9%)	Purity
+GetSchedule_TRAIN (8.9%)	2	0	0	55	0	0	0	0	0	96.5%
+GetScheduleAtALocation_TRAIN (15.1%)	0	0	96	0	0	0	0	0	0	100.0%
+GetScheduleForAMovie_TRAIN (17.0%)	0	87	0	0	2	0	1	0	18	80.6%
+GetScheduleForAMovieAtNearbyCinemas_TRAIN (6.1%)	0	0	0	0	38	0	0	1	0	97.4%
+GetScheduleAtNearbyCinemas_DEV (13.5%)	86	0	0	0	0	0	0	0	0	100.0%
+GetScheduleAtATimeRange_DEV (4.1%)	19	0	0	6	0	0	0	0	1	73.1%
+GetScheduleForAnimatedMovies_DEV (5.2%)	33	0	0	0	0	0	0	0	0	100.0%
+GetScheduleForAMovieAtALocation_TEST (18.1%)	0	5	2	0	0	87	19	1	1	75.7%
+FindCinemasPlayingAMovieAtATimeRange_TEST (12.1%)	0	48	0	0	21	0	1	2	5	62.3%
+Purity	61.4%	62.1%	98.0%	90.2%	62.3%	100.0%	90.5%	50.0%	72.0%	

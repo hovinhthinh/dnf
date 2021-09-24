@@ -470,7 +470,7 @@ class Pipeline(object):
             true_clusters_log_file=
             os.path.join(report_folder, '0_test.true_clusters.log') if report_folder is not None else None,
             contingency_matrix_log_file=
-            os.path.join(report_folder, '0_test.contingency_matrix.log') if report_folder is not None else None)
+            os.path.join(report_folder, '0_test.contingency_matrix.tsv') if report_folder is not None else None)
         print('No-fine-tune test quality:', test_quality)
         if stats_file is not None:
             stats_file.write('No-fine-tune test quality: {}\n'.format(test_quality))
@@ -528,7 +528,7 @@ class Pipeline(object):
                 os.path.join(report_folder, '{}_{}_test.true_clusters.log'.format(i + 1, step))
                 if report_folder is not None else None,
                 contingency_matrix_log_file=
-                os.path.join(report_folder, '{}_{}_test.contingency_matrix.log'.format(i + 1, step))
+                os.path.join(report_folder, '{}_{}_test.contingency_matrix.tsv'.format(i + 1, step))
                 if report_folder is not None else None)
             print('Finetune-{} test quality: {}'.format(step, test_quality))
             if stats_file is not None:
@@ -605,7 +605,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                     if folder is not None else None,
                     true_clusters_log_file=os.path.join(folder, intent_name + '.true_clusters.log')
                     if folder is not None else None,
-                    contingency_matrix_log_file=os.path.join(folder, intent_name + '.contingency_matrix.log')
+                    contingency_matrix_log_file=os.path.join(folder, intent_name + '.contingency_matrix.tsv')
                     if folder is not None else None)
                 print('Clustering TEST quality [{}]: {}'.format(intent_name, test_quality))
                 if stats_file is not None:

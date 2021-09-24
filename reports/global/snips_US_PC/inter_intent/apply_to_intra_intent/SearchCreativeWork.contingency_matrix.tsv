@@ -1,0 +1,11 @@
+Feature/Cluster	C_0 (9.8%)	C_1 (40.7%)	C_2 (15.0%)	C_3 (8.3%)	C_4 (10.1%)	C_5 (6.6%)	C_6 (4.7%)	C_7 (2.4%)	C_8 (2.4%)	Purity
+PlayTVProgram_TRAIN (17.1%)	0	120	0	0	0	0	0	0	0	100.0%
+SearchPicture_TRAIN (9.8%)	68	0	0	0	0	1	0	0	0	98.6%
+SearchGame_TRAIN (6.4%)	0	0	0	0	0	45	0	0	0	100.0%
+WHQuestion_TRAIN (8.5%)	0	0	1	58	0	0	0	0	1	96.7%
+SearchCreativeWork_DEV (17.1%)	1	13	72	0	3	0	24	5	2	60.0%
+PlaySong_DEV (6.3%)	0	21	0	0	10	0	0	4	9	47.7%
+SearchAlbum_DEV (2.7%)	0	2	0	0	16	0	0	0	1	84.2%
+PlayTVProgramTrailer_TEST (11.8%)	0	59	11	0	1	0	3	7	2	71.1%
+SearchBook_TEST (20.2%)	0	71	21	0	41	0	6	1	2	50.0%
+Purity	98.6%	42.0%	68.6%	100.0%	57.7%	97.8%	72.7%	41.2%	52.9%	

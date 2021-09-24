@@ -1,0 +1,7 @@
+Feature/Cluster	C_0 (6.8%)	C_1 (30.0%)	C_2 (2.1%)	C_3 (19.1%)	C_4 (42.1%)	Purity
+AddAnArtistToAPlaylist_TRAIN (24.6%)	1	30	0	89	0	74.2%
+AddCurrentSongToAPlaylist_TRAIN (23.0%)	0	0	0	0	112	100.0%
+AddASongToAPlaylist_DEV (24.6%)	0	115	0	4	1	95.8%
+AddCurrentArtistToAPlaylist_DEV (6.6%)	32	0	0	0	0	100.0%
+AddCurrentAlbumToAPlaylist_TEST (21.1%)	0	1	10	0	92	89.3%
+Purity	97.0%	78.8%	100.0%	95.7%	54.6%	

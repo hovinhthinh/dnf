@@ -1,0 +1,6 @@
+Feature/Cluster	C_0 (17.6%)	C_1 (49.2%)	C_2 (14.5%)	C_3 (18.8%)	Purity
+GetCurrentWeatherInALocation_TRAIN (19.9%)	0	120	0	0	100.0%
+GetWeatherInCurrentPositionAtATimeRange_TRAIN (7.6%)	46	0	0	0	100.0%
+GetCurrentWeatherInCurrentPosition_DEV (6.0%)	26	6	1	3	72.2%
+GetWeatherInALocationAtATimeRange_TEST (66.4%)	34	170	86	110	42.5%
+Purity	43.4%	57.4%	98.9%	97.3%	
