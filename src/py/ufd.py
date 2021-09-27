@@ -409,7 +409,7 @@ class Pipeline(object):
                 f.write('Purity')
                 for i in range(k):
                     f.write('\t{:.1f}%'.format(numpy.max(matrix[:, i]) / sum_by_predicted_clusters[i] * 100))
-                f.write('\n')
+                f.write('\t\n')
 
         return {
             'all': get_clustering_quality(test_true_clusters, test_predicted_clusters),
