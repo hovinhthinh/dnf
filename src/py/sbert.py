@@ -148,17 +148,22 @@ def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, t
             finetune_model_2.train()
 
             train_ids_len = len(train_loader_1) + len(train_loader_2)
-            cur = 0
             for epoch in range(n_train_epochs):
                 train_ids = list(range(train_ids_len))
                 random.shuffle(train_ids)
                 train_loader_1_iter = iter(train_loader_1)
                 train_loader_2_iter = iter(train_loader_2)
+
+                cur_1 = 0
+                cur_2 = 0
                 for idx in train_ids:
-                    cur += 1
-                    print('\rJoint training: {}/{} ({:.1f}%)'.format(cur, train_ids_len * n_train_epochs,
-                                                                     100 * cur / (train_ids_len * n_train_epochs)),
-                          end='' if cur < train_ids_len * n_train_epochs else '\n')
+                    if idx < len(train_loader_1):
+                        cur_1 += 1
+                    else:
+                        cur_2 += 1
+                    print('\r==== Joint training: Epoch: {} Batch: {}+{}/{} ({:.1f}%)'
+                          .format(epoch + 1, cur_1, cur_2, len(train_ids), 100 * (cur_1 + cur_2) / len(train_ids)),
+                          end='' if cur_1 + cur_2 < len(train_ids) else '\n')
                     if idx < len(train_loader_1):
                         optim_1.zero_grad()
                         batch = next(train_loader_1_iter)
