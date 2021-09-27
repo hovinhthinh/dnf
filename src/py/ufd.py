@@ -87,7 +87,7 @@ class Pipeline(object):
 
     def __init__(self, utterances: List[Tuple[str, any, str, dict]],  # (utterance, cluster_label, sample_type, slots)
                  dataset_name=None,
-                 squashing_train_dev=False,  # TODO: This parameter is deprecated, and has to be removed.
+                 squashing_train_dev=False,
                  use_unseen_in_training=True):
         self.dataset_name = dataset_name
         self.use_unseen_in_training = use_unseen_in_training
@@ -104,7 +104,7 @@ class Pipeline(object):
             else:
                 raise Exception('Invalid sample type')
 
-        # For squashing train/dev. TODO: remove.
+        # For squashing train/dev.
         self.squashing_train_dev = squashing_train_dev
         self.dev_indices = [i for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
 
@@ -279,6 +279,7 @@ class Pipeline(object):
                                                  n_train_epochs=n_train_epochs,
                                                  early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
 
+    @DeprecationWarning
     def fine_tune_slot_tagging(self):
         sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                      [u[3] for u in self.utterances if u[2] == 'TRAIN'],
@@ -289,6 +290,7 @@ class Pipeline(object):
                                                        [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                                                        early_stopping_eval_callback=self.get_validation_score)
 
+    @DeprecationWarning
     def fine_tune_joint_slot_tagging_and_utterance_similarity(self):
         if self.use_unseen_in_training:
             sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
@@ -303,22 +305,24 @@ class Pipeline(object):
                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
                 early_stopping_eval_callback=self.get_validation_score)
 
-    def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self):
+    def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self, n_train_epochs=None):
         if self.use_unseen_in_training:
             sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
                 [u[0] for u in self.utterances],
                 [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
                 [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
-                early_stopping_eval_callback=self.get_validation_score)
+                n_train_epochs=n_train_epochs,
+                early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
         else:
             sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
                 [u[0] for u in self.utterances if u[2] == 'TRAIN'],
                 [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
-                early_stopping_eval_callback=self.get_validation_score)
+                n_train_epochs=n_train_epochs,
+                early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
 
     def get_dev_clustering_quality(self):
-        if self.squashing_train_dev:  # TODO: remove this case.
+        if self.squashing_train_dev:
             dev_embeddings = [self.embeddings[i] for i in self.dev_indices]
             dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map)).fit(
                 dev_embeddings).labels_
@@ -426,10 +430,11 @@ class Pipeline(object):
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
+                'SMC+US_n_train_epochs': None,
+                'US_n_train_epochs': None,
                 'PC_sample_weights': True,
                 'PC_iterations': None,
                 'PC_max_iterations': 10,
-                'US_n_train_epochs': None
             }):
         set_seed(12993)
         for s in steps:
@@ -483,7 +488,8 @@ class Pipeline(object):
             if step == 'ST+US':
                 self.fine_tune_joint_slot_tagging_and_utterance_similarity()
             elif step == 'SMC+US':
-                self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity()
+                self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
+                    n_train_epochs=config.get('SMC+US_n_train_epochs', None))
             elif step == 'ST':
                 self.fine_tune_slot_tagging()
             elif step == 'SMC':
