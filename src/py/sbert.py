@@ -263,25 +263,31 @@ class ClassificationDataset(torch.utils.data.Dataset):
 
 
 class ClassificationHead(nn.Module):
-    def __init__(self, base_model_config, num_labels):
+    def __init__(self, base_model_config, num_labels, n_dense_layers=0):
         super().__init__()
-        # self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dense = nn.ModuleList([nn.Linear(base_model_config.hidden_size, base_model_config.hidden_size)
+                                    for _ in range(n_dense_layers)])
         self.dropout = nn.Dropout(base_model_config.hidden_dropout_prob)
         self.out_proj = nn.Linear(base_model_config.hidden_size, num_labels)
 
         print('Initializing classifier head')
+        for d in self.dense:
+            d.weight.data.normal_(mean=0.0, std=0.02)
+            if d.bias is not None:
+                d.bias.data.zero_()
         self.out_proj.weight.data.normal_(mean=0.0, std=0.02)
         if self.out_proj.bias is not None:
             self.out_proj.bias.data.zero_()
 
     def forward(self, mean_pooling, **kwargs):
-        # mean_pooling = torch.tanh(mean_pooling)
-        x = self.dropout(mean_pooling)
-        # x = self.dense(x)
-        # x = torch.tanh(x)
-        # x = self.dropout(x)
-        x = self.out_proj(x)
-        return x
+        x = mean_pooling
+        for d in self.dense:
+            x = self.dropout(torch.tanh(x))
+            x = d(x)
+        if len(self.dense) > 0:
+            x = torch.tanh(x)
+
+        return self.out_proj(self.dropout(x))
 
 
 class PseudoClassificationModel(nn.Module):

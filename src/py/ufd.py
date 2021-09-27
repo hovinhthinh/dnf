@@ -305,13 +305,15 @@ class Pipeline(object):
                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
                 early_stopping_eval_callback=self.get_validation_score)
 
-    def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self, n_train_epochs=None):
+    def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self, n_train_epochs=None,
+                                                                                early_stopping_eval_patience=0):
         if self.use_unseen_in_training:
             sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
                 [u[0] for u in self.utterances],
                 [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
                 [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
                 n_train_epochs=n_train_epochs,
+                early_stopping_eval_patience=early_stopping_eval_patience,
                 early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
         else:
             sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
@@ -319,6 +321,7 @@ class Pipeline(object):
                 [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
                 n_train_epochs=n_train_epochs,
+                early_stopping_eval_patience=early_stopping_eval_patience,
                 early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
 
     def get_dev_clustering_quality(self):
@@ -489,6 +492,7 @@ class Pipeline(object):
                 self.fine_tune_joint_slot_tagging_and_utterance_similarity()
             elif step == 'SMC+US':
                 self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
+                    early_stopping_eval_patience=3,
                     n_train_epochs=config.get('SMC+US_n_train_epochs', None))
             elif step == 'ST':
                 self.fine_tune_slot_tagging()
