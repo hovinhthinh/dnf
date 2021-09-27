@@ -859,7 +859,7 @@ def get_train_test_data(generate_data=False, use_dev=True):
     inter_intent_data = []
     for intent_name, cluster_data in intra_intent_data:
         inter_intent_data.extend(
-            [(text, intent_name + '_' + cluster, sample_type, slots)
+            [(text, intent_name + '_' + cluster, sample_type, {intent_name + '_' + k: v for k, v in slots.items()})
              for text, cluster, sample_type, slots in cluster_data])
 
     print('======== Cluster information ========')
