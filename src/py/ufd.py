@@ -12,7 +12,7 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 import numpy
 import umap
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.metrics import pairwise_distances
 
 import sbert
@@ -86,11 +86,11 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
 class Pipeline(object):
 
     def __init__(self, utterances: List[Tuple[str, any, str, dict]],  # (utterance, cluster_label, sample_type, slots)
-                 dataset_name=None,
-                 squashing_train_dev=False,
-                 use_unseen_in_training=True):
+                 dataset_name=None, squashing_train_dev=False, use_unseen_in_training=True,
+                 dev_test_clustering_method='k-means'):
         self.dataset_name = dataset_name
         self.use_unseen_in_training = use_unseen_in_training
+        self.dev_test_clustering_method = dev_test_clustering_method
         self.use_dev = 'DEV' in [u[2] for u in utterances]
         self.utterances = []  # TRAIN + DEV, if DEV is not provided, use DEV = TEST instead.
         self.test_utterances = []
@@ -325,18 +325,22 @@ class Pipeline(object):
                 early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
 
     def get_dev_clustering_quality(self):
+        if self.dev_test_clustering_method == 'k-means':
+            clusterer = KMeans(n_clusters=len(self.cluster_label_2_index_map))
+        elif self.dev_test_clustering_method == 'hac-complete':
+            clusterer = AgglomerativeClustering(n_clusters=len(self.cluster_label_2_index_map), linkage='complete')
+        else:
+            raise Exception('Invalid clustering method')
+
         if self.squashing_train_dev:
-            dev_embeddings = [self.embeddings[i] for i in self.dev_indices]
-            dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map)).fit(
-                dev_embeddings).labels_
+            dev_predicted_clusters = clusterer.fit([self.embeddings[i] for i in self.dev_indices]).labels_
             dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i][1]] for i in self.dev_indices]
             return get_clustering_quality(dev_true_clusters, dev_predicted_clusters)
         else:
             dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
             if len(dev_embeddings) == 0:
                 raise Exception('DEV set is unavailable')
-            dev_predicted_clusters = KMeans(n_clusters=len(self.cluster_label_2_index_map)).fit(
-                dev_embeddings).labels_
+            dev_predicted_clusters = clusterer.fit(dev_embeddings).labels_
             return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
@@ -350,7 +354,14 @@ class Pipeline(object):
         test_true_clusters = [true_cluster_2_index_map[u[1]] for u in self.test_utterances]
 
         k = k if k is not None else len(true_cluster_2_index_map)
-        test_predicted_clusters = KMeans(n_clusters=k).fit(self.test_embeddings).labels_
+
+        if self.dev_test_clustering_method == 'k-means':
+            test_predicted_clusters = KMeans(n_clusters=k).fit(self.test_embeddings).labels_
+        elif self.dev_test_clustering_method == 'hac-complete':
+            test_predicted_clusters = AgglomerativeClustering(n_clusters=k, linkage='complete').fit(
+                self.test_embeddings).labels_
+        else:
+            raise Exception('Invalid clustering method')
 
         if predicted_clusters_log_file is not None:
             with open(predicted_clusters_log_file, 'w') as f:
@@ -556,6 +567,7 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                     config={
                         'use_unseen_in_training': True,
                         'squashing_train_dev': False,
+                        'dev_test_clustering_method': 'k-means'
                     }):
     # Processing intra-intents
     if intra_intent_data is not None:
@@ -571,7 +583,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
             print_train_dev_test_stats(intent_data)
             p = Pipeline(intent_data, dataset_name=intent_name,
                          use_unseen_in_training=config.get('use_unseen_in_training', True),
-                         squashing_train_dev=config.get('squashing_train_dev', False))
+                         squashing_train_dev=config.get('squashing_train_dev', False),
+                         dev_test_clustering_method=config.get('dev_test_clustering_method', 'k-means'))
             intent_report_folder = os.path.join(report_folder, intent_name) if report_folder is not None else None
             p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
 
@@ -581,7 +594,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
         print_train_dev_test_stats(inter_intent_data)
         p = Pipeline(inter_intent_data, dataset_name='inter_intent',
                      use_unseen_in_training=config.get('use_unseen_in_training', True),
-                     squashing_train_dev=config.get('squashing_train_dev', False))
+                     squashing_train_dev=config.get('squashing_train_dev', False),
+                     dev_test_clustering_method=config.get('dev_test_clustering_method', 'k-means'))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
         p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
 
@@ -603,7 +617,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 stats_file.write('======== Apply inter-intent model back to intra-intent ========\n')
 
             for intent_name, intent_data in intra_intent_data:
-                p = Pipeline(intent_data, dataset_name=intent_name)
+                p = Pipeline(intent_data, dataset_name=intent_name,
+                             dev_test_clustering_method=config.get('dev_test_clustering_method', 'k-means'))
                 p.update_test_embeddings()
                 p.plot(show_test_only=True,
                        output_file_path=os.path.join(folder, intent_name + '.pdf') if folder is not None else None)
