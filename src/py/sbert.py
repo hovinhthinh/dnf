@@ -263,12 +263,13 @@ class ClassificationDataset(torch.utils.data.Dataset):
 
 
 class ClassificationHead(nn.Module):
-    def __init__(self, base_model_config, num_labels, n_dense_layers=0):
+    def __init__(self, base_model_config, num_labels, n_dense_layers=0, mean_pooling_activation=False):
         super().__init__()
         self.dense = nn.ModuleList([nn.Linear(base_model_config.hidden_size, base_model_config.hidden_size)
                                     for _ in range(n_dense_layers)])
         self.dropout = nn.Dropout(base_model_config.hidden_dropout_prob)
         self.out_proj = nn.Linear(base_model_config.hidden_size, num_labels)
+        self.mean_pooling_activation = mean_pooling_activation
 
         print('Initializing classifier head')
         for d in self.dense:
@@ -284,7 +285,7 @@ class ClassificationHead(nn.Module):
         for d in self.dense:
             x = self.dropout(torch.tanh(x))
             x = d(x)
-        if len(self.dense) > 0:
+        if self.mean_pooling_activation or len(self.dense) > 0:
             x = torch.tanh(x)
 
         return self.out_proj(self.dropout(x))
