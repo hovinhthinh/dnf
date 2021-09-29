@@ -266,6 +266,7 @@ class Pipeline(object):
                                              pseudo_clusters))
                 sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
                                                       train_sample_weights=weights if use_sample_weights else None)
+                print('Validation score: {:.3f}'.format(self.get_validation_score()))
 
     def fine_tune_utterance_similarity(self, n_train_epochs=None):
         if self.use_unseen_in_training:
