@@ -71,6 +71,7 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_
         if not early_stopping:
             if n_train_epochs is None:
                 n_train_epochs = ceil((n_train_steps if n_train_steps is not None else 2000) / len(train_dataset))
+            """ Uncomment the below block for using Huggingface's Trainer interface.
             Trainer(
                 model=finetune_model,
                 args=TrainingArguments(
@@ -86,6 +87,26 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_
                 ),
                 train_dataset=train_dataset,
             ).train()
+            """
+
+            for epoch in range(n_train_epochs):
+                finetune_model.train()  # Switch mode
+                cur = 0
+                for batch in train_loader:
+                    cur += 1
+                    print('\r==== Epoch: {} Num examples: {} Batch: {}/{} ({:.1f}%)'
+                          .format(epoch + 1, len(train_dataset), cur, len(train_loader), 100 * cur / len(train_loader)),
+                          end='' if cur < len(train_loader) else '\n')
+                    optim.zero_grad()
+                    batch = {key: val.to(device) for key, val in batch.items()}
+                    outputs = finetune_model(**batch)
+                    loss = outputs[0]
+                    loss.backward()
+                    optim.step()
+                finetune_model.eval()
+
+                if eval_callback is not None:
+                    print('Validation score: {:.3f}'.format(eval_callback()))
         else:
             best_epoch = None
             best_eval = None
