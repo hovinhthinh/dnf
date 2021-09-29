@@ -183,7 +183,7 @@ def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, t
                 finetune_model_2.eval()
 
                 if eval_callback is not None:
-                    print('Validation score: {:.3f}'.format(eval_callback()), end='')
+                    print('Validation score: {:.3f}'.format(eval_callback()))
         else:
             best_epoch = None
             best_eval = None
