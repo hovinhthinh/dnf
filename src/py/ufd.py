@@ -223,16 +223,18 @@ class Pipeline(object):
                     it += 1
                     print('==== Iteration: {}'.format(it))
                     # self.update_embeddings() # No need to update, already called in self.get_validation_score()
+                    utterances = self.utterances
                     pseudo_clusters, weights = self.get_pseudo_clusters()
 
                     if not self.use_unseen_in_training:
+                        utterances = [u for u in utterances if u[2] == 'TRAIN']
                         pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
 
                     print('Pseudo-cluster quality:',
                           get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                                  pseudo_clusters))
-                    sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
+                    sbert.fine_tune_pseudo_classification([u[0] for u in utterances], pseudo_clusters,
                                                           train_sample_weights=weights if use_sample_weights else None)
                     eval = self.get_validation_score()
                     print('Validation score: {:.3f}'.format(eval), end='')
@@ -254,16 +256,18 @@ class Pipeline(object):
             for it in range(iterations):
                 print('Iter: {}'.format(it + 1))
                 # self.update_embeddings() # No need to update
+                utterances = self.utterances
                 pseudo_clusters, weights = self.get_pseudo_clusters()
 
                 if not self.use_unseen_in_training:
+                    utterances = [u for u in utterances if u[2] == 'TRAIN']
                     pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
 
                 print('Pseudo-cluster quality:',
                       get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                              pseudo_clusters))
-                sbert.fine_tune_pseudo_classification([u[0] for u in self.utterances], pseudo_clusters,
+                sbert.fine_tune_pseudo_classification([u[0] for u in utterances], pseudo_clusters,
                                                       train_sample_weights=weights if use_sample_weights else None)
                 print('Validation score: {:.3f}'.format(self.get_validation_score()))
 
