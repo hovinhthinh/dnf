@@ -213,7 +213,7 @@ class Pipeline(object):
         return self.get_dev_clustering_quality()['NMI']
 
     def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None,
-                                        early_stopping_eval_patience=0, min_iterations=None, max_iterations=None):
+                                        early_stopping_patience=0, min_iterations=None, max_iterations=None):
         if iterations is None:
             with tempfile.TemporaryDirectory() as temp_dir:
                 best_iter = None
@@ -242,7 +242,7 @@ class Pipeline(object):
                         print(' -> Save model', end='')
                         sbert.save(temp_dir)
 
-                    if (it > best_iter + early_stopping_eval_patience and (
+                    if (it > best_iter + early_stopping_patience and (
                             min_iterations is None or it >= min_iterations)) \
                             or (max_iterations is not None and it == max_iterations):
                         print(' -> Stop')
@@ -272,23 +272,25 @@ class Pipeline(object):
             sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances],
                                                  [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
                                                  n_train_epochs=n_train_epochs,
-                                                 early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
+                                                 eval_callback=self.get_validation_score,
+                                                 early_stopping=True if n_train_epochs is None else None)
         else:
             sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                                  [u[1] for u in self.utterances if u[2] == 'TRAIN'],
                                                  n_train_epochs=n_train_epochs,
-                                                 early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
+                                                 eval_callback=self.get_validation_score,
+                                                 early_stopping=True if n_train_epochs is None else None)
 
     @DeprecationWarning
     def fine_tune_slot_tagging(self):
         sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                      [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                                     early_stopping_eval_callback=self.get_validation_score)
+                                     eval_callback=self.get_validation_score, early_stopping=True)
 
     def fine_tune_slot_multiclass_classification(self):
         sbert.fine_tune_slot_multiclass_classification([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                                        [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                                                       early_stopping_eval_callback=self.get_validation_score)
+                                                       eval_callback=self.get_validation_score, early_stopping=True)
 
     @DeprecationWarning
     def fine_tune_joint_slot_tagging_and_utterance_similarity(self):
@@ -297,32 +299,34 @@ class Pipeline(object):
                 [u[0] for u in self.utterances],
                 [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
                 [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
-                early_stopping_eval_callback=self.get_validation_score)
+                eval_callback=self.get_validation_score, early_stopping=True)
         else:
             sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
                 [u[0] for u in self.utterances if u[2] == 'TRAIN'],
                 [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
-                early_stopping_eval_callback=self.get_validation_score)
+                eval_callback=self.get_validation_score, early_stopping=True)
 
     def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self, n_train_epochs=None,
-                                                                                early_stopping_eval_patience=0):
+                                                                                early_stopping_patience=0):
         if self.use_unseen_in_training:
             sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
                 [u[0] for u in self.utterances],
                 [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
                 [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
                 n_train_epochs=n_train_epochs,
-                early_stopping_eval_patience=early_stopping_eval_patience,
-                early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
+                eval_callback=self.get_validation_score,
+                early_stopping=True if n_train_epochs is None else None,
+                early_stopping_patience=early_stopping_patience)
         else:
             sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
                 [u[0] for u in self.utterances if u[2] == 'TRAIN'],
                 [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
                 n_train_epochs=n_train_epochs,
-                early_stopping_eval_patience=early_stopping_eval_patience,
-                early_stopping_eval_callback=self.get_validation_score if n_train_epochs is None else None)
+                eval_callback=self.get_validation_score,
+                early_stopping=True if n_train_epochs is None else None,
+                early_stopping_patience=early_stopping_patience)
 
     def get_dev_clustering_quality(self):
         if self.dev_test_clustering_method == 'k-means':
@@ -503,7 +507,7 @@ class Pipeline(object):
                 self.fine_tune_joint_slot_tagging_and_utterance_similarity()
             elif step == 'SMC+US':
                 self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
-                    early_stopping_eval_patience=3,
+                    early_stopping_patience=3,
                     n_train_epochs=config.get('SMC+US_n_train_epochs', None))
             elif step == 'ST':
                 self.fine_tune_slot_tagging()
@@ -515,7 +519,7 @@ class Pipeline(object):
                 self.fine_tune_pseudo_classification(
                     use_sample_weights=config.get('PC_sample_weights', True),
                     iterations=config.get('PC_iterations', None),
-                    early_stopping_eval_patience=3,
+                    early_stopping_patience=3,
                     min_iterations=1, max_iterations=config.get('PC_max_iterations', 10),
                 )
             else:

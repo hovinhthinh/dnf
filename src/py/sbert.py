@@ -61,15 +61,14 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
 
 
 def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_steps=None,
-                    early_stopping_eval_callback: Callable[..., float] = None,
-                    early_stopping_eval_patience=0):
+                    eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0):
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-    optim = AdamW(finetune_model.parameters(), lr=5e-5)
+    optim = AdamW(finetune_model.parameters(), lr=5e-5, weight_decay=0.01)
 
     finetune_model.to(device)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        if early_stopping_eval_callback is None:
+        if not early_stopping:
             if n_train_epochs is None:
                 n_train_epochs = ceil((n_train_steps if n_train_steps is not None else 2000) / len(train_dataset))
             Trainer(
@@ -109,7 +108,7 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_
                     optim.step()
                 finetune_model.eval()
 
-                eval = early_stopping_eval_callback()
+                eval = eval_callback()
                 print('Validation score: {:.3f}'.format(eval), end='')
                 if best_eval is None or eval > best_eval:
                     best_eval = eval
@@ -117,7 +116,7 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_
                     print(' -> Save model')
                     save(temp_dir)
                 else:
-                    if epoch > best_epoch + early_stopping_eval_patience:
+                    if epoch > best_epoch + early_stopping_patience:
                         print(' -> Stop')
                         load(temp_dir)
                         break
@@ -127,28 +126,27 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_
 
 def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, train_dataset_2,
                           n_train_epochs=None, n_train_steps=None,
-                          early_stopping_eval_callback: Callable[..., float] = None,
-                          early_stopping_eval_patience=0):
+                          eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0):
     train_loader_1 = DataLoader(train_dataset_1, batch_size=16, shuffle=True)
     train_loader_2 = DataLoader(train_dataset_2, batch_size=16, shuffle=True)
-    optim_1 = AdamW(finetune_model_1.parameters(), lr=5e-5)
-    optim_2 = AdamW(finetune_model_2.parameters(), lr=5e-5)
+    optim_1 = AdamW(finetune_model_1.parameters(), lr=5e-5, weight_decay=0.01)
+    optim_2 = AdamW(finetune_model_2.parameters(), lr=5e-5, weight_decay=0.01)
 
     finetune_model_1.to(device)
     finetune_model_2.to(device)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        if early_stopping_eval_callback is None:
+        if not early_stopping:
             if n_train_epochs is None:
                 n_train_epochs = ceil(
                     (n_train_steps if n_train_steps is not None else 2000) / min(len(train_dataset_1),
                                                                                  len(train_dataset_2)))
 
-            finetune_model_1.train()  # Switch mode
-            finetune_model_2.train()
-
             train_ids_len = len(train_loader_1) + len(train_loader_2)
             for epoch in range(n_train_epochs):
+                finetune_model_1.train()  # Switch mode
+                finetune_model_2.train()
+
                 train_ids = list(range(train_ids_len))
                 random.shuffle(train_ids)
                 train_loader_1_iter = iter(train_loader_1)
@@ -181,8 +179,11 @@ def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, t
                         loss.backward()
                         optim_2.step()
 
-            finetune_model_1.eval()  # Switch mode
-            finetune_model_2.eval()
+                finetune_model_1.eval()  # Switch mode
+                finetune_model_2.eval()
+
+                if eval_callback is not None:
+                    print('Validation score: {:.3f}'.format(eval_callback()), end='')
         else:
             best_epoch = None
             best_eval = None
@@ -228,7 +229,7 @@ def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, t
                 finetune_model_1.eval()  # Switch mode
                 finetune_model_2.eval()
 
-                eval = early_stopping_eval_callback()
+                eval = eval_callback()
                 print('Validation score: {:.3f}'.format(eval), end='')
                 if best_eval is None or eval > best_eval:
                     best_eval = eval
@@ -236,7 +237,7 @@ def _joint_finetune_model(finetune_model_1, finetune_model_2, train_dataset_1, t
                     print(' -> Save model')
                     save(temp_dir)
                 else:
-                    if epoch > best_epoch + early_stopping_eval_patience:
+                    if epoch > best_epoch + early_stopping_patience:
                         print(' -> Stop')
                         load(temp_dir)
                         break
@@ -334,7 +335,7 @@ def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weig
     # print(classifier(**train_encodings))
 
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-    optim = AdamW(classifier.parameters(), lr=5e-5)
+    optim = AdamW(classifier.parameters(), lr=5e-5, weight_decay=0.01)
 
     classifier.to(device)
 
@@ -456,11 +457,12 @@ class UtteranceSimilarityModel(nn.Module):
 
 
 # labels: None means unseen
-def fine_tune_utterance_similarity(train_texts, train_labels,
-                                   n_train_epochs=None, n_train_steps=None,
-                                   negative_sampling_rate_from_seen=3, negative_sampling_rate_from_unseen=0.0,
-                                   early_stopping_eval_callback: Callable[..., float] = None,
-                                   early_stopping_eval_patience=0):
+def fine_tune_utterance_similarity(
+        train_texts, train_labels,
+        n_train_epochs=None, n_train_steps=None,
+        negative_sampling_rate_from_seen=3, negative_sampling_rate_from_unseen=0.0,
+        eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
+):
     label_set = dict.fromkeys(train_labels)
     label_map = {None: -1}
     label_count = 0
@@ -478,8 +480,9 @@ def fine_tune_utterance_similarity(train_texts, train_labels,
     estimator = UtteranceSimilarityModel(model)
 
     _finetune_model(estimator, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
-                    early_stopping_eval_callback=early_stopping_eval_callback,
-                    early_stopping_eval_patience=early_stopping_eval_patience)
+                    eval_callback=eval_callback,
+                    early_stopping=early_stopping,
+                    early_stopping_patience=early_stopping_patience)
 
 
 class SlotTaggingDataset(torch.utils.data.Dataset):
@@ -596,8 +599,7 @@ def _encode_tags(tags, encodings, tag2id):
 
 
 def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=None, n_train_steps=None,
-                           early_stopping_eval_callback: Callable[..., float] = None,
-                           early_stopping_eval_patience=0):
+                           eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0):
     train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
 
     # Tag set
@@ -614,17 +616,19 @@ def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=None, n_trai
     tagger = SlotTaggingModel(model, len(unique_tags))
 
     _finetune_model(tagger, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
-                    early_stopping_eval_callback=early_stopping_eval_callback,
-                    early_stopping_eval_patience=early_stopping_eval_patience)
+                    eval_callback=eval_callback,
+                    early_stopping=early_stopping,
+                    early_stopping_patience=early_stopping_patience)
 
 
 # train_cluster_labels is None means unseen cluster
-def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slots, train_cluster_labels,
-                                                          n_train_epochs=None, n_train_steps=None,
-                                                          us_negative_sampling_rate_from_seen=3,
-                                                          us_negative_sampling_rate_from_unseen=0.0,
-                                                          early_stopping_eval_callback: Callable[..., float] = None,
-                                                          early_stopping_eval_patience=0):
+@DeprecationWarning
+def fine_tune_joint_slot_tagging_and_utterance_similarity(
+        train_texts, train_slots, train_cluster_labels,
+        n_train_epochs=None, n_train_steps=None,
+        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0,
+        eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
+):
     # Prepare for slot tagging
     train_texts_sr = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
     train_slots = [s for s in train_slots if s is not None]
@@ -657,8 +661,9 @@ def fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slo
 
     _joint_finetune_model(tagger, estimator, sr_train_dataset, us_train_dataset,
                           n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
-                          early_stopping_eval_callback=early_stopping_eval_callback,
-                          early_stopping_eval_patience=early_stopping_eval_patience)
+                          eval_callback=eval_callback,
+                          early_stopping=early_stopping,
+                          early_stopping_patience=early_stopping_patience)
 
 
 class SlotMulticlassClassificationModel(nn.Module):
@@ -667,7 +672,8 @@ class SlotMulticlassClassificationModel(nn.Module):
         self.config = base_model.config
         self.num_labels = num_labels
         self.base_model = base_model
-        self.classifier = ClassificationHead(base_model.config, num_labels)
+        self.classifier = ClassificationHead(base_model.config, num_labels,
+                                             mean_pooling_activation=True, n_dense_layers=1)
         self.loss_fct = BCEWithLogitsLoss()
 
     def forward(
@@ -689,9 +695,10 @@ class SlotMulticlassClassificationModel(nn.Module):
         return (loss,) + output
 
 
-def fine_tune_slot_multiclass_classification(train_texts, train_slots, n_train_epochs=None, n_train_steps=None,
-                                             early_stopping_eval_callback: Callable[..., float] = None,
-                                             early_stopping_eval_patience=0):
+def fine_tune_slot_multiclass_classification(
+        train_texts, train_slots, n_train_epochs=None, n_train_steps=None,
+        eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
+):
     # Tag set
     unique_tags = dict.fromkeys(tag for doc in train_slots for tag in doc.keys())
 
@@ -703,18 +710,17 @@ def fine_tune_slot_multiclass_classification(train_texts, train_slots, n_train_e
     classifier = SlotMulticlassClassificationModel(model, len(unique_tags))
 
     _finetune_model(classifier, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
-                    early_stopping_eval_callback=early_stopping_eval_callback,
-                    early_stopping_eval_patience=early_stopping_eval_patience)
+                    eval_callback=eval_callback,
+                    early_stopping=early_stopping,
+                    early_stopping_patience=early_stopping_patience)
 
 
 # train_cluster_labels is None means unseen cluster
 def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
         train_texts, train_slots, train_cluster_labels,
         n_train_epochs=None, n_train_steps=None,
-        us_negative_sampling_rate_from_seen=3,
-        us_negative_sampling_rate_from_unseen=0.0,
-        early_stopping_eval_callback: Callable[..., float] = None,
-        early_stopping_eval_patience=0
+        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0,
+        eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
 ):
     # Prepare for slot multiclass classification
     train_texts_smc = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
@@ -744,8 +750,9 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
 
     _joint_finetune_model(classifier, estimator, smc_train_dataset, us_train_dataset,
                           n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
-                          early_stopping_eval_callback=early_stopping_eval_callback,
-                          early_stopping_eval_patience=early_stopping_eval_patience)
+                          eval_callback=eval_callback,
+                          early_stopping=early_stopping,
+                          early_stopping_patience=early_stopping_patience)
 
 
 if __name__ == '__main__':
