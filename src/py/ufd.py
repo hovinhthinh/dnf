@@ -310,23 +310,20 @@ class Pipeline(object):
     def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self, n_train_epochs=None,
                                                                                 early_stopping_patience=0):
         if self.use_unseen_in_training:
-            sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
-                [u[0] for u in self.utterances],
-                [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
-                [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
-                n_train_epochs=n_train_epochs,
-                eval_callback=self.get_validation_score,
-                early_stopping=True if n_train_epochs is None else None,
-                early_stopping_patience=early_stopping_patience)
+            utterances, slots, clusters = [u[0] for u in self.utterances], \
+                                          [u[3] if u[2] == 'TRAIN' else None for u in self.utterances], \
+                                          [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         else:
-            sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
-                [u[0] for u in self.utterances if u[2] == 'TRAIN'],
-                [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                [u[1] for u in self.utterances if u[2] == 'TRAIN'],
-                n_train_epochs=n_train_epochs,
-                eval_callback=self.get_validation_score,
-                early_stopping=True if n_train_epochs is None else None,
-                early_stopping_patience=early_stopping_patience)
+            utterances, slots, clusters = [u[0] for u in self.utterances if u[2] == 'TRAIN'], \
+                                          [u[3] for u in self.utterances if u[2] == 'TRAIN'], \
+                                          [u[1] for u in self.utterances if u[2] == 'TRAIN']
+        sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_2(
+            utterances, slots, clusters,
+            us_loss_weight=0.9, smc_loss_weight=0.1,
+            n_train_epochs=n_train_epochs,
+            eval_callback=self.get_validation_score,
+            early_stopping=True if n_train_epochs is None else None,
+            early_stopping_patience=early_stopping_patience)
 
     def get_dev_clustering_quality(self):
         if self.dev_test_clustering_method == 'k-means':

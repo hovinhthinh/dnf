@@ -10,7 +10,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
 from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, set_seed, AdamW
+from transformers import AutoTokenizer, AutoModel, set_seed, AdamW
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
@@ -431,7 +431,7 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
             if idx >= len(c):
                 idx -= len(c)
             else:
-                return random.choice(self.unseen_indices), c[idx]
+                return c[idx], random.choice(self.unseen_indices)
 
     def __getitem__(self, idx):
         item = {}
@@ -774,6 +774,163 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
                           eval_callback=eval_callback,
                           early_stopping=early_stopping,
                           early_stopping_patience=early_stopping_patience)
+
+
+class JointUtteranceSimilarityAndSlotClassificationDataset(torch.utils.data.Dataset):
+    # cluster_labels \in {-1,0,1,2,3,...}, -1 means unseen
+    # slot_labels: tuple[Literal[0.0,1.0]] or None for unseen
+    def __init__(self, encodings, cluster_labels, slot_labels,
+                 us_negative_sampling_rate_from_seen: int = 3,
+                 us_negative_sampling_rate_from_unseen: float = 0.0):
+        self.unseen_indices = []
+        self.n_seen_utterances = 0
+        self.seen_indices = [[] for _ in range(max(cluster_labels) + 1)]
+
+        for i, l in enumerate(cluster_labels):
+            if l != -1:
+                self.seen_indices[l].append(i)
+                self.n_seen_utterances += 1
+            else:
+                self.unseen_indices.append(i)
+
+        self.encodings = encodings
+        self.slot_labels = slot_labels
+
+        self.positive_bound = self.n_seen_utterances
+        self.negative_from_seen_bound = self.positive_bound + self.n_seen_utterances * us_negative_sampling_rate_from_seen
+        self.negative_from_unseen_bound = self.negative_from_seen_bound + int(
+            len(self.unseen_indices) * us_negative_sampling_rate_from_unseen)
+
+    def _get_positive_pair(self, idx):
+        for c in self.seen_indices:
+            if idx >= len(c):
+                idx -= len(c)
+            else:
+                return c[idx], random.choice(c)
+        raise Exception('Invalid idx')
+
+    def _get_negative_pair_from_seen(self, idx):
+        for cpos_idx, cpos in enumerate(self.seen_indices):
+            if idx >= len(cpos):
+                idx -= len(cpos)
+            else:
+                idx2 = random.randrange(self.n_seen_utterances + len(self.unseen_indices) - len(cpos))
+                for cneg_idx, cneg in enumerate(self.seen_indices):
+                    if cneg_idx == cpos_idx:
+                        continue
+                    if idx2 >= len(cneg):
+                        idx2 -= len(cneg)
+                    else:
+                        return cpos[idx], cneg[idx2]
+                return cpos[idx], self.unseen_indices[idx2]
+        raise Exception('Invalid idx')
+
+    def _get_negative_pair_from_unseen(self):
+        idx = random.randrange(self.n_seen_utterances)
+
+        for c in self.seen_indices:
+            if idx >= len(c):
+                idx -= len(c)
+            else:
+                return c[idx], random.choice(self.unseen_indices)
+
+    def __getitem__(self, idx):
+        item = {}
+        if idx < self.positive_bound:
+            idx, idx2 = self._get_positive_pair(idx)
+            item['us_labels'] = torch.tensor(1.0)
+        elif idx < self.negative_from_seen_bound:
+            idx, idx2 = self._get_negative_pair_from_seen(idx % self.n_seen_utterances)
+            item['us_labels'] = torch.tensor(-1.0)
+        else:
+            idx, idx2 = self._get_negative_pair_from_unseen()
+            item['us_labels'] = torch.tensor(-1.0)
+
+        for key, val in self.encodings.items():
+            item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
+
+        item['smc_labels'] = torch.tensor(self.slot_labels[idx])
+
+        return item
+
+    def __len__(self):
+        return self.negative_from_unseen_bound
+
+
+class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
+    def __init__(self, base_model, smc_num_labels, us_loss_weight=0.5, smc_loss_weight=0.5):
+        super().__init__()
+        self.base_model = base_model
+        self.us_loss_weight = us_loss_weight
+        self.smc_loss_weight = smc_loss_weight
+
+        self.us_loss_fct = MSELoss()
+
+        self.smc_classifier = ClassificationHead(base_model.config, smc_num_labels,
+                                                 mean_pooling_activation=True, n_dense_layers=1)
+        self.smc_loss_fct = BCEWithLogitsLoss()
+
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            us_labels=None,
+            smc_labels=None,
+    ):
+        input_ids_0, attention_mask_0 = input_ids[:, 0, :], attention_mask[:, 0, :]
+        input_ids_1, attention_mask_1 = input_ids[:, 1, :], attention_mask[:, 1, :]
+        first_outputs = _mean_pooling(self.base_model(input_ids_0, attention_mask=attention_mask_0),
+                                      attention_mask_0)
+        second_outputs = _mean_pooling(self.base_model(input_ids_1, attention_mask=attention_mask_1),
+                                       attention_mask_1)
+        us_loss = self.us_loss_fct(cosine_similarity(first_outputs, second_outputs), us_labels)
+
+        smc_logits = self.smc_classifier(first_outputs)
+        smc_loss = self.smc_loss_fct(smc_logits, smc_labels)
+
+        total_loss = torch.add(torch.mul(us_loss, self.us_loss_weight), torch.mul(smc_loss, self.smc_loss_weight))
+        return (total_loss,)
+
+
+# train_cluster_labels is None means unseen cluster
+def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_2(
+        train_texts, train_slots, train_cluster_labels,
+        us_loss_weight=0.5, smc_loss_weight=0.5,
+        n_train_epochs=None, n_train_steps=None,
+        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0,
+        eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
+):
+    # Prepare for slot multiclass classification
+    unique_tags = dict.fromkeys(tag for doc in [s for s in train_slots if s is not None] for tag in doc.keys())
+
+    train_slot_labels = [None if u_slots is None else [1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in
+                         train_slots]
+
+    # Prepare for utterance similarity
+    label_set = dict.fromkeys(train_cluster_labels)
+    label_map = {None: -1}
+    label_count = 0
+    for l in label_set:
+        if l is not None:
+            label_map[l] = label_count
+            label_count += 1
+
+    train_cluster_labels = [label_map[l] for l in train_cluster_labels]
+    train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
+
+    train_dataset = JointUtteranceSimilarityAndSlotClassificationDataset(
+        train_encodings, train_cluster_labels, train_slot_labels,
+        us_negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
+        us_negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen
+    )
+
+    estimator = JointUtteranceSimilarityAndSlotClassificationModel(
+        model, len(unique_tags), us_loss_weight=us_loss_weight, smc_loss_weight=smc_loss_weight)
+
+    _finetune_model(estimator, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
+                    eval_callback=eval_callback,
+                    early_stopping=early_stopping,
+                    early_stopping_patience=early_stopping_patience)
 
 
 if __name__ == '__main__':
