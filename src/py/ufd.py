@@ -253,8 +253,7 @@ class Pipeline(object):
         else:
             for it in range(iterations):
                 print('Iter: {}'.format(it + 1))
-                if it > 0:
-                    self.update_embeddings()
+                # self.update_embeddings() # No need to update
                 pseudo_clusters, weights = self.get_pseudo_clusters()
 
                 if not self.use_unseen_in_training:
