@@ -38,6 +38,10 @@ def _mean_pooling(model_output, attention_mask):
     return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
 
+def _cls(model_output):
+    return model_output[0][:, 0, :]
+
+
 def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
     batches = []
     cur = 0
@@ -302,13 +306,14 @@ class ClassificationHead(nn.Module):
         if self.out_proj.bias is not None:
             self.out_proj.bias.data.zero_()
 
-    def forward(self, mean_pooling, **kwargs):
-        x = mean_pooling
-        for d in self.dense:
-            x = self.dropout(torch.tanh(x))
-            x = d(x)
-        if self.mean_pooling_activation or len(self.dense) > 0:
+    def forward(self, cls=None, mean=None, **kwargs):
+        x = cls if cls is not None else mean
+
+        if cls is None and self.mean_pooling_activation:
             x = torch.tanh(x)
+
+        for d in self.dense:
+            x = torch.tanh(d(self.dropout(x)))
 
         return self.out_proj(self.dropout(x))
 
@@ -333,7 +338,7 @@ class PseudoClassificationModel(nn.Module):
             input_ids,
             attention_mask=attention_mask,
         )
-        logits = self.classifier(_mean_pooling(outputs, attention_mask))
+        logits = self.classifier(mean=_mean_pooling(outputs, attention_mask))
 
         per_sample_loss = self.loss_fct(logits, labels)
         if sample_weights is not None:
@@ -693,8 +698,7 @@ class SlotMulticlassClassificationModel(nn.Module):
         self.config = base_model.config
         self.num_labels = num_labels
         self.base_model = base_model
-        self.classifier = ClassificationHead(base_model.config, num_labels,
-                                             mean_pooling_activation=True, n_dense_layers=1)
+        self.classifier = ClassificationHead(base_model.config, num_labels)
         self.loss_fct = BCEWithLogitsLoss()
 
     def forward(
@@ -707,7 +711,7 @@ class SlotMulticlassClassificationModel(nn.Module):
             input_ids,
             attention_mask=attention_mask,
         )
-        logits = self.classifier(_mean_pooling(outputs, attention_mask))
+        logits = self.classifier(cls=_cls(outputs))
 
         loss = self.loss_fct(logits, labels)
 
@@ -866,8 +870,7 @@ class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
 
         self.us_loss_fct = MSELoss()
 
-        self.smc_classifier = ClassificationHead(base_model.config, smc_num_labels,
-                                                 mean_pooling_activation=True, n_dense_layers=1)
+        self.smc_classifier = ClassificationHead(base_model.config, smc_num_labels)
         self.smc_loss_fct = BCEWithLogitsLoss()
 
     def forward(
@@ -879,13 +882,15 @@ class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
     ):
         input_ids_0, attention_mask_0 = input_ids[:, 0, :], attention_mask[:, 0, :]
         input_ids_1, attention_mask_1 = input_ids[:, 1, :], attention_mask[:, 1, :]
-        first_outputs = _mean_pooling(self.base_model(input_ids_0, attention_mask=attention_mask_0),
-                                      attention_mask_0)
-        second_outputs = _mean_pooling(self.base_model(input_ids_1, attention_mask=attention_mask_1),
-                                       attention_mask_1)
-        us_loss = self.us_loss_fct(cosine_similarity(first_outputs, second_outputs), us_labels)
 
-        smc_logits = self.smc_classifier(first_outputs)
+        output_0 = self.base_model(input_ids_0, attention_mask=attention_mask_0)
+        mean_0 = _mean_pooling(output_0, attention_mask_0)
+        mean_1 = _mean_pooling(self.base_model(input_ids_1, attention_mask=attention_mask_1), attention_mask_1)
+
+        us_loss = self.us_loss_fct(cosine_similarity(mean_0, mean_1), us_labels)
+
+        smc_logits = self.smc_classifier(cls=_cls(output_0))
+
         smc_loss = self.smc_loss_fct(smc_logits, smc_labels)
 
         total_loss = torch.add(torch.mul(us_loss, self.us_loss_weight), torch.mul(smc_loss, self.smc_loss_weight))
