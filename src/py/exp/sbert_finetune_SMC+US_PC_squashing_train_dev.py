@@ -13,6 +13,5 @@ pipeline_steps = [
 run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data, report_folder=report_folder,
                 config={
                     'squashing_train_dev': True,
-                    'SMC+US_n_train_epochs': 3,
                     'PC_iterations': 3
                 })

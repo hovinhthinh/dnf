@@ -889,7 +889,8 @@ class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
 
         us_loss = self.us_loss_fct(cosine_similarity(mean_0, mean_1), us_labels)
 
-        smc_logits = self.smc_classifier(cls=_cls(output_0))
+        # smc_logits = self.smc_classifier(cls=_cls(output_0))
+        smc_logits = self.smc_classifier(mean=mean_0)
 
         smc_loss = self.smc_loss_fct(smc_logits, smc_labels)
 

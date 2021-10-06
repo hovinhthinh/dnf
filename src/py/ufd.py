@@ -323,7 +323,7 @@ class Pipeline(object):
                                           [u[1] for u in self.utterances if u[2] == 'TRAIN']
         sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_2(
             utterances, slots, clusters,
-            us_loss_weight=0.9, smc_loss_weight=0.1,
+            us_loss_weight=0.5, smc_loss_weight=0.5,
             n_train_epochs=n_train_epochs,
             eval_callback=self.get_validation_score,
             early_stopping=True if n_train_epochs is None else None,
