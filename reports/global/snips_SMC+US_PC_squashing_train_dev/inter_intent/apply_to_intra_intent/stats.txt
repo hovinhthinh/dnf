@@ -1,0 +1,8 @@
+======== Apply inter-intent model back to intra-intent ========
+Clustering TEST quality [GetWeather]: {'all': {'NMI': 0.721, 'ARI': 0.684, 'ACC': 0.894}, 'train_dev': {'NMI': 0.949, 'ARI': 0.976, 'ACC': 0.99}, 'test': {'NMI': 0.0, 'ARI': 0.0, 'ACC': 0.845}}
+Clustering TEST quality [AddToPlaylist]: {'all': {'NMI': 0.796, 'ARI': 0.726, 'ACC': 0.879}, 'train_dev': {'NMI': 0.754, 'ARI': 0.68, 'ACC': 0.865}, 'test': {'NMI': 0.0, 'ARI': 0.0, 'ACC': 0.932}}
+Clustering TEST quality [RateBook]: {'all': {'NMI': 1.0, 'ARI': 1.0, 'ACC': 1.0}, 'train_dev': {'NMI': 1.0, 'ARI': 1.0, 'ACC': 1.0}, 'test': {'NMI': 1.0, 'ARI': 1.0, 'ACC': nan}}
+Clustering TEST quality [BookRestaurant]: {'all': {'NMI': 1.0, 'ARI': 1.0, 'ACC': 1.0}, 'train_dev': {'NMI': 1.0, 'ARI': 1.0, 'ACC': nan}, 'test': {'NMI': 1.0, 'ARI': 1.0, 'ACC': 1.0}}
+Clustering TEST quality [PlayMusic]: {'all': {'NMI': 0.817, 'ARI': 0.8, 'ACC': 0.8}, 'train_dev': {'NMI': 0.828, 'ARI': 0.817, 'ACC': 0.834}, 'test': {'NMI': 0.742, 'ARI': 0.786, 'ACC': 0.775}}
+Clustering TEST quality [SearchCreativeWork]: {'all': {'NMI': 0.795, 'ARI': 0.662, 'ACC': 0.839}, 'train_dev': {'NMI': 0.954, 'ARI': 0.952, 'ACC': 0.983}, 'test': {'NMI': 0.309, 'ARI': 0.228, 'ACC': 0.533}}
+Clustering TEST quality [SearchScreeningEvent]: {'all': {'NMI': 0.754, 'ARI': 0.584, 'ACC': 0.695}, 'train_dev': {'NMI': 0.899, 'ARI': 0.88, 'ACC': 0.928}, 'test': {'NMI': 0.551, 'ARI': 0.508, 'ACC': 0.688}}

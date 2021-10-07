@@ -1,0 +1,3 @@
+No-fine-tune test quality: {'all': {'NMI': 0.532, 'ARI': 0.458, 'ACC': 0.6}, 'train_dev': {'NMI': 0.427, 'ARI': 0.334, 'ACC': 0.551}, 'test': {'NMI': 0.617, 'ARI': 0.624, 'ACC': 0.724}}
+Finetune-SMC+US TEST quality: {'all': {'NMI': 0.773, 'ARI': 0.596, 'ACC': 0.744}, 'train_dev': {'NMI': 0.905, 'ARI': 0.897, 'ACC': 0.935}, 'test': {'NMI': 0.31, 'ARI': 0.196, 'ACC': 0.52}}
+Finetune-PC TEST quality: {'all': {'NMI': 0.806, 'ARI': 0.546, 'ACC': 0.724}, 'train_dev': {'NMI': 0.97, 'ARI': 0.967, 'ACC': 0.99}, 'test': {'NMI': 0.23, 'ARI': 0.011, 'ACC': 0.529}}

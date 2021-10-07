@@ -1,0 +1,16 @@
+Feature/Cluster	C_0 (9.0%)	C_1 (16.3%)	C_2 (13.6%)	C_3 (3.0%)	C_4 (5.3%)	C_5 (3.6%)	C_6 (4.9%)	C_7 (21.6%)	C_8 (3.4%)	C_9 (1.3%)	C_10 (3.9%)	C_11 (0.5%)	C_12 (10.2%)	C_13 (3.5%)	Purity
+PlayAlbum_TRAIN (3.8%)	0	0	7	1	23	0	0	0	0	1	1	0	0	0	69.7%
+PlayMusicByArtistOnService_TRAIN (7.9%)	0	3	0	0	0	0	0	0	0	0	0	0	65	0	95.6%
+PlayMusicByArtistAndYearOnService_TRAIN (3.4%)	0	0	0	0	0	29	0	0	0	0	0	0	0	0	100.0%
+PlayMusicByArtist_TRAIN (12.5%)	0	0	104	0	0	0	0	1	0	2	1	0	0	0	96.3%
+PlayMusicByGenre_TRAIN (3.0%)	0	0	1	2	0	0	0	0	0	0	23	0	0	0	88.5%
+PlayMusicByYear_TRAIN (8.3%)	72	0	0	0	0	0	0	0	0	0	0	0	0	0	100.0%
+PlayMusicByYearOnService_DEV (3.5%)	0	0	0	0	0	1	0	0	29	0	0	0	0	0	96.7%
+PlayTrack_DEV (4.8%)	0	0	3	2	23	0	0	0	0	8	0	4	0	1	56.1%
+PlayPlaylist_DEV (3.5%)	0	0	1	21	0	0	0	0	0	0	8	0	0	0	70.0%
+PlayTrackOnService_DEV (2.4%)	0	0	0	0	0	0	7	0	0	0	0	0	6	8	38.1%
+PlayMusicByArtistAndYear_TEST (22.2%)	6	0	1	0	0	0	0	185	0	0	0	0	0	0	96.4%
+PlayMusicByGenreOnService_TEST (6.3%)	0	44	0	0	0	0	4	0	0	0	0	0	6	0	81.5%
+PlayOnService_TEST (11.0%)	0	93	0	0	0	0	1	0	0	0	1	0	0	0	97.9%
+PlayAlbumOnService_TEST (7.4%)	0	1	0	0	0	1	30	0	0	0	0	0	11	21	46.9%
+Purity	92.3%	66.0%	88.9%	80.8%	50.0%	93.5%	71.4%	99.5%	100.0%	72.7%	67.6%	100.0%	73.9%	70.0%	
