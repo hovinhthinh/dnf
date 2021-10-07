@@ -128,7 +128,9 @@ class Pipeline(object):
         if squashing_train_dev:
             if not self.use_dev:
                 raise Exception('squashing_train_dev is only possible when use_dev is True')
-            self.utterances = [(u, c, 'TRAIN', s) for (u, c, _, s) in self.utterances]
+            self.utterances = [list(u) for u in self.utterances]
+            for u in self.utterances:
+                u[2] = 'TRAIN'
 
         # pseudo-scatter for getting colors.
         ax = plt.figure().add_subplot()
@@ -331,6 +333,26 @@ class Pipeline(object):
             early_stopping=True if n_train_epochs is None else False,
             early_stopping_patience=early_stopping_patience)
 
+    def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_intent_classification(
+            self, n_train_epochs=None, early_stopping_patience=0):
+        if self.use_unseen_in_training:
+            utterances, slots, clusters, intents = [u[0] for u in self.utterances], \
+                                                   [u[3] if u[2] == 'TRAIN' else None for u in self.utterances], \
+                                                   [u[1] if u[2] == 'TRAIN' else None for u in self.utterances], \
+                                                   [u[4] if u[2] == 'TRAIN' else None for u in self.utterances]
+        else:
+            utterances, slots, clusters, intents = [u[0] for u in self.utterances if u[2] == 'TRAIN'], \
+                                                   [u[3] for u in self.utterances if u[2] == 'TRAIN'], \
+                                                   [u[1] for u in self.utterances if u[2] == 'TRAIN'], \
+                                                   [u[4] for u in self.utterances if u[2] == 'TRAIN']
+        sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_intent_classification(
+            utterances, slots, clusters, intents,
+            us_loss_weight=0.4, smc_loss_weight=0.4, ic_loss_weight=0.2,
+            n_train_epochs=n_train_epochs,
+            eval_callback=self.get_validation_score,
+            early_stopping=True if n_train_epochs is None else False,
+            early_stopping_patience=early_stopping_patience)
+
     def get_dev_clustering_quality(self):
         if self.dev_test_clustering_method == 'k-means':
             clusterer = KMeans(n_clusters=len(self.cluster_label_2_index_map))
@@ -454,13 +476,14 @@ class Pipeline(object):
                 'SMC_n_train_epochs': None,
                 'US_n_train_epochs': None,
                 'SMC+US_n_train_epochs': None,
+                'IC+SMC+US_n_train_epochs': None,
                 'PC_sample_weights': True,
                 'PC_iterations': None,
                 'PC_max_iterations': 10,
             }):
         set_seed(12993)
         for s in steps:
-            if s not in ['ST+US', 'SMC+US', 'ST', 'SMC', 'US', 'PC']:
+            if s not in ['ST+US', 'SMC+US', 'IC+SMC+US', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
 
         sbert.load()
@@ -509,6 +532,10 @@ class Pipeline(object):
             # Fine-tuning
             if step == 'ST+US':
                 self.fine_tune_joint_slot_tagging_and_utterance_similarity()
+            elif step == 'IC+SMC+US':
+                self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_intent_classification(
+                    early_stopping_patience=3,
+                    n_train_epochs=config.get('IC+SMC+US_n_train_epochs', None))
             elif step == 'SMC+US':
                 self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
                     early_stopping_patience=3,
