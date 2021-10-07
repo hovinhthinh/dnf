@@ -277,13 +277,13 @@ class Pipeline(object):
                                                  [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
                                                  n_train_epochs=n_train_epochs,
                                                  eval_callback=self.get_validation_score,
-                                                 early_stopping=True if n_train_epochs is None else None)
+                                                 early_stopping=True if n_train_epochs is None else False)
         else:
             sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                                  [u[1] for u in self.utterances if u[2] == 'TRAIN'],
                                                  n_train_epochs=n_train_epochs,
                                                  eval_callback=self.get_validation_score,
-                                                 early_stopping=True if n_train_epochs is None else None)
+                                                 early_stopping=True if n_train_epochs is None else False)
 
     @DeprecationWarning
     def fine_tune_slot_tagging(self):
@@ -291,10 +291,12 @@ class Pipeline(object):
                                      [u[3] for u in self.utterances if u[2] == 'TRAIN'],
                                      eval_callback=self.get_validation_score, early_stopping=True)
 
-    def fine_tune_slot_multiclass_classification(self):
+    def fine_tune_slot_multiclass_classification(self, n_train_epochs=None):
         sbert.fine_tune_slot_multiclass_classification([u[0] for u in self.utterances if u[2] == 'TRAIN'],
                                                        [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                                                       eval_callback=self.get_validation_score, early_stopping=True)
+                                                       n_train_epochs=n_train_epochs,
+                                                       eval_callback=self.get_validation_score,
+                                                       early_stopping=True if n_train_epochs is None else False)
 
     @DeprecationWarning
     def fine_tune_joint_slot_tagging_and_utterance_similarity(self):
@@ -326,7 +328,7 @@ class Pipeline(object):
             us_loss_weight=0.5, smc_loss_weight=0.5,
             n_train_epochs=n_train_epochs,
             eval_callback=self.get_validation_score,
-            early_stopping=True if n_train_epochs is None else None,
+            early_stopping=True if n_train_epochs is None else False,
             early_stopping_patience=early_stopping_patience)
 
     def get_dev_clustering_quality(self):
@@ -449,8 +451,9 @@ class Pipeline(object):
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
-                'SMC+US_n_train_epochs': None,
+                'SMC_n_train_epochs': None,
                 'US_n_train_epochs': None,
+                'SMC+US_n_train_epochs': None,
                 'PC_sample_weights': True,
                 'PC_iterations': None,
                 'PC_max_iterations': 10,
@@ -513,7 +516,7 @@ class Pipeline(object):
             elif step == 'ST':
                 self.fine_tune_slot_tagging()
             elif step == 'SMC':
-                self.fine_tune_slot_multiclass_classification()
+                self.fine_tune_slot_multiclass_classification(n_train_epochs=config.get('SMC_n_train_epochs', None))
             elif step == 'US':
                 self.fine_tune_utterance_similarity(n_train_epochs=config.get('US_n_train_epochs', None))
             elif step == 'PC':
