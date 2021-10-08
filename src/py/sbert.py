@@ -782,7 +782,8 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
 
 class JointUtteranceSimilarityAndSlotClassificationDataset(torch.utils.data.Dataset):
     # cluster_labels \in {-1,0,1,2,3,...}, -1 means unseen
-    # slot_labels: tuple[Literal[0.0,1.0]] or None for unseen
+    # slot_labels: tuple[Literal[0.0,1.0]] or None for unseen TODO: remove this line
+    # slot_labels: tuple[Literal[0.0,1.0]]
     def __init__(self, encodings, cluster_labels, slot_labels,
                  us_negative_sampling_rate_from_seen: int = 3,
                  us_negative_sampling_rate_from_unseen: float = 0.0):
@@ -854,6 +855,7 @@ class JointUtteranceSimilarityAndSlotClassificationDataset(torch.utils.data.Data
             item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
 
         item['smc_labels'] = torch.tensor(self.slot_labels[idx])
+        item['smc_labels_2'] = torch.tensor(self.slot_labels[idx2])
 
         return item
 
@@ -862,7 +864,8 @@ class JointUtteranceSimilarityAndSlotClassificationDataset(torch.utils.data.Data
 
 
 class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
-    def __init__(self, base_model, smc_num_labels, us_loss_weight=0.5, smc_loss_weight=0.5):
+    def __init__(self, base_model, smc_num_labels, us_loss_weight=0.5, smc_loss_weight=0.5,
+                 us_negative_to_positive_rate=3):
         super().__init__()
         self.base_model = base_model
         self.us_loss_weight = us_loss_weight
@@ -873,12 +876,15 @@ class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
         self.smc_classifier = ClassificationHead(base_model.config, smc_num_labels)
         self.smc_loss_fct = BCEWithLogitsLoss()
 
+        self.us_negative_to_positive_rate = us_negative_to_positive_rate
+
     def forward(
             self,
             input_ids=None,
             attention_mask=None,
             us_labels=None,
             smc_labels=None,
+            smc_labels_2=None,
     ):
         input_ids_0, attention_mask_0 = input_ids[:, 0, :], attention_mask[:, 0, :]
         input_ids_1, attention_mask_1 = input_ids[:, 1, :], attention_mask[:, 1, :]
@@ -891,8 +897,13 @@ class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
 
         # smc_logits = self.smc_classifier(cls=_cls(output_0))
         smc_logits = self.smc_classifier(mean=mean_0)
+        smc_logits_2 = self.smc_classifier(mean=mean_1)
 
-        smc_loss = self.smc_loss_fct(smc_logits, smc_labels)
+        smc_loss = torch.add(
+            torch.mul(self.smc_loss_fct(smc_logits, smc_labels),
+                      1 / (2 + self.us_negative_to_positive_rate)),
+            torch.mul(self.smc_loss_fct(smc_logits_2, smc_labels_2),
+                      (1 + self.us_negative_to_positive_rate) / (2 + self.us_negative_to_positive_rate)))
 
         total_loss = torch.add(torch.mul(us_loss, self.us_loss_weight), torch.mul(smc_loss, self.smc_loss_weight))
         return (total_loss,)
@@ -909,8 +920,10 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_2(
     # Prepare for slot multiclass classification
     unique_tags = dict.fromkeys(tag for doc in [s for s in train_slots if s is not None] for tag in doc.keys())
 
-    train_slot_labels = [None if u_slots is None else [1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in
-                         train_slots]
+    # train_slot_labels = [None if u_slots is None else [1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in
+    #                      train_slots]
+
+    train_slot_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in train_slots]
 
     # Prepare for utterance similarity
     label_set = dict.fromkeys(train_cluster_labels)

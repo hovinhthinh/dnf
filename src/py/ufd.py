@@ -319,7 +319,7 @@ class Pipeline(object):
                                                                                 early_stopping_patience=0):
         if self.use_unseen_in_training:
             utterances, slots, clusters = [u[0] for u in self.utterances], \
-                                          [u[3] if u[2] == 'TRAIN' else None for u in self.utterances], \
+                                          [u[3] for u in self.utterances], \
                                           [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
         else:
             utterances, slots, clusters = [u[0] for u in self.utterances if u[2] == 'TRAIN'], \
