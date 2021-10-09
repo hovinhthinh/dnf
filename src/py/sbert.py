@@ -350,20 +350,24 @@ class PseudoClassificationModel(nn.Module):
         return (loss,) + output
 
 
-def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=None):
+def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weights=None,
+                                    previous_classifier=None, previous_optim=None):
     label_set = dict.fromkeys(train_labels)
     label_map = {l: i for i, l in enumerate(label_set)}
     train_labels = [label_map[l] for l in train_labels]
     train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
     train_dataset = ClassificationDataset(train_encodings, train_labels, train_sample_weights)
-    classifier = PseudoClassificationModel(model, len(label_set))
+
+    if previous_classifier is None:
+        classifier = PseudoClassificationModel(model, len(label_set))
+        classifier.to(device)
+    else:
+        classifier = previous_classifier
 
     # print(classifier(**train_encodings))
 
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-    optim = AdamW(classifier.parameters(), lr=5e-5, weight_decay=0.01)
-
-    classifier.to(device)
+    optim = AdamW(classifier.parameters(), lr=5e-5, weight_decay=0.01) if previous_optim is None else previous_optim
 
     classifier.train()  # Switch mode
     cur = 0
@@ -379,6 +383,8 @@ def fine_tune_pseudo_classification(train_texts, train_labels, train_sample_weig
         loss.backward()
         optim.step()
     classifier.eval()
+
+    return classifier, optim
 
 
 class UtteranceSimilarityDataset(torch.utils.data.Dataset):

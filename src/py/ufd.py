@@ -1,6 +1,7 @@
 import tempfile
 
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.optimize import linear_sum_assignment
 from transformers import set_seed
 
 Axes3D = Axes3D
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy
 import umap
 from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics import pairwise_distances, euclidean_distances
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
@@ -184,6 +185,34 @@ class Pipeline(object):
                 assignment_conf.append(scaled_dist[clusters[i]] / sum(scaled_dist))
         return clusters, assignment_conf
 
+    # pseudo_cluster_0: previous clusters, pseudo_cluster_1: current clusters
+    def get_aligned_pseudo_clusters(self, embeddings, pseudo_clusters_0, pseudo_clusters_1):
+        assert max(pseudo_clusters_0) == max(pseudo_clusters_1)
+        assert len(embeddings) == len(pseudo_clusters_0) == len(pseudo_clusters_1)
+
+        k = max(pseudo_clusters_0) + 1
+        centers_0 = numpy.zeros((k, len(embeddings[0])))
+        counts_0 = numpy.zeros(k)
+        centers_1 = numpy.zeros((k, len(embeddings[0])))
+        counts_1 = numpy.zeros(k)
+        for i in range(0, len(pseudo_clusters_0)):
+            counts_0[pseudo_clusters_0[i]] += 1
+            centers_0[pseudo_clusters_0[i]] += embeddings[i]
+            counts_1[pseudo_clusters_1[i]] += 1
+            centers_1[pseudo_clusters_1[i]] += embeddings[i]
+
+        for i in range(k):
+            centers_0[i] /= counts_0[i]
+            centers_1[i] /= counts_1[i]
+
+        distance_matrix = euclidean_distances(centers_0, centers_1)
+
+        _, forward_mapping = linear_sum_assignment(distance_matrix)
+        backward_mapping = numpy.zeros((k,), dtype=int)
+        for i in range(k):
+            backward_mapping[forward_mapping[i]] = i
+        return [backward_mapping[i] for i in pseudo_clusters_1]
+
     def plot(self, show_train_dev_only=False, show_test_only=False, show_labels=True, show_sample_type=True,
              plot_3d=False, output_file_path=None):
         if show_train_dev_only:
@@ -214,8 +243,9 @@ class Pipeline(object):
         self.update_embeddings()
         return self.get_dev_clustering_quality()['NMI']
 
-    def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None,
+    def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None, align_clusters=True,
                                         early_stopping_patience=0, min_iterations=None, max_iterations=None):
+        classifier, optim, previous_clusters = None, None, None
         if iterations is None:
             with tempfile.TemporaryDirectory() as temp_dir:
                 best_iter = None
@@ -226,18 +256,28 @@ class Pipeline(object):
                     print('==== Iteration: {}'.format(it))
                     # self.update_embeddings() # No need to update, already called in self.get_validation_score()
                     utterances = self.utterances
+                    embeddings = self.embeddings
                     pseudo_clusters, weights = self.get_pseudo_clusters()
 
                     if not self.use_unseen_in_training:
                         utterances = [u for u in utterances if u[2] == 'TRAIN']
+                        embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                         pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                    if align_clusters and previous_clusters is not None:
+                        pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters,
+                                                                           pseudo_clusters)
+                    previous_clusters = pseudo_clusters
 
                     print('Pseudo-cluster quality:',
                           get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                                  pseudo_clusters))
-                    sbert.fine_tune_pseudo_classification([u[0] for u in utterances], pseudo_clusters,
-                                                          train_sample_weights=weights if use_sample_weights else None)
+                    classifier, optim = sbert.fine_tune_pseudo_classification([u[0] for u in utterances],
+                                                                              pseudo_clusters,
+                                                                              train_sample_weights=weights if use_sample_weights else None,
+                                                                              previous_classifier=classifier if align_clusters else None,
+                                                                              previous_optim=optim if align_clusters else None)
                     eval = self.get_validation_score()
                     print('Validation score: {:.3f}'.format(eval), end='')
                     if best_eval is None or eval > best_eval:
@@ -259,18 +299,26 @@ class Pipeline(object):
                 print('Iter: {}'.format(it + 1))
                 # self.update_embeddings() # No need to update
                 utterances = self.utterances
+                embeddings = self.embeddings
                 pseudo_clusters, weights = self.get_pseudo_clusters()
 
                 if not self.use_unseen_in_training:
                     utterances = [u for u in utterances if u[2] == 'TRAIN']
+                    embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                     pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                if align_clusters and previous_clusters is not None:
+                    pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
+                previous_clusters = pseudo_clusters
 
                 print('Pseudo-cluster quality:',
                       get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                              pseudo_clusters))
-                sbert.fine_tune_pseudo_classification([u[0] for u in utterances], pseudo_clusters,
-                                                      train_sample_weights=weights if use_sample_weights else None)
+                classifier, optim = sbert.fine_tune_pseudo_classification([u[0] for u in utterances], pseudo_clusters,
+                                                                          train_sample_weights=weights if use_sample_weights else None,
+                                                                          previous_classifier=classifier if align_clusters else None,
+                                                                          previous_optim=optim if align_clusters else None)
                 print('Validation score: {:.3f}'.format(self.get_validation_score()))
 
     def fine_tune_utterance_similarity(self, n_train_epochs=None):
