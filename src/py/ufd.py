@@ -36,6 +36,7 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
         if l not in u_labels:
             continue
         idx = [i for i, _ in enumerate(labels) if _ == l]
+        l = l.replace('_TRAIN', '_TRAIN_L').replace('_DEV', '_TRAIN_U') # rename cluster names
         if plot_3d:
             if sample_type is None:
                 ax.scatter([embeddings[i][0] for i in idx],
