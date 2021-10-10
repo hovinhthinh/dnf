@@ -36,7 +36,7 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
         if l not in u_labels:
             continue
         idx = [i for i, _ in enumerate(labels) if _ == l]
-        l = l.replace('_TRAIN', '_TRAIN_L').replace('_DEV', '_TRAIN_U') # rename cluster names
+        l = l.replace('_TRAIN', '_TRAIN_L').replace('_DEV', '_TRAIN_U')  # rename cluster names
         if plot_3d:
             if sample_type is None:
                 ax.scatter([embeddings[i][0] for i in idx],
@@ -244,6 +244,12 @@ class Pipeline(object):
         self.update_embeddings()
         return self.get_dev_clustering_quality()['NMI']
 
+    # map to 0,1,2...
+    def remap_clusters(self, clusters):
+        label_set = dict.fromkeys(clusters)
+        label_map = {l: i for i, l in enumerate(label_set)}
+        return [label_map[l] for l in clusters]
+
     def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None, align_clusters=True,
                                         early_stopping_patience=0, min_iterations=None, max_iterations=None):
         classifier, optim, previous_clusters = None, None, None
@@ -265,6 +271,8 @@ class Pipeline(object):
                         embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                         pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                    pseudo_clusters = self.remap_clusters(pseudo_clusters)
 
                     if align_clusters and previous_clusters is not None:
                         pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters,
@@ -308,6 +316,8 @@ class Pipeline(object):
                     embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                     pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                pseudo_clusters = self.remap_clusters(pseudo_clusters)
 
                 if align_clusters and previous_clusters is not None:
                     pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
