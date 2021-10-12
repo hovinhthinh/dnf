@@ -348,31 +348,16 @@ class Pipeline(object):
 
     @DeprecationWarning
     def fine_tune_slot_tagging(self):
-        sbert.fine_tune_slot_tagging([u[0] for u in self.utterances if u[2] == 'TRAIN'],
-                                     [u[3] for u in self.utterances if u[2] == 'TRAIN'],
+        sbert.fine_tune_slot_tagging([u[0] for u in self.utterances],
+                                     [u[3] for u in self.utterances],
                                      eval_callback=self.get_validation_score, early_stopping=True)
 
     def fine_tune_slot_multiclass_classification(self, n_train_epochs=None):
-        sbert.fine_tune_slot_multiclass_classification([u[0] for u in self.utterances if u[2] == 'TRAIN'],
-                                                       [u[3] for u in self.utterances if u[2] == 'TRAIN'],
+        sbert.fine_tune_slot_multiclass_classification([u[0] for u in self.utterances],
+                                                       [u[3] for u in self.utterances],
                                                        n_train_epochs=n_train_epochs,
                                                        eval_callback=self.get_validation_score,
                                                        early_stopping=True if n_train_epochs is None else False)
-
-    @DeprecationWarning
-    def fine_tune_joint_slot_tagging_and_utterance_similarity(self):
-        if self.use_unseen_in_training:
-            sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
-                [u[0] for u in self.utterances],
-                [u[3] if u[2] == 'TRAIN' else None for u in self.utterances],
-                [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
-                eval_callback=self.get_validation_score, early_stopping=True)
-        else:
-            sbert.fine_tune_joint_slot_tagging_and_utterance_similarity(
-                [u[0] for u in self.utterances if u[2] == 'TRAIN'],
-                [u[3] for u in self.utterances if u[2] == 'TRAIN'],
-                [u[1] for u in self.utterances if u[2] == 'TRAIN'],
-                eval_callback=self.get_validation_score, early_stopping=True)
 
     def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self, n_train_epochs=None,
                                                                                 early_stopping_patience=0):
@@ -384,7 +369,7 @@ class Pipeline(object):
             utterances, slots, clusters = [u[0] for u in self.utterances if u[2] == 'TRAIN'], \
                                           [u[3] for u in self.utterances if u[2] == 'TRAIN'], \
                                           [u[1] for u in self.utterances if u[2] == 'TRAIN']
-        sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_2(
+        sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
             utterances, slots, clusters,
             us_loss_weight=0.5, smc_loss_weight=0.5,
             n_train_epochs=n_train_epochs,
@@ -396,9 +381,9 @@ class Pipeline(object):
             self, n_train_epochs=None, early_stopping_patience=0):
         if self.use_unseen_in_training:
             utterances, slots, clusters, intents = [u[0] for u in self.utterances], \
-                                                   [u[3] if u[2] == 'TRAIN' else None for u in self.utterances], \
+                                                   [u[3] for u in self.utterances], \
                                                    [u[1] if u[2] == 'TRAIN' else None for u in self.utterances], \
-                                                   [u[4] if u[2] == 'TRAIN' else None for u in self.utterances]
+                                                   [u[4] for u in self.utterances]
         else:
             utterances, slots, clusters, intents = [u[0] for u in self.utterances if u[2] == 'TRAIN'], \
                                                    [u[3] for u in self.utterances if u[2] == 'TRAIN'], \
@@ -542,7 +527,7 @@ class Pipeline(object):
             }):
         set_seed(12993)
         for s in steps:
-            if s not in ['ST+US', 'SMC+US', 'IC+SMC+US', 'ST', 'SMC', 'US', 'PC']:
+            if s not in ['SMC+US', 'IC+SMC+US', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
 
         sbert.load()
@@ -589,9 +574,7 @@ class Pipeline(object):
             print('==================== Step: finetune-{} ===================='.format(step))
 
             # Fine-tuning
-            if step == 'ST+US':
-                self.fine_tune_joint_slot_tagging_and_utterance_similarity()
-            elif step == 'IC+SMC+US':
+            if step == 'IC+SMC+US':
                 self.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_intent_classification(
                     early_stopping_patience=3,
                     n_train_epochs=config.get('IC+SMC+US_n_train_epochs', None))

@@ -650,51 +650,6 @@ def fine_tune_slot_tagging(train_texts, train_slots, n_train_epochs=None, n_trai
                     early_stopping_patience=early_stopping_patience)
 
 
-# train_cluster_labels is None means unseen cluster
-@DeprecationWarning
-def fine_tune_joint_slot_tagging_and_utterance_similarity(
-        train_texts, train_slots, train_cluster_labels,
-        n_train_epochs=None, n_train_steps=None,
-        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0,
-        eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
-):
-    # Prepare for slot tagging
-    train_texts_sr = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
-    train_slots = [s for s in train_slots if s is not None]
-    train_texts_sr, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts_sr, train_slots)
-    unique_tags = dict.fromkeys(tag for doc in train_tags for tag in doc)
-    tag2id = {tag: id for id, tag in enumerate(unique_tags)}
-
-    train_encodings_sr = tokenizer(train_texts_sr, is_split_into_words=True, return_offsets_mapping=True,
-                                   padding=True, truncation=True, return_tensors='pt')
-    train_slot_labels = _encode_tags(train_tags, train_encodings_sr, tag2id)
-    train_encodings_sr.pop("offset_mapping")
-    sr_train_dataset = SlotTaggingDataset(train_encodings_sr, train_slot_labels)
-    tagger = SlotTaggingModel(model, len(unique_tags))
-
-    # Prepare for utterance similarity
-    label_set = dict.fromkeys(train_cluster_labels)
-    label_map = {None: -1}
-    label_count = 0
-    for l in label_set:
-        if l is not None:
-            label_map[l] = label_count
-            label_count += 1
-
-    train_cluster_labels = [label_map[l] for l in train_cluster_labels]
-    train_encodings_us = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
-    us_train_dataset = UtteranceSimilarityDataset(train_encodings_us, train_cluster_labels,
-                                                  negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
-                                                  negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen)
-    estimator = UtteranceSimilarityModel(model)
-
-    _joint_finetune_model(tagger, estimator, sr_train_dataset, us_train_dataset,
-                          n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
-                          eval_callback=eval_callback,
-                          early_stopping=early_stopping,
-                          early_stopping_patience=early_stopping_patience)
-
-
 class SlotMulticlassClassificationModel(nn.Module):
     def __init__(self, base_model, num_labels):
         super().__init__()
@@ -741,46 +696,6 @@ def fine_tune_slot_multiclass_classification(
                     eval_callback=eval_callback,
                     early_stopping=early_stopping,
                     early_stopping_patience=early_stopping_patience)
-
-
-# train_cluster_labels is None means unseen cluster
-def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
-        train_texts, train_slots, train_cluster_labels,
-        n_train_epochs=None, n_train_steps=None,
-        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0,
-        eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
-):
-    # Prepare for slot multiclass classification
-    train_texts_smc = [train_texts[i] for i, l in enumerate(train_cluster_labels) if l is not None]
-    train_slots = [s for s in train_slots if s is not None]
-    unique_tags = dict.fromkeys(tag for doc in train_slots for tag in doc.keys())
-
-    train_encodings_smc = tokenizer(train_texts_smc, padding=True, truncation=True, return_tensors='pt')
-    train_slot_labels = [[1.0 if s in u_slots else 0.0 for s in unique_tags] for u_slots in train_slots]
-    smc_train_dataset = ClassificationDataset(train_encodings_smc, train_slot_labels)
-    classifier = SlotMulticlassClassificationModel(model, len(unique_tags))
-
-    # Prepare for utterance similarity
-    label_set = dict.fromkeys(train_cluster_labels)
-    label_map = {None: -1}
-    label_count = 0
-    for l in label_set:
-        if l is not None:
-            label_map[l] = label_count
-            label_count += 1
-
-    train_cluster_labels = [label_map[l] for l in train_cluster_labels]
-    train_encodings_us = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
-    us_train_dataset = UtteranceSimilarityDataset(train_encodings_us, train_cluster_labels,
-                                                  negative_sampling_rate_from_seen=us_negative_sampling_rate_from_seen,
-                                                  negative_sampling_rate_from_unseen=us_negative_sampling_rate_from_unseen)
-    estimator = UtteranceSimilarityModel(model)
-
-    _joint_finetune_model(classifier, estimator, smc_train_dataset, us_train_dataset,
-                          n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
-                          eval_callback=eval_callback,
-                          early_stopping=early_stopping,
-                          early_stopping_patience=early_stopping_patience)
 
 
 class JointUtteranceSimilarityAndSlotClassificationDataset(torch.utils.data.Dataset):
@@ -913,7 +828,7 @@ class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
 
 
 # train_cluster_labels is None means unseen cluster
-def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_2(
+def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
         train_texts, train_slots, train_cluster_labels,
         us_loss_weight=0.5, smc_loss_weight=0.5,
         n_train_epochs=None, n_train_steps=None,
@@ -1154,7 +1069,6 @@ if __name__ == '__main__':
     # train_texts, train_slots, train_labels \
     #     = ['this is first sentence', 'this is second with oov word qwertyuiop asdfghjkl', 'test'], \
     #       [{'slot_1': {'start': 8, 'end': 22}, 'slot_2': {'start': 0, 'end': 4}},
-    #        {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}], \
+    #        {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}, {}], \
     #       [0, 1, None]
     # fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(train_texts, train_slots, train_labels)
-    # fine_tune_joint_slot_tagging_and_utterance_similarity(train_texts, train_slots, train_labels)
