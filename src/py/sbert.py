@@ -946,7 +946,9 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationDatase
             item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
 
         item['smc_labels'] = torch.tensor(self.slot_labels[idx])
+        item['smc_labels_2'] = torch.tensor(self.slot_labels[idx2])
         item['ic_labels'] = torch.tensor(self.intent_labels[idx])
+        item['ic_labels_2'] = torch.tensor(self.intent_labels[idx2])
 
         return item
 
@@ -956,7 +958,8 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationDatase
 
 class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationModel(nn.Module):
     def __init__(self, base_model, smc_num_labels, ic_num_labels,
-                 us_loss_weight=0.4, smc_loss_weight=0.4, ic_loss_weight=0.2):
+                 us_loss_weight=0.4, smc_loss_weight=0.4, ic_loss_weight=0.2,
+                 us_negative_to_positive_rate=3):
         super().__init__()
         self.base_model = base_model
         self.us_loss_weight = us_loss_weight
@@ -971,13 +974,17 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationModel(
         self.ic_classifier = ClassificationHead(base_model.config, ic_num_labels)
         self.ic_loss_fct = CrossEntropyLoss()
 
+        self.us_negative_to_positive_rate = us_negative_to_positive_rate
+
     def forward(
             self,
             input_ids=None,
             attention_mask=None,
             us_labels=None,
             smc_labels=None,
-            ic_labels=None
+            smc_labels_2=None,
+            ic_labels=None,
+            ic_labels_2=None,
     ):
         input_ids_0, attention_mask_0 = input_ids[:, 0, :], attention_mask[:, 0, :]
         input_ids_1, attention_mask_1 = input_ids[:, 1, :], attention_mask[:, 1, :]
@@ -990,11 +997,20 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationModel(
 
         # smc_logits = self.smc_classifier(cls=_cls(output_0))
         smc_logits = self.smc_classifier(mean=mean_0)
-
-        smc_loss = self.smc_loss_fct(smc_logits, smc_labels)
+        smc_logits_2 = self.smc_classifier(mean=mean_1)
+        smc_loss = torch.add(
+            torch.mul(self.smc_loss_fct(smc_logits, smc_labels),
+                      1 / (2 + self.us_negative_to_positive_rate)),
+            torch.mul(self.smc_loss_fct(smc_logits_2, smc_labels_2),
+                      (1 + self.us_negative_to_positive_rate) / (2 + self.us_negative_to_positive_rate)))
 
         ic_logits = self.ic_classifier(mean=mean_0)
-        ic_loss = self.ic_loss_fct(ic_logits, ic_labels)
+        ic_logits_2 = self.ic_classifier(mean=mean_1)
+        ic_loss = torch.add(
+            torch.mul(self.ic_loss_fct(ic_logits, ic_labels),
+                      1 / (2 + self.us_negative_to_positive_rate)),
+            torch.mul(self.ic_loss_fct(ic_logits_2, ic_labels_2),
+                      (1 + self.us_negative_to_positive_rate) / (2 + self.us_negative_to_positive_rate)))
 
         total_loss = torch.sum(torch.stack([torch.mul(us_loss, self.us_loss_weight),
                                             torch.mul(smc_loss, self.smc_loss_weight),
