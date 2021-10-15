@@ -1064,6 +1064,104 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_
                     early_stopping_patience=early_stopping_patience)
 
 
+class JointClassificationPseudoAndIntentClassificationDataset(torch.utils.data.Dataset):
+    # labels \in {0,1,2,3,...} (for single-class) or tuple[Literal[0.0,1.0]] (for multi-class)
+    def __init__(self, encodings, pseudo_labels, intent_labels, pseudo_sample_weights=None):
+        self.encodings = encodings
+        self.pseudo_labels = pseudo_labels
+        self.intent_labels = intent_labels
+        self.pseudo_sample_weights = pseudo_sample_weights
+
+    def __getitem__(self, idx):
+        item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
+        item['pseudo_labels'] = torch.tensor(self.pseudo_labels[idx])
+        item['intent_labels'] = torch.tensor(self.intent_labels[idx])
+        if self.pseudo_sample_weights is not None:
+            item['pseudo_sample_weights'] = torch.tensor(self.pseudo_sample_weights[idx])
+        return item
+
+    def __len__(self):
+        return len(self.pseudo_labels)
+
+
+class JointPseudoClassificationAndIntentClassificationModel(nn.Module):
+    def __init__(self, base_model, num_pseudo_labels, num_intent_labels, intent_classifier_weight=0.1):
+        super().__init__()
+        self.config = base_model.config
+        self.base_model = base_model
+        self.pseudo_classifier = ClassificationHead(base_model.config, num_pseudo_labels)
+        self.pseudo_loss_fct = CrossEntropyLoss(reduction='none')
+
+        self.intent_classifier = ClassificationHead(base_model.config, num_intent_labels)
+        self.intent_loss_fct = CrossEntropyLoss()
+        self.intent_classifier_weight = intent_classifier_weight
+
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            pseudo_labels=None,
+            pseudo_sample_weights=None,
+            intent_labels=None
+    ):
+        outputs = self.base_model(
+            input_ids,
+            attention_mask=attention_mask,
+        )
+        mean = _mean_pooling(outputs, attention_mask)
+
+        pc_logits = self.pseudo_classifier(mean=mean)
+        per_sample_loss = self.pseudo_loss_fct(pc_logits, pseudo_labels)
+        if pseudo_sample_weights is not None:
+            per_sample_loss = torch.mul(per_sample_loss, pseudo_sample_weights)
+        pc_loss = torch.mean(per_sample_loss)
+
+        ic_logits = self.intent_classifier(mean=mean)
+        ic_loss = self.intent_loss_fct(ic_logits, intent_labels)
+
+        total_loss = torch.add(torch.mul(pc_loss, 1 - self.intent_classifier_weight),
+                               torch.mul(ic_loss, self.intent_classifier_weight))
+
+        return (total_loss,)
+
+
+def fine_tune_joint_pseudo_classification_and_intent_classification(
+        train_texts, train_cluster_ids, train_intent_ids, train_sample_weights=None,
+        intent_classifier_weight=0.1, previous_classifier=None, previous_optim=None):
+    train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
+    train_dataset = JointClassificationPseudoAndIntentClassificationDataset(train_encodings, train_cluster_ids,
+                                                                            train_intent_ids,
+                                                                            pseudo_sample_weights=train_sample_weights)
+
+    if previous_classifier is None:
+        classifier = JointPseudoClassificationAndIntentClassificationModel(model, len(dict.fromkeys(train_cluster_ids)),
+                                                                           len(dict.fromkeys(train_intent_ids)),
+                                                                           intent_classifier_weight=intent_classifier_weight)
+        classifier.to(device)
+    else:
+        classifier = previous_classifier
+
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    optim = AdamW(classifier.parameters(), lr=5e-5, weight_decay=0.01) if previous_optim is None else previous_optim
+
+    classifier.train()  # Switch mode
+    cur = 0
+    for batch in train_loader:
+        cur += 1
+        print('\rNum examples: {} Batch: {}/{} ({:.1f}%)'
+              .format(len(train_dataset), cur, len(train_loader), 100 * cur / len(train_loader)),
+              end='' if cur < len(train_loader) else '\n')
+        optim.zero_grad()
+        batch = {key: val.to(device) for key, val in batch.items()}
+        outputs = classifier(**batch)
+        loss = outputs[0]
+        loss.backward()
+        optim.step()
+    classifier.eval()
+
+    return classifier, optim
+
+
 if __name__ == '__main__':
     set_seed(12993)
     load()

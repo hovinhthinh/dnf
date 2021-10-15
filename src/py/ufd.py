@@ -332,6 +332,94 @@ class Pipeline(object):
                                                                           previous_optim=optim if align_clusters else None)
                 print('Validation score: {:.3f}'.format(self.get_validation_score()))
 
+    def fine_tune_joint_pseudo_classification_and_intent_classification(
+            self, use_pseudo_sample_weights=True, align_clusters=True, intent_classifier_weight=0.1,
+            iterations=None, early_stopping_patience=0, min_iterations=None, max_iterations=None):
+        classifier, optim, previous_clusters = None, None, None
+        if iterations is None:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                best_iter = None
+                best_eval = None
+                it = 0
+                while True:
+                    it += 1
+                    print('==== Iteration: {}'.format(it))
+                    # self.update_embeddings() # No need to update, already called in self.get_validation_score()
+                    utterances = self.utterances
+                    embeddings = self.embeddings
+                    pseudo_clusters, weights = self.get_pseudo_clusters()
+
+                    if not self.use_unseen_in_training:
+                        utterances = [u for u in utterances if u[2] == 'TRAIN']
+                        embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                        weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                    pseudo_clusters = self.remap_clusters(pseudo_clusters)
+
+                    if align_clusters and previous_clusters is not None:
+                        pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters,
+                                                                           pseudo_clusters)
+                    previous_clusters = pseudo_clusters
+
+                    print('Pseudo-cluster quality:',
+                          get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
+                                                 pseudo_clusters))
+                    classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
+                        [u[0] for u in utterances], pseudo_clusters,
+                        self.remap_clusters([u[4] for u in utterances]),
+                        train_sample_weights=weights if use_pseudo_sample_weights else None,
+                        intent_classifier_weight=intent_classifier_weight,
+                        previous_classifier=classifier if align_clusters else None,
+                        previous_optim=optim if align_clusters else None)
+                    eval = self.get_validation_score()
+                    print('Validation score: {:.3f}'.format(eval), end='')
+                    if best_eval is None or eval > best_eval:
+                        best_eval = eval
+                        best_iter = it
+                        print(' -> Save model', end='')
+                        sbert.save(temp_dir)
+
+                    if (it > best_iter + early_stopping_patience and (
+                            min_iterations is None or it >= min_iterations)) \
+                            or (max_iterations is not None and it == max_iterations):
+                        print(' -> Stop')
+                        sbert.load(temp_dir)
+                        break
+                    else:
+                        print()
+        else:
+            for it in range(iterations):
+                print('Iter: {}'.format(it + 1))
+                # self.update_embeddings() # No need to update
+                utterances = self.utterances
+                embeddings = self.embeddings
+                pseudo_clusters, weights = self.get_pseudo_clusters()
+
+                if not self.use_unseen_in_training:
+                    utterances = [u for u in utterances if u[2] == 'TRAIN']
+                    embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                    weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+
+                pseudo_clusters = self.remap_clusters(pseudo_clusters)
+
+                if align_clusters and previous_clusters is not None:
+                    pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
+                previous_clusters = pseudo_clusters
+
+                print('Pseudo-cluster quality:',
+                      get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
+                                             pseudo_clusters))
+                classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
+                    [u[0] for u in utterances], pseudo_clusters,
+                    self.remap_clusters([u[4] for u in utterances]),
+                    intent_classifier_weight=intent_classifier_weight,
+                    train_sample_weights=weights if use_pseudo_sample_weights else None,
+                    previous_classifier=classifier if align_clusters else None,
+                    previous_optim=optim if align_clusters else None)
+                print('Validation score: {:.3f}'.format(self.get_validation_score()))
+
     def fine_tune_utterance_similarity(self, n_train_epochs=None):
         if self.use_unseen_in_training:
             sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances],
@@ -527,7 +615,7 @@ class Pipeline(object):
             }):
         set_seed(12993)
         for s in steps:
-            if s not in ['SMC+US', 'IC+SMC+US', 'ST', 'SMC', 'US', 'PC']:
+            if s not in ['SMC+US', 'IC+SMC+US', 'PC+IC', 'ST', 'SMC', 'US', 'PC']:
                 raise Exception('Invalid step name:', s)
 
         sbert.load()
@@ -591,6 +679,13 @@ class Pipeline(object):
             elif step == 'PC':
                 self.fine_tune_pseudo_classification(
                     use_sample_weights=config.get('PC_sample_weights', True),
+                    iterations=config.get('PC_iterations', None),
+                    early_stopping_patience=3,
+                    min_iterations=1, max_iterations=config.get('PC_max_iterations', 10),
+                )
+            elif step == 'PC+IC':
+                self.fine_tune_joint_pseudo_classification_and_intent_classification(
+                    use_pseudo_sample_weights=config.get('PC_sample_weights', True),
                     iterations=config.get('PC_iterations', None),
                     early_stopping_patience=3,
                     min_iterations=1, max_iterations=config.get('PC_max_iterations', 10),
