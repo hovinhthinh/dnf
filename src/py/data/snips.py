@@ -851,12 +851,86 @@ def get_train_test_data(generate_data=False, use_dev=True):
         intra_intent_data = json.loads(open(train_test_data_file).read())
 
     # Use entity class instead of array for storing utterances.
+    def get_feature_type_for_SNIPS(intent_name, feature_name):
+        if intent_name == 'GetWeather':
+            feature_name_2_type = {
+                'GetCurrentWeatherInCurrentPosition': 'SLOT+VALUE',
+                'GetCurrentWeatherInALocation': 'SLOT+VALUE',
+                'GetWeatherInCurrentPositionAtATimeRange': 'SLOT+VALUE',
+                'GetWeatherInALocationAtATimeRange': 'SLOT+VALUE'
+            }
+        elif intent_name == 'AddToPlaylist':
+            feature_name_2_type = {
+                'AddAnArtistToAPlaylist': 'SLOT+VALUE',
+                'AddCurrentSongToAPlaylist': 'SLOT+VALUE',
+                'AddCurrentArtistToAPlaylist': 'SLOT+VALUE',
+                'AddASongToAPlaylist': 'SLOT',
+                'AddCurrentAlbumToAPlaylist': 'SLOT+VALUE'
+            }
+        elif intent_name in ['RateBook', 'BookRestaurant']:
+            return 'INTENT'
+        elif intent_name == 'PlayMusic':
+            feature_name_2_type = {
+                'PlayMusicByYearOnService': 'SLOT',
+                'PlayMusicByArtistAndYear': 'SLOT',
+                'PlayMusicByGenreOnService': 'SLOT+VALUE',
+                'PlayTrack': 'SLOT+VALUE',
+                'PlayPlaylist': 'SLOT',
+                'PlayAlbum': 'SLOT+VALUE',
+                'PlayMusicByArtistOnService': 'SLOT',
+                'PlayMusicByArtistAndYearOnService': 'SLOT',
+                'PlayOnService': 'SLOT',
+                'PlayTrackOnService': 'SLOT+VALUE',
+                'PlayMusicByArtist': 'SLOT',
+                'PlayMusicByGenre': 'SLOT+VALUE',
+                'PlayMusicByYear': 'SLOT',
+                'PlayAlbumOnService': 'SLOT+VALUE'
+            }
+        elif intent_name == 'SearchCreativeWork':
+            feature_name_2_type = {
+                'SearchCreativeWork': 'SLOT',
+                'PlayTVProgram': 'SLOT+VALUE',
+                'PlayTVProgramTrailer': 'SLOT+VALUE',
+                'PlaySong': 'SLOT+VALUE',
+                'SearchAlbum': 'SLOT+VALUE',
+                'SearchBook': 'SLOT+VALUE',
+                'SearchPicture': 'SLOT+VALUE',
+                'SearchGame': 'SLOT+VALUE',
+                'WHQuestion': 'SLOT+VALUE'
+            }
+        elif intent_name == 'SearchScreeningEvent':
+            feature_name_2_type = {
+                'GetScheduleAtNearbyCinemas': 'SLOT+VALUE',
+                'GetSchedule': 'SLOT+VALUE',
+                'GetScheduleAtALocation': 'SLOT+VALUE',
+                'GetScheduleAtATimeRange': 'SLOT',
+                'GetScheduleForAnimatedMovies': 'SLOT+VALUE',
+                'GetScheduleForAMovieAtALocation': 'SLOT',
+                'FindCinemasPlayingAMovieAtATimeRange': 'SLOT',
+                'GetScheduleForAMovie': 'SLOT',
+                'GetScheduleForAMovieAtNearbyCinemas': 'SLOT',
+            }
+        else:
+            raise Exception('Invalid intent name')
+
+        if feature_name.endswith('_TRAIN'):
+            feature_name = feature_name[:-6]
+        if feature_name.endswith('_DEV'):
+            feature_name = feature_name[:-4]
+        if feature_name.endswith('_TEST'):
+            feature_name = feature_name[:-5]
+
+        return feature_name_2_type[feature_name]
+
     for i, (intent_name, array_cluster_data) in enumerate(intra_intent_data):
         entity_cluster_data = []
         for a in array_cluster_data:
             u = Utterance()
             u.text = a[0]
             u.feature_name = a[1]
+            u.feature_type = get_feature_type_for_SNIPS(intent_name, u.feature_name)
+            if u.feature_type not in ['SLOT', 'SLOT+VALUE', 'INTENT']:
+                raise Exception('Invalid feature type: ', u.feature_type)
             u.part_type = a[2]
             u.slots = a[3]
             u.intent_name = intent_name
