@@ -193,6 +193,9 @@ def _get_ml_info(root_2_idx, dataset):
 
 
 def get_clustering_quality(labels_true, labels_pred):
+    if len(labels_true) == len(labels_pred) == 0:
+        return None
+
     quality = {
         'NMI': round(normalized_mutual_info_score(labels_true, labels_pred), 3),
         'ARI': round(adjusted_rand_score(labels_true, labels_pred), 3),

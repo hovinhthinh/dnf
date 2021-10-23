@@ -233,7 +233,8 @@ class Pipeline(object):
             embeddings = numpy.concatenate([self.embeddings, self.test_embeddings if self.use_dev else numpy.ndarray(
                 (0, self.embeddings.shape[1]))])
 
-            labels = [u.feature_name for u in self.utterances] + ([u.feature_name for u in self.test_utterances] if self.use_dev else [])
+            labels = [u.feature_name for u in self.utterances] + (
+                [u.feature_name for u in self.test_utterances] if self.use_dev else [])
             sample_type = [u.part_type for u in self.utterances] + (
                 [u.part_type for u in self.test_utterances] if self.use_dev else [])
 
@@ -270,7 +271,8 @@ class Pipeline(object):
                     if not self.use_unseen_in_training:
                         utterances = [u for u in utterances if u.part_type == 'TRAIN']
                         embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
-                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if
+                                           u.part_type == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                     pseudo_clusters = self.remap_clusters(pseudo_clusters)
@@ -315,7 +317,8 @@ class Pipeline(object):
                 if not self.use_unseen_in_training:
                     utterances = [u for u in utterances if u.part_type == 'TRAIN']
                     embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
-                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if
+                                       u.part_type == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                 pseudo_clusters = self.remap_clusters(pseudo_clusters)
@@ -353,7 +356,8 @@ class Pipeline(object):
                     if not self.use_unseen_in_training:
                         utterances = [u for u in utterances if u.part_type == 'TRAIN']
                         embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
-                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if
+                                           u.part_type == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                     pseudo_clusters = self.remap_clusters(pseudo_clusters)
@@ -400,7 +404,8 @@ class Pipeline(object):
                 if not self.use_unseen_in_training:
                     utterances = [u for u in utterances if u.part_type == 'TRAIN']
                     embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
-                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if
+                                       u.part_type == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                 pseudo_clusters = self.remap_clusters(pseudo_clusters)
@@ -424,7 +429,8 @@ class Pipeline(object):
     def fine_tune_utterance_similarity(self, n_train_epochs=None):
         if self.use_unseen_in_training:
             sbert.fine_tune_utterance_similarity([u.text for u in self.utterances],
-                                                 [u.feature_name if u.part_type == 'TRAIN' else None for u in self.utterances],
+                                                 [u.feature_name if u.part_type == 'TRAIN' else None for u in
+                                                  self.utterances],
                                                  n_train_epochs=n_train_epochs,
                                                  eval_callback=self.get_validation_score,
                                                  early_stopping=True if n_train_epochs is None else False)
@@ -471,7 +477,8 @@ class Pipeline(object):
         if self.use_unseen_in_training:
             utterances, slots, clusters, intents = [u.text for u in self.utterances], \
                                                    [u.slots for u in self.utterances], \
-                                                   [u.feature_name if u.part_type == 'TRAIN' else None for u in self.utterances], \
+                                                   [u.feature_name if u.part_type == 'TRAIN' else None for u in
+                                                    self.utterances], \
                                                    [u.intent_name for u in self.utterances]
         else:
             utterances, slots, clusters, intents = [u.text for u in self.utterances if u.part_type == 'TRAIN'], \
@@ -496,7 +503,8 @@ class Pipeline(object):
 
         if self.squashing_train_dev:
             dev_predicted_clusters = clusterer.fit([self.embeddings[i] for i in self.dev_indices]).labels_
-            dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i].feature_name] for i in self.dev_indices]
+            dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i].feature_name] for i in
+                                 self.dev_indices]
             return get_clustering_quality(dev_true_clusters, dev_predicted_clusters)
         else:
             dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u.part_type != 'TRAIN']
@@ -507,9 +515,12 @@ class Pipeline(object):
 
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
                                     contingency_matrix_log_file=None):
-        true_clusters = dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TRAIN')])
-        true_clusters.update(dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_DEV')]))
-        true_clusters.update(dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TEST')]))
+        true_clusters = dict.fromkeys(
+            [u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TRAIN')])
+        true_clusters.update(
+            dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_DEV')]))
+        true_clusters.update(
+            dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TEST')]))
 
         true_clusters = [l for l in true_clusters]
         true_cluster_2_index_map = dict((l, i) for i, l in enumerate(true_clusters))
@@ -593,6 +604,7 @@ class Pipeline(object):
 
         return {
             'all': get_clustering_quality(test_true_clusters, test_predicted_clusters),
+            # Filter intents by part type
             'train_dev': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')],
@@ -600,7 +612,24 @@ class Pipeline(object):
                  u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')]),
             'test': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')],
-                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')])
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_name.endswith('_TEST')]),
+            # Filter intents by feature type
+            'slot': get_clustering_quality(
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'SLOT'],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'SLOT']),
+            'slot_value': get_clustering_quality(
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'SLOT+VALUE'],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'SLOT+VALUE']),
+            'intent': get_clustering_quality(
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'INTENT'],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'INTENT'])
         }
         # TODO: other clustering algorithms could be also applied here as well, e.g., DBScan, HAC.
 
