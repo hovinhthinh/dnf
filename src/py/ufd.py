@@ -334,7 +334,7 @@ class Pipeline(object):
                 print('Validation score: {:.3f}'.format(self.get_validation_score()))
 
     def fine_tune_joint_pseudo_classification_and_intent_classification(
-            self, use_pseudo_sample_weights=True, align_clusters=True, intent_classifier_weight=0.1,
+            self, use_pseudo_sample_weights=True, align_clusters=True, intent_classifier_weight=0.2,
             iterations=None, early_stopping_patience=0, min_iterations=None, max_iterations=None):
         classifier, optim, previous_clusters = None, None, None
         if iterations is None:
@@ -480,7 +480,7 @@ class Pipeline(object):
                                                    [u.intent_name for u in self.utterances if u.part_type == 'TRAIN']
         sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_intent_classification(
             utterances, slots, clusters, intents,
-            us_loss_weight=0.4, smc_loss_weight=0.4, ic_loss_weight=0.2,
+            us_loss_weight=0.5, smc_loss_weight=0.25, ic_loss_weight=0.25,
             n_train_epochs=n_train_epochs,
             eval_callback=self.get_validation_score,
             early_stopping=True if n_train_epochs is None else False,
