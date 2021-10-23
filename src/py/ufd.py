@@ -4,11 +4,13 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import linear_sum_assignment
 from transformers import set_seed
 
+from data.entity import Utterance
+
 Axes3D = Axes3D
 
 import os
 from math import pow
-from typing import List, Tuple
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy
@@ -87,19 +89,19 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
 
 class Pipeline(object):
 
-    def __init__(self, utterances: List[Tuple[str, any, str, dict]],  # (utterance, cluster_label, sample_type, slots)
+    def __init__(self, utterances: List[Utterance],
                  dataset_name=None, squashing_train_dev=False, use_unseen_in_training=True,
                  dev_test_clustering_method='k-means'):
         self.dataset_name = dataset_name
         self.use_unseen_in_training = use_unseen_in_training
         self.dev_test_clustering_method = dev_test_clustering_method
-        self.use_dev = 'DEV' in [u[2] for u in utterances]
+        self.use_dev = 'DEV' in [u.part_type for u in utterances]
         self.utterances = []  # TRAIN + DEV, if DEV is not provided, use DEV = TEST instead.
         self.test_utterances = []
         for u in utterances:
-            if u[2] in ['TRAIN', 'DEV']:
+            if u.part_type in ['TRAIN', 'DEV']:
                 self.utterances.append(u)
-            elif u[2] == 'TEST':
+            elif u.part_type == 'TEST':
                 self.test_utterances.append(u)
                 if not self.use_dev:
                     self.utterances.append(u)
@@ -108,19 +110,19 @@ class Pipeline(object):
 
         # For squashing train/dev.
         self.squashing_train_dev = squashing_train_dev
-        self.dev_indices = [i for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
+        self.dev_indices = [i for i, u in enumerate(self.utterances) if u.part_type != 'TRAIN']
 
         self.cluster_label_2_index_map = dict(
-            (n, i) for i, n in enumerate(dict.fromkeys([u[1] for u in self.utterances])))
+            (n, i) for i, n in enumerate(dict.fromkeys([u.feature_name for u in self.utterances])))
 
         self.embeddings = None
         self.test_embeddings = None
 
         # Label plotting order
         self.label_plotting_order = []
-        for u in [u[1] for u in utterances if u[2] == 'TRAIN'] \
-                 + [u[1] for u in utterances if u[2] == 'DEV'] \
-                 + [u[1] for u in utterances if u[2] == 'TEST']:
+        for u in [u.feature_name for u in utterances if u.part_type == 'TRAIN'] \
+                 + [u.feature_name for u in utterances if u.part_type == 'DEV'] \
+                 + [u.feature_name for u in utterances if u.part_type == 'TEST']:
             if u in self.label_plotting_order:
                 continue
             self.label_plotting_order.append(u)
@@ -130,9 +132,8 @@ class Pipeline(object):
         if squashing_train_dev:
             if not self.use_dev:
                 raise Exception('squashing_train_dev is only possible when use_dev is True')
-            self.utterances = [list(u) for u in self.utterances]
             for u in self.utterances:
-                u[2] = 'TRAIN'
+                u.part_type = 'TRAIN'
 
         # pseudo-scatter for getting colors.
         ax = plt.figure().add_subplot()
@@ -140,25 +141,25 @@ class Pipeline(object):
         plt.close()
 
     def update_embeddings(self):
-        self.embeddings = sbert.get_embeddings([u[0] for u in self.utterances])
+        self.embeddings = sbert.get_embeddings([u.text for u in self.utterances])
 
     def update_test_embeddings(self, reuse_from_train_dev=True):
         if self.use_dev or self.embeddings is None or not reuse_from_train_dev:
-            self.test_embeddings = sbert.get_embeddings([u[0] for u in self.test_utterances])
+            self.test_embeddings = sbert.get_embeddings([u.text for u in self.test_utterances])
         else:
-            indices = [i for i, u in enumerate(self.utterances) if u[2] == 'TEST']
+            indices = [i for i, u in enumerate(self.utterances) if u.part_type == 'TEST']
             self.test_embeddings = self.embeddings[indices]
 
     def get_true_clusters(self, including_train=True, including_dev=True):
-        return [self.cluster_label_2_index_map[u[1]] for u in self.utterances if
-                (including_train and u[2] == 'TRAIN') or (including_dev and u[2] != 'TRAIN')]
+        return [self.cluster_label_2_index_map[u.feature_name] for u in self.utterances if
+                (including_train and u.part_type == 'TRAIN') or (including_dev and u.part_type != 'TRAIN')]
 
     # Returns pseudo clusters and assignment confidences
     def get_pseudo_clusters(self, k=None):
         train_clusters = [[] for _ in range(len(self.cluster_label_2_index_map))]
         for i, u in enumerate(self.utterances):
-            if u[2] == 'TRAIN':
-                train_clusters[self.cluster_label_2_index_map[u[1]]].append(i)
+            if u.part_type == 'TRAIN':
+                train_clusters[self.cluster_label_2_index_map[u.feature_name]].append(i)
 
         # Constraints
         ml = []
@@ -179,7 +180,7 @@ class Pipeline(object):
         assignment_conf = []
         distance_matrix = pairwise_distances(self.embeddings, centers)
         for i, u in enumerate(self.utterances):
-            if u[2] == 'TRAIN':
+            if u.part_type == 'TRAIN':
                 assignment_conf.append(1.0)
             else:
                 scaled_dist = [1 / (1 + pow(d, 2)) for d in distance_matrix[i]]
@@ -217,13 +218,13 @@ class Pipeline(object):
     def plot(self, show_train_dev_only=False, show_test_only=False, show_labels=True, show_sample_type=True,
              plot_3d=False, output_file_path=None):
         if show_train_dev_only:
-            labels = [u[1] for u in self.utterances]
-            sample_type = [u[2] for u in self.utterances]
+            labels = [u.feature_name for u in self.utterances]
+            sample_type = [u.part_type for u in self.utterances]
             umap_plot(self.embeddings, labels, sample_type if show_sample_type else None,
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
                       label_plotting_order=self.label_plotting_order, output_file_path=output_file_path)
         elif show_test_only:
-            test_labels = [u[1] for u in self.test_utterances]
+            test_labels = [u.feature_name for u in self.test_utterances]
 
             umap_plot(self.test_embeddings, test_labels, title=self.dataset_name, show_labels=show_labels,
                       plot_3d=plot_3d,
@@ -232,9 +233,9 @@ class Pipeline(object):
             embeddings = numpy.concatenate([self.embeddings, self.test_embeddings if self.use_dev else numpy.ndarray(
                 (0, self.embeddings.shape[1]))])
 
-            labels = [u[1] for u in self.utterances] + ([u[1] for u in self.test_utterances] if self.use_dev else [])
-            sample_type = [u[2] for u in self.utterances] + (
-                [u[2] for u in self.test_utterances] if self.use_dev else [])
+            labels = [u.feature_name for u in self.utterances] + ([u.feature_name for u in self.test_utterances] if self.use_dev else [])
+            sample_type = [u.part_type for u in self.utterances] + (
+                [u.part_type for u in self.test_utterances] if self.use_dev else [])
 
             umap_plot(embeddings, labels, sample_type if show_sample_type else None,
                       title=self.dataset_name, show_labels=show_labels, plot_3d=plot_3d,
@@ -267,10 +268,10 @@ class Pipeline(object):
                     pseudo_clusters, weights = self.get_pseudo_clusters()
 
                     if not self.use_unseen_in_training:
-                        utterances = [u for u in utterances if u[2] == 'TRAIN']
-                        embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                        weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                        utterances = [u for u in utterances if u.part_type == 'TRAIN']
+                        embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                        weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                     pseudo_clusters = self.remap_clusters(pseudo_clusters)
 
@@ -282,7 +283,7 @@ class Pipeline(object):
                     print('Pseudo-cluster quality:',
                           get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                                  pseudo_clusters))
-                    classifier, optim = sbert.fine_tune_pseudo_classification([u[0] for u in utterances],
+                    classifier, optim = sbert.fine_tune_pseudo_classification([u.text for u in utterances],
                                                                               pseudo_clusters,
                                                                               train_sample_weights=weights if use_sample_weights else None,
                                                                               previous_classifier=classifier if align_clusters else None,
@@ -312,10 +313,10 @@ class Pipeline(object):
                 pseudo_clusters, weights = self.get_pseudo_clusters()
 
                 if not self.use_unseen_in_training:
-                    utterances = [u for u in utterances if u[2] == 'TRAIN']
-                    embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                    weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                    utterances = [u for u in utterances if u.part_type == 'TRAIN']
+                    embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                    weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                 pseudo_clusters = self.remap_clusters(pseudo_clusters)
 
@@ -326,7 +327,7 @@ class Pipeline(object):
                 print('Pseudo-cluster quality:',
                       get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                              pseudo_clusters))
-                classifier, optim = sbert.fine_tune_pseudo_classification([u[0] for u in utterances], pseudo_clusters,
+                classifier, optim = sbert.fine_tune_pseudo_classification([u.text for u in utterances], pseudo_clusters,
                                                                           train_sample_weights=weights if use_sample_weights else None,
                                                                           previous_classifier=classifier if align_clusters else None,
                                                                           previous_optim=optim if align_clusters else None)
@@ -350,10 +351,10 @@ class Pipeline(object):
                     pseudo_clusters, weights = self.get_pseudo_clusters()
 
                     if not self.use_unseen_in_training:
-                        utterances = [u for u in utterances if u[2] == 'TRAIN']
-                        embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                        weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                        utterances = [u for u in utterances if u.part_type == 'TRAIN']
+                        embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                        pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                        weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                     pseudo_clusters = self.remap_clusters(pseudo_clusters)
 
@@ -366,8 +367,8 @@ class Pipeline(object):
                           get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                                  pseudo_clusters))
                     classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
-                        [u[0] for u in utterances], pseudo_clusters,
-                        self.remap_clusters([u[4] for u in utterances]),
+                        [u.text for u in utterances], pseudo_clusters,
+                        self.remap_clusters([u.intent_name for u in utterances]),
                         train_sample_weights=weights if use_pseudo_sample_weights else None,
                         intent_classifier_weight=intent_classifier_weight,
                         previous_classifier=classifier if align_clusters else None,
@@ -397,10 +398,10 @@ class Pipeline(object):
                 pseudo_clusters, weights = self.get_pseudo_clusters()
 
                 if not self.use_unseen_in_training:
-                    utterances = [u for u in utterances if u[2] == 'TRAIN']
-                    embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
-                    weights = [weights[i] for i, u in enumerate(self.utterances) if u[2] == 'TRAIN']
+                    utterances = [u for u in utterances if u.part_type == 'TRAIN']
+                    embeddings = [embeddings[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                    pseudo_clusters = [pseudo_clusters[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
+                    weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
                 pseudo_clusters = self.remap_clusters(pseudo_clusters)
 
@@ -412,8 +413,8 @@ class Pipeline(object):
                       get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                              pseudo_clusters))
                 classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
-                    [u[0] for u in utterances], pseudo_clusters,
-                    self.remap_clusters([u[4] for u in utterances]),
+                    [u.text for u in utterances], pseudo_clusters,
+                    self.remap_clusters([u.intent_name for u in utterances]),
                     intent_classifier_weight=intent_classifier_weight,
                     train_sample_weights=weights if use_pseudo_sample_weights else None,
                     previous_classifier=classifier if align_clusters else None,
@@ -422,27 +423,27 @@ class Pipeline(object):
 
     def fine_tune_utterance_similarity(self, n_train_epochs=None):
         if self.use_unseen_in_training:
-            sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances],
-                                                 [u[1] if u[2] == 'TRAIN' else None for u in self.utterances],
+            sbert.fine_tune_utterance_similarity([u.text for u in self.utterances],
+                                                 [u.feature_name if u.part_type == 'TRAIN' else None for u in self.utterances],
                                                  n_train_epochs=n_train_epochs,
                                                  eval_callback=self.get_validation_score,
                                                  early_stopping=True if n_train_epochs is None else False)
         else:
-            sbert.fine_tune_utterance_similarity([u[0] for u in self.utterances if u[2] == 'TRAIN'],
-                                                 [u[1] for u in self.utterances if u[2] == 'TRAIN'],
+            sbert.fine_tune_utterance_similarity([u.text for u in self.utterances if u.part_type == 'TRAIN'],
+                                                 [u.feature_name for u in self.utterances if u.part_type == 'TRAIN'],
                                                  n_train_epochs=n_train_epochs,
                                                  eval_callback=self.get_validation_score,
                                                  early_stopping=True if n_train_epochs is None else False)
 
     @DeprecationWarning
     def fine_tune_slot_tagging(self):
-        sbert.fine_tune_slot_tagging([u[0] for u in self.utterances],
-                                     [u[3] for u in self.utterances],
+        sbert.fine_tune_slot_tagging([u.text for u in self.utterances],
+                                     [u.slots for u in self.utterances],
                                      eval_callback=self.get_validation_score, early_stopping=True)
 
     def fine_tune_slot_multiclass_classification(self, n_train_epochs=None):
-        sbert.fine_tune_slot_multiclass_classification([u[0] for u in self.utterances],
-                                                       [u[3] for u in self.utterances],
+        sbert.fine_tune_slot_multiclass_classification([u.text for u in self.utterances],
+                                                       [u.slots for u in self.utterances],
                                                        n_train_epochs=n_train_epochs,
                                                        eval_callback=self.get_validation_score,
                                                        early_stopping=True if n_train_epochs is None else False)
@@ -450,13 +451,13 @@ class Pipeline(object):
     def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(self, n_train_epochs=None,
                                                                                 early_stopping_patience=0):
         if self.use_unseen_in_training:
-            utterances, slots, clusters = [u[0] for u in self.utterances], \
-                                          [u[3] for u in self.utterances], \
-                                          [u[1] if u[2] == 'TRAIN' else None for u in self.utterances]
+            utterances, slots, clusters = [u.text for u in self.utterances], \
+                                          [u.slots for u in self.utterances], \
+                                          [u.feature_name if u.part_type == 'TRAIN' else None for u in self.utterances]
         else:
-            utterances, slots, clusters = [u[0] for u in self.utterances if u[2] == 'TRAIN'], \
-                                          [u[3] for u in self.utterances if u[2] == 'TRAIN'], \
-                                          [u[1] for u in self.utterances if u[2] == 'TRAIN']
+            utterances, slots, clusters = [u.text for u in self.utterances if u.part_type == 'TRAIN'], \
+                                          [u.slots for u in self.utterances if u.part_type == 'TRAIN'], \
+                                          [u.feature_name for u in self.utterances if u.part_type == 'TRAIN']
         sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
             utterances, slots, clusters,
             us_loss_weight=0.5, smc_loss_weight=0.5,
@@ -468,15 +469,15 @@ class Pipeline(object):
     def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_intent_classification(
             self, n_train_epochs=None, early_stopping_patience=0):
         if self.use_unseen_in_training:
-            utterances, slots, clusters, intents = [u[0] for u in self.utterances], \
-                                                   [u[3] for u in self.utterances], \
-                                                   [u[1] if u[2] == 'TRAIN' else None for u in self.utterances], \
-                                                   [u[4] for u in self.utterances]
+            utterances, slots, clusters, intents = [u.text for u in self.utterances], \
+                                                   [u.slots for u in self.utterances], \
+                                                   [u.feature_name if u.part_type == 'TRAIN' else None for u in self.utterances], \
+                                                   [u.intent_name for u in self.utterances]
         else:
-            utterances, slots, clusters, intents = [u[0] for u in self.utterances if u[2] == 'TRAIN'], \
-                                                   [u[3] for u in self.utterances if u[2] == 'TRAIN'], \
-                                                   [u[1] for u in self.utterances if u[2] == 'TRAIN'], \
-                                                   [u[4] for u in self.utterances if u[2] == 'TRAIN']
+            utterances, slots, clusters, intents = [u.text for u in self.utterances if u.part_type == 'TRAIN'], \
+                                                   [u.slots for u in self.utterances if u.part_type == 'TRAIN'], \
+                                                   [u.feature_name for u in self.utterances if u.part_type == 'TRAIN'], \
+                                                   [u.intent_name for u in self.utterances if u.part_type == 'TRAIN']
         sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_intent_classification(
             utterances, slots, clusters, intents,
             us_loss_weight=0.4, smc_loss_weight=0.4, ic_loss_weight=0.2,
@@ -495,10 +496,10 @@ class Pipeline(object):
 
         if self.squashing_train_dev:
             dev_predicted_clusters = clusterer.fit([self.embeddings[i] for i in self.dev_indices]).labels_
-            dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i][1]] for i in self.dev_indices]
+            dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i].feature_name] for i in self.dev_indices]
             return get_clustering_quality(dev_true_clusters, dev_predicted_clusters)
         else:
-            dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u[2] != 'TRAIN']
+            dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u.part_type != 'TRAIN']
             if len(dev_embeddings) == 0:
                 raise Exception('DEV set is unavailable')
             dev_predicted_clusters = clusterer.fit(dev_embeddings).labels_
@@ -506,13 +507,13 @@ class Pipeline(object):
 
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
                                     contingency_matrix_log_file=None):
-        true_clusters = dict.fromkeys([u[1] for u in self.test_utterances if u[1].endswith('_TRAIN')])
-        true_clusters.update(dict.fromkeys([u[1] for u in self.test_utterances if u[1].endswith('_DEV')]))
-        true_clusters.update(dict.fromkeys([u[1] for u in self.test_utterances if u[1].endswith('_TEST')]))
+        true_clusters = dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TRAIN')])
+        true_clusters.update(dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_DEV')]))
+        true_clusters.update(dict.fromkeys([u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TEST')]))
 
         true_clusters = [l for l in true_clusters]
         true_cluster_2_index_map = dict((l, i) for i, l in enumerate(true_clusters))
-        test_true_clusters = [true_cluster_2_index_map[u[1]] for u in self.test_utterances]
+        test_true_clusters = [true_cluster_2_index_map[u.feature_name] for u in self.test_utterances]
 
         k = k if k is not None else len(true_cluster_2_index_map)
 
@@ -540,7 +541,7 @@ class Pipeline(object):
                     for tl, cnt in sorted(true_label_2_count.items(), key=lambda o: o[1], reverse=True):
                         f.write('Feature: {} | {} ({:.1f}%)\n'.format(true_clusters[tl], cnt, cnt / len(indices) * 100))
                         f.write('    {}\n'.format(
-                            [self.test_utterances[idx][0] for idx in indices if test_true_clusters[idx] == tl]))
+                            [self.test_utterances[idx].text for idx in indices if test_true_clusters[idx] == tl]))
                     f.write('\n')
 
         if true_clusters_log_file is not None:
@@ -559,7 +560,7 @@ class Pipeline(object):
                     for pl, cnt in sorted(predicted_label_2_count.items(), key=lambda o: o[1], reverse=True):
                         f.write('Cluster: {} | {} ({:.1f}%)\n'.format(pl, cnt, cnt / len(indices) * 100))
                         f.write('    {}\n'.format(
-                            [self.test_utterances[idx][0] for idx in indices if test_predicted_clusters[idx] == pl]))
+                            [self.test_utterances[idx].text for idx in indices if test_predicted_clusters[idx] == pl]))
                     f.write('\n')
 
         if contingency_matrix_log_file is not None:
@@ -594,12 +595,12 @@ class Pipeline(object):
             'all': get_clustering_quality(test_true_clusters, test_predicted_clusters),
             'train_dev': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u[1].endswith('_TRAIN') or u[1].endswith('_DEV')],
+                 u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')],
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u[1].endswith('_TRAIN') or u[1].endswith('_DEV')]),
+                 u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')]),
             'test': get_clustering_quality(
-                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if u[1].endswith('_TEST')],
-                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if u[1].endswith('_TEST')])
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')])
         }
         # TODO: other clustering algorithms could be also applied here as well, e.g., DBScan, HAC.
 
@@ -747,8 +748,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
             print('======================================== Intra-intent:', intent_name,
                   '========================================')
 
-            if len([u for u in intent_data if u[1].endswith('_TRAIN')]) == 0 or len(
-                    [u for u in intent_data if u[1].endswith('_TEST')]) == 0:
+            if len([u for u in intent_data if u.feature_name.endswith('_TRAIN')]) == 0 or len(
+                    [u for u in intent_data if u.feature_name.endswith('_TEST')]) == 0:
                 print('Ignore this intent for intra-intent setting')
                 continue
 

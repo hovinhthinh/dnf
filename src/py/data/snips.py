@@ -1,6 +1,9 @@
+import copy
 import json
 import random
 from math import ceil
+
+from data.entity import Utterance
 
 
 def get_utterances(input_file):
@@ -847,31 +850,47 @@ def get_train_test_data(generate_data=False, use_dev=True):
     else:
         intra_intent_data = json.loads(open(train_test_data_file).read())
 
+    # Use entity class instead of array for storing utterances.
+    for i, (intent_name, array_cluster_data) in enumerate(intra_intent_data):
+        entity_cluster_data = []
+        for a in array_cluster_data:
+            u = Utterance()
+            u.text = a[0]
+            u.feature_name = a[1]
+            u.part_type = a[2]
+            u.slots = a[3]
+            u.intent_name = intent_name
+            entity_cluster_data.append(u)
+
+        intra_intent_data[i][1] = entity_cluster_data
+
     # Merge DEV into TRAIN if dev is not used.
     if not use_dev:
         for intent_name, cluster_data in intra_intent_data:
             for u in cluster_data:
-                if u[1].endswith('_DEV'):
-                    u[1] = u[1][:-4] + '_TRAIN'
-                if u[2] == 'DEV':
-                    u[2] = 'TRAIN'
+                if u.feature_name.endswith('_DEV'):
+                    u.feature_name = u.feature_name[:-4] + '_TRAIN'
+                if u.part_type == 'DEV':
+                    u.part_type = 'TRAIN'
 
     inter_intent_data = []
     for intent_name, cluster_data in intra_intent_data:
-        inter_intent_data.extend(
-            [(text, intent_name + '_' + cluster, sample_type, {intent_name + '_' + k: v for k, v in slots.items()}, intent_name)
-             for text, cluster, sample_type, slots in cluster_data])
+        for u in cluster_data:
+            mu = copy.copy(u)
+            mu.feature_name = intent_name + '_' + mu.feature_name
+            mu.slots = {intent_name + '_' + k: v for k, v in mu.slots.items()}
+            inter_intent_data.append(mu)
 
     print('======== Cluster information ========')
     for intent_name, cluster_data in intra_intent_data:
         print("====", intent_name)
-        clusters = dict.fromkeys(u[1] for u in cluster_data)
+        clusters = dict.fromkeys(u.feature_name for u in cluster_data)
         all_clusters = []
         train_clusters = []
         dev_clusters = []
         test_clusters = []
         for c in clusters:
-            total = len([u for u in cluster_data if u[1] == c])
+            total = len([u for u in cluster_data if u.feature_name == c])
             if c.endswith('_TRAIN'):
                 all_clusters.append((c[:-6], total))
                 train_clusters.append((c, total))
@@ -892,9 +911,9 @@ def get_train_test_data(generate_data=False, use_dev=True):
 
 
 def print_train_dev_test_stats(intent_data):
-    train_size = len([u for u in intent_data if u[2] == 'TRAIN'])
-    dev_size = len([u for u in intent_data if u[2] == 'DEV'])
-    test_size = len([u for u in intent_data if u[2] == 'TEST'])
+    train_size = len([u for u in intent_data if u.part_type == 'TRAIN'])
+    dev_size = len([u for u in intent_data if u.part_type == 'DEV'])
+    test_size = len([u for u in intent_data if u.part_type == 'TEST'])
     print('Train/Dev/Test utterances: {}/{}/{} ({:.1f}%,{:.1f}%,{:.1f}%)'.format(train_size, dev_size, test_size,
                                                                                  100 * train_size / len(intent_data),
                                                                                  100 * dev_size / len(intent_data),
@@ -910,16 +929,16 @@ if __name__ == '__main__':
     # Write utterances to file
     if False:
         f = open('data/snips/slot_based_clusters/utterances.txt', 'w')
-        intents = dict.fromkeys(u[1][:u[1].find('_')] for u in inter_intent_data)
+        intents = dict.fromkeys(u.feature_name[:u.feature_name.find('_')] for u in inter_intent_data)
         for intent in intents:
-            data = [u for u in inter_intent_data if u[1].startswith(intent)]
-            sets = dict.fromkeys(u[1] for u in data)
+            data = [u for u in inter_intent_data if u.feature_name.startswith(intent)]
+            sets = dict.fromkeys(u.feature_name for u in data)
             print('======== Intent:', intent, '========', file=f)
             sets = [s for s in sets if s.endswith('TRAIN')] + \
                    [s for s in sets if s.endswith('DEV')] + \
                    [s for s in sets if s.endswith('TEST')]
             for s in sets:
-                utrs = [u[0] for u in data if u[1] == s]
+                utrs = [u.text for u in data if u.feature_name == s]
                 print('Feature:', s[s.find('_') + 1:], file=f)
                 print(utrs, file=f)
                 print(file=f)
