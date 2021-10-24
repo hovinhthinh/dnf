@@ -498,6 +498,10 @@ class Pipeline(object):
             clusterer = KMeans(n_clusters=len(self.cluster_label_2_index_map))
         elif self.dev_test_clustering_method == 'hac-complete':
             clusterer = AgglomerativeClustering(n_clusters=len(self.cluster_label_2_index_map), linkage='complete')
+        elif self.dev_test_clustering_method == 'hac-average':
+            clusterer = AgglomerativeClustering(n_clusters=len(self.cluster_label_2_index_map), linkage='average')
+        elif self.dev_test_clustering_method == 'hac-single':
+            clusterer = AgglomerativeClustering(n_clusters=len(self.cluster_label_2_index_map), linkage='single')
         else:
             raise Exception('Invalid clustering method')
 
@@ -532,6 +536,12 @@ class Pipeline(object):
             test_predicted_clusters = KMeans(n_clusters=k).fit(self.test_embeddings).labels_
         elif self.dev_test_clustering_method == 'hac-complete':
             test_predicted_clusters = AgglomerativeClustering(n_clusters=k, linkage='complete').fit(
+                self.test_embeddings).labels_
+        elif self.dev_test_clustering_method == 'hac-average':
+            test_predicted_clusters = AgglomerativeClustering(n_clusters=k, linkage='average').fit(
+                self.test_embeddings).labels_
+        elif self.dev_test_clustering_method == 'hac-single':
+            test_predicted_clusters = AgglomerativeClustering(n_clusters=k, linkage='single').fit(
                 self.test_embeddings).labels_
         else:
             raise Exception('Invalid clustering method')
