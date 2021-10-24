@@ -518,7 +518,8 @@ class Pipeline(object):
             return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
-                                    contingency_matrix_log_file=None):
+                                    contingency_matrix_log_file=None,
+                                    advanced=False):
         true_clusters = dict.fromkeys(
             [u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TRAIN')])
         true_clusters.update(
@@ -613,35 +614,34 @@ class Pipeline(object):
                 f.write('\t\n')
 
         return {
-            'all': get_clustering_quality(test_true_clusters, test_predicted_clusters),
+            'all': get_clustering_quality(test_true_clusters, test_predicted_clusters, advanced=advanced),
             # Filter intents by part type
             'train_dev': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')],
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')]),
+                 u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')], advanced=advanced),
             'test': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')],
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u.feature_name.endswith('_TEST')]),
+                 u.feature_name.endswith('_TEST')], advanced=advanced),
             # Filter intents by feature type
             'slot': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_type == 'SLOT'],
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u.feature_type == 'SLOT']),
+                 u.feature_type == 'SLOT'], advanced=advanced),
             'slot_value': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_type == 'SLOT+VALUE'],
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u.feature_type == 'SLOT+VALUE']),
+                 u.feature_type == 'SLOT+VALUE'], advanced=advanced),
             'intent': get_clustering_quality(
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_type == 'INTENT'],
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u.feature_type == 'INTENT'])
+                 u.feature_type == 'INTENT'], advanced=advanced)
         }
-        # TODO: other clustering algorithms could be also applied here as well, e.g., DBScan, HAC.
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
