@@ -521,7 +521,7 @@ class Pipeline(object):
         if method is None or self.dev_test_clustering_method != 'k-means':  # tuning support k-means only
             return len(dict.fromkeys([u.feature_name for u in self.test_utterances]))
         elif method == 'elbow':
-            _min_distance_falling_rate = 0.3
+            _min_distance_falling_rate = 0.2
             sse = {}
             optimal_k = 1
             stopped = False
