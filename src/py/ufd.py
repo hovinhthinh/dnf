@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy
 import umap
 from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.metrics import pairwise_distances, euclidean_distances
+from sklearn.metrics import pairwise_distances, euclidean_distances, silhouette_score
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
@@ -539,6 +539,8 @@ class Pipeline(object):
                 optimal_k,
                 len(dict.fromkeys([u.feature_name for u in self.test_utterances]))))
             plt.ylabel('SSE')
+            if self.dataset_name is not None:
+                plt.title(self.dataset_name)
 
             plt.tight_layout()
             if plot_file_path == None:
@@ -549,7 +551,31 @@ class Pipeline(object):
 
             return optimal_k
         elif method == 'silhouette':
-            raise Exception('Not implemented')
+            sc = {}
+            optimal_k = None
+            for k in range(2, int(len(self.test_utterances) / 20 + 1)):
+                kmeans = KMeans(n_clusters=k).fit(self.test_embeddings)
+                sc[k] = silhouette_score(self.test_embeddings, kmeans.labels_)
+
+                if optimal_k is None or sc[k] > sc[optimal_k]:
+                    optimal_k = k
+            plt.figure()
+            plt.plot(list(sc.keys()), list(sc.values()))
+            plt.xlabel('#clusters (selected={}, ground-truth={})'.format(
+                optimal_k,
+                len(dict.fromkeys([u.feature_name for u in self.test_utterances]))))
+            plt.ylabel('SC')
+            if self.dataset_name is not None:
+                plt.title(self.dataset_name)
+
+            plt.tight_layout()
+            if plot_file_path == None:
+                plt.show()
+            else:
+                plt.savefig(plot_file_path, bbox_inches='tight')
+            plt.close()
+
+            return optimal_k
         else:
             raise Exception('Invalid method:', method)
 
