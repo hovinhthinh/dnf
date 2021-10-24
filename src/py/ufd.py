@@ -517,6 +517,42 @@ class Pipeline(object):
             dev_predicted_clusters = clusterer.fit(dev_embeddings).labels_
             return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
+    def get_n_test_clusters(self, method=None, plot_file_path=None):
+        if method is None or self.dev_test_clustering_method != 'k-means':  # tuning support k-means only
+            return len(dict.fromkeys([u.feature_name for u in self.test_utterances]))
+        elif method == 'elbow':
+            _min_distance_falling_rate = 0.3
+            sse = {}
+            optimal_k = 1
+            stopped = False
+            for k in range(1, int(len(self.test_utterances) / 20 + 1)):
+                kmeans = KMeans(n_clusters=k).fit(self.test_embeddings)
+                sse[k] = kmeans.inertia_
+
+                if not stopped and (k == 1 or sse[k] / sse[k - 1] <= 1 - _min_distance_falling_rate):
+                    optimal_k = k
+                else:
+                    stopped = True
+            plt.figure()
+            plt.plot(list(sse.keys()), list(sse.values()))
+            plt.xlabel('#clusters (selected={}, ground-truth={})'.format(
+                optimal_k,
+                len(dict.fromkeys([u.feature_name for u in self.test_utterances]))))
+            plt.ylabel('SSE')
+
+            plt.tight_layout()
+            if plot_file_path == None:
+                plt.show()
+            else:
+                plt.savefig(plot_file_path, bbox_inches='tight')
+            plt.close()
+
+            return optimal_k
+        elif method == 'silhouette':
+            raise Exception('Not implemented')
+        else:
+            raise Exception('Invalid method:', method)
+
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
                                     contingency_matrix_log_file=None,
                                     advanced=False):
@@ -652,6 +688,7 @@ class Pipeline(object):
                 'PC_sample_weights': True,
                 'PC_iterations': None,
                 'PC_max_iterations': 10,
+                'n_test_clusters_selection_method': None,
             }):
         set_seed(12993)
         for s in steps:
@@ -686,7 +723,11 @@ class Pipeline(object):
 
         print('Clustering DEV no-fine-tuning:', self.get_dev_clustering_quality())
 
+        k = self.get_n_test_clusters(method=config.get('n_test_clusters_selection_method', None),
+                                     plot_file_path=os.path.join(report_folder, '0_test.tuning_n_clusters.pdf')
+                                     if report_folder is not None else None)
         test_quality = self.get_test_clustering_quality(
+            k=k,
             predicted_clusters_log_file=
             os.path.join(report_folder, '0_test.predicted_clusters.log') if report_folder is not None else None,
             true_clusters_log_file=
@@ -753,7 +794,12 @@ class Pipeline(object):
                 self.plot(show_test_only=True, plot_3d=True,
                           output_file_path=os.path.join(folder_3d, '{}_{}_test.pdf'.format(i + 1, step)))
 
+            k = self.get_n_test_clusters(method=config.get('n_test_clusters_selection_method', None),
+                                         plot_file_path=os.path.join(report_folder, '{}_{}_test.tuning_n_clusters.pdf'
+                                                                     .format(i + 1, step))
+                                         if report_folder is not None else None)
             test_quality = self.get_test_clustering_quality(
+                k=k,
                 predicted_clusters_log_file=
                 os.path.join(report_folder, '{}_{}_test.predicted_clusters.log'.format(i + 1, step))
                 if report_folder is not None else None,
@@ -837,7 +883,11 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 if folder_3d is not None:
                     p.plot(show_test_only=True, plot_3d=True,
                            output_file_path=os.path.join(folder_3d, intent_name + '.pdf'))
+                k = p.get_n_test_clusters(method=config.get('n_test_clusters_selection_method', None),
+                                          plot_file_path=os.path.join(folder, intent_name + '.tuning_n_clusters.pdf')
+                                          if folder is not None else None)
                 test_quality = p.get_test_clustering_quality(
+                    k=k,
                     predicted_clusters_log_file=os.path.join(folder, intent_name + '.predicted_clusters.log')
                     if folder is not None else None,
                     true_clusters_log_file=os.path.join(folder, intent_name + '.true_clusters.log')
