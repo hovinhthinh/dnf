@@ -699,6 +699,7 @@ class Pipeline(object):
                 f.write('\t\n')
 
         return {
+            'k': k,
             'all': get_clustering_quality(test_true_clusters, test_predicted_clusters, advanced=advanced),
             # Filter intents by part type
             'train_dev': get_clustering_quality(
