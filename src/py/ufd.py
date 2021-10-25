@@ -518,7 +518,7 @@ class Pipeline(object):
             return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
     def get_n_test_clusters(self, method=None, plot_file_path=None):
-        groundtruth = len(dict.fromkeys([u.feature_name for u in self.test_utterances])) + 3
+        groundtruth = len(dict.fromkeys([u.feature_name for u in self.test_utterances]))
         if method is None or self.dev_test_clustering_method != 'k-means':  # tuning support k-means only
             return groundtruth
         elif method == 'elbow':
