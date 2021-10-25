@@ -518,30 +518,53 @@ class Pipeline(object):
             return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
 
     def get_n_test_clusters(self, method=None, plot_file_path=None):
+        groundtruth = len(dict.fromkeys([u.feature_name for u in self.test_utterances])) + 3
         if method is None or self.dev_test_clustering_method != 'k-means':  # tuning support k-means only
-            return len(dict.fromkeys([u.feature_name for u in self.test_utterances]))
+            return groundtruth
         elif method == 'elbow':
-            _min_distance_falling_rate = 0.2
             sse = {}
             optimal_k = 1
-            stopped = False
-            for k in range(1, int(len(self.test_utterances) / 20 + 1)):
-                kmeans = KMeans(n_clusters=k).fit(self.test_embeddings)
-                sse[k] = kmeans.inertia_
 
-                if not stopped and (k == 1 or sse[k] / sse[k - 1] <= 1 - _min_distance_falling_rate):
-                    optimal_k = k
-                else:
-                    stopped = True
-            plt.figure()
-            plt.plot(list(sse.keys()), list(sse.values()))
-            plt.xlabel('#clusters (selected={}, ground-truth={})'.format(
+            for k in range(1, groundtruth * 2 + 1):
+                kmeans = KMeans(n_clusters=k).fit(self.test_embeddings)
+                if k == 1:
+                    max_sse = kmeans.inertia_
+                sse[k] = kmeans.inertia_ / max_sse
+
+            delta_1 = {}
+            delta_2 = {}
+            strength = {}
+            for k in sse:
+                if k >= 2:
+                    delta_1[k] = sse[k - 1] - sse[k]
+            for k in sse:
+                if k >= 3:
+                    delta_2[k] = delta_1[k - 1] - delta_1[k]
+            for k in sse:
+                if k + 1 in delta_2 and delta_2[k + 1] > delta_1[k + 1]:
+                    strength[k] = (delta_2[k + 1] - delta_1[k + 1]) / k
+
+            if len(strength) > 0:
+                optimal_k = max(strength, key=strength.get)
+
+            plot = plt.figure().add_subplot(111)
+
+            plot.plot(list(sse.keys()), list(sse.values()), color='tab:blue', marker='x')
+            plot.set_xlabel('#clusters (selected={}, ground-truth={})'.format(
                 optimal_k,
                 len(dict.fromkeys([u.feature_name for u in self.test_utterances]))))
-            plt.ylabel('SSE')
+            plot.set_xticks(list(sse.keys()))
+            plot.set_ylabel('normalized SSE')
+
+            ax2 = plot.twinx()
+            ax2.bar(list(strength.keys()), list(strength.values()), color='red', width=0.2)
+            ax2.set_ylabel('relative strength')
+
             if self.dataset_name is not None:
                 plt.title(self.dataset_name)
 
+            plot.set_zorder(ax2.get_zorder() + 1)
+            plot.patch.set_visible(False)
             plt.tight_layout()
             if plot_file_path == None:
                 plt.show()
@@ -553,7 +576,7 @@ class Pipeline(object):
         elif method == 'silhouette':
             sc = {}
             optimal_k = None
-            for k in range(2, int(len(self.test_utterances) / 20 + 1)):
+            for k in range(2, groundtruth * 2 + 1):
                 kmeans = KMeans(n_clusters=k).fit(self.test_embeddings)
                 sc[k] = silhouette_score(self.test_embeddings, kmeans.labels_)
 
