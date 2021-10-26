@@ -542,7 +542,7 @@ class Pipeline(object):
                     delta_2[k] = delta_1[k - 1] - delta_1[k]
             for k in sse:
                 if k + 1 in delta_2 and delta_2[k + 1] > delta_1[k + 1]:
-                    strength[k] = (delta_2[k + 1] - delta_1[k + 1]) / k
+                    strength[k] = (delta_2[k + 1] - delta_1[k + 1]) # / k # uncomment to compute relative strength
 
             if len(strength) > 0:
                 optimal_k = max(strength, key=strength.get)
@@ -553,12 +553,13 @@ class Pipeline(object):
             plot.set_xlabel('#clusters (selected={}, ground-truth={})'.format(
                 optimal_k,
                 len(dict.fromkeys([u.feature_name for u in self.test_utterances]))))
-            plot.set_xticks(list(sse.keys()))
+            plot.xaxis.get_major_locator().set_params(integer=True)
+            # plot.set_xticks(list(sse.keys()))
             plot.set_ylabel('normalized SSE')
 
             ax2 = plot.twinx()
             ax2.bar(list(strength.keys()), list(strength.values()), color='red', width=0.2)
-            ax2.set_ylabel('relative strength')
+            ax2.set_ylabel('strength')
 
             if self.dataset_name is not None:
                 plt.title(self.dataset_name)
