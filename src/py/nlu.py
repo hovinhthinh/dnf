@@ -60,21 +60,25 @@ class NLUModel(MPNetPreTrainedModel):
     ):
         outputs = self.base(input_ids, attention_mask=attention_mask)
 
-        # slot tagging
-        st_logits = self.slot_tagger(outputs[0])
-        # Only keep active parts of the loss
-        active_loss = attention_mask.view(-1) == 1
-        active_logits = st_logits.view(-1, self.config.st_num_labels)
-        active_labels = torch.where(
-            active_loss, st_labels.view(-1), torch.tensor(self.st_loss_fct.ignore_index).type_as(st_labels)
-        )
-        st_loss = self.st_loss_fct(active_logits, active_labels)
-
-        # intent classification
+        # logits
         ic_logits = self.intent_classifier(cls=_cls(outputs))
-        ic_loss = self.ic_loss_fct(ic_logits, ic_labels)
+        st_logits = self.slot_tagger(outputs[0])
 
-        loss = torch.add(st_loss, ic_loss) # TODO: change how loss is computed
+        # losses
+        loss = None
+        if ic_labels is not None and st_labels is not None:
+            ic_loss = self.ic_loss_fct(ic_logits, ic_labels)
+
+            # Only keep active parts of the loss
+            active_st_logits = st_logits.view(-1, self.config.st_num_labels)
+            active_st_labels = torch.where(
+                attention_mask.view(-1) == 1,
+                st_labels.view(-1),
+                torch.tensor(self.st_loss_fct.ignore_index).type_as(st_labels)
+            )
+            st_loss = self.st_loss_fct(active_st_logits, active_st_labels)
+
+            loss = torch.add(st_loss, ic_loss)
 
         output = (st_logits, ic_logits) + outputs[2:]
 
