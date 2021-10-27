@@ -5,6 +5,7 @@ from scipy.optimize import linear_sum_assignment
 from transformers import set_seed
 
 from data.entity import Utterance
+from sbert import _remap_clusters
 
 Axes3D = Axes3D
 
@@ -246,12 +247,6 @@ class Pipeline(object):
         self.update_embeddings()
         return self.get_dev_clustering_quality()['NMI']
 
-    # map to 0,1,2...
-    def remap_clusters(self, clusters):
-        label_set = dict.fromkeys(clusters)
-        label_map = {l: i for i, l in enumerate(label_set)}
-        return [label_map[l] for l in clusters]
-
     def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None, align_clusters=True,
                                         early_stopping_patience=0, min_iterations=None, max_iterations=None):
         classifier, optim, previous_clusters = None, None, None
@@ -275,7 +270,7 @@ class Pipeline(object):
                                            u.part_type == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                    pseudo_clusters = self.remap_clusters(pseudo_clusters)
+                    pseudo_clusters = _remap_clusters(pseudo_clusters)
 
                     if align_clusters and previous_clusters is not None:
                         pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters,
@@ -321,7 +316,7 @@ class Pipeline(object):
                                        u.part_type == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                pseudo_clusters = self.remap_clusters(pseudo_clusters)
+                pseudo_clusters = _remap_clusters(pseudo_clusters)
 
                 if align_clusters and previous_clusters is not None:
                     pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
@@ -360,7 +355,7 @@ class Pipeline(object):
                                            u.part_type == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                    pseudo_clusters = self.remap_clusters(pseudo_clusters)
+                    pseudo_clusters = _remap_clusters(pseudo_clusters)
 
                     if align_clusters and previous_clusters is not None:
                         pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters,
@@ -372,7 +367,7 @@ class Pipeline(object):
                                                  pseudo_clusters))
                     classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
                         [u.text for u in utterances], pseudo_clusters,
-                        self.remap_clusters([u.intent_name for u in utterances]),
+                        _remap_clusters([u.intent_name for u in utterances]),
                         train_sample_weights=weights if use_pseudo_sample_weights else None,
                         intent_classifier_weight=intent_classifier_weight,
                         previous_classifier=classifier if align_clusters else None,
@@ -408,7 +403,7 @@ class Pipeline(object):
                                        u.part_type == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                pseudo_clusters = self.remap_clusters(pseudo_clusters)
+                pseudo_clusters = _remap_clusters(pseudo_clusters)
 
                 if align_clusters and previous_clusters is not None:
                     pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
@@ -419,7 +414,7 @@ class Pipeline(object):
                                              pseudo_clusters))
                 classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
                     [u.text for u in utterances], pseudo_clusters,
-                    self.remap_clusters([u.intent_name for u in utterances]),
+                    _remap_clusters([u.intent_name for u in utterances]),
                     intent_classifier_weight=intent_classifier_weight,
                     train_sample_weights=weights if use_pseudo_sample_weights else None,
                     previous_classifier=classifier if align_clusters else None,
@@ -542,7 +537,7 @@ class Pipeline(object):
                     delta_2[k] = delta_1[k - 1] - delta_1[k]
             for k in sse:
                 if k + 1 in delta_2 and delta_2[k + 1] > delta_1[k + 1]:
-                    strength[k] = (delta_2[k + 1] - delta_1[k + 1]) # / k # uncomment to compute relative strength
+                    strength[k] = (delta_2[k + 1] - delta_1[k + 1])  # / k # uncomment to compute relative strength
 
             if len(strength) > 0:
                 optimal_k = max(strength, key=strength.get)
