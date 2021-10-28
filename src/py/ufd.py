@@ -938,8 +938,6 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                      dev_test_clustering_method=config.get('dev_test_clustering_method', 'k-means'))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
         p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
-        # print('Train NLU model')
-        # p.train_nlu_model(os.path.join(report_folder, 'inter_intent', 'nlu_model'))
 
         if intra_intent_data is not None:
             # Apply back to intra-intent
