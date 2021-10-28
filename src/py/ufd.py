@@ -271,7 +271,7 @@ class Pipeline(object):
                                            u.part_type == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                    pseudo_clusters = _remap_clusters(pseudo_clusters)
+                    pseudo_clusters = _remap_clusters(pseudo_clusters)[0]
 
                     if align_clusters and previous_clusters is not None:
                         pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters,
@@ -317,7 +317,7 @@ class Pipeline(object):
                                        u.part_type == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                pseudo_clusters = _remap_clusters(pseudo_clusters)
+                pseudo_clusters = _remap_clusters(pseudo_clusters)[0]
 
                 if align_clusters and previous_clusters is not None:
                     pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
@@ -356,7 +356,7 @@ class Pipeline(object):
                                            u.part_type == 'TRAIN']
                         weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                    pseudo_clusters = _remap_clusters(pseudo_clusters)
+                    pseudo_clusters = _remap_clusters(pseudo_clusters)[0]
 
                     if align_clusters and previous_clusters is not None:
                         pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters,
@@ -368,7 +368,7 @@ class Pipeline(object):
                                                  pseudo_clusters))
                     classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
                         [u.text for u in utterances], pseudo_clusters,
-                        _remap_clusters([u.intent_name for u in utterances]),
+                        _remap_clusters([u.intent_name for u in utterances])[0],
                         train_sample_weights=weights if use_pseudo_sample_weights else None,
                         intent_classifier_weight=intent_classifier_weight,
                         previous_classifier=classifier if align_clusters else None,
@@ -404,7 +404,7 @@ class Pipeline(object):
                                        u.part_type == 'TRAIN']
                     weights = [weights[i] for i, u in enumerate(self.utterances) if u.part_type == 'TRAIN']
 
-                pseudo_clusters = _remap_clusters(pseudo_clusters)
+                pseudo_clusters = _remap_clusters(pseudo_clusters)[0]
 
                 if align_clusters and previous_clusters is not None:
                     pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
@@ -415,7 +415,7 @@ class Pipeline(object):
                                              pseudo_clusters))
                 classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
                     [u.text for u in utterances], pseudo_clusters,
-                    _remap_clusters([u.intent_name for u in utterances]),
+                    _remap_clusters([u.intent_name for u in utterances])[0],
                     intent_classifier_weight=intent_classifier_weight,
                     train_sample_weights=weights if use_pseudo_sample_weights else None,
                     previous_classifier=classifier if align_clusters else None,
@@ -938,6 +938,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                      dev_test_clustering_method=config.get('dev_test_clustering_method', 'k-means'))
         intent_report_folder = os.path.join(report_folder, 'inter_intent') if report_folder is not None else None
         p.run(report_folder=intent_report_folder, steps=pipeline_steps, config=config, plot_3d=plot_3d)
+        # print('Train NLU model')
+        # p.train_nlu_model(os.path.join(report_folder, 'inter_intent', 'nlu_model'))
 
         if intra_intent_data is not None:
             # Apply back to intra-intent

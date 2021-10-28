@@ -102,7 +102,7 @@ def fine_tune_nlu_model(train_texts, train_slots, train_intents,
     train_encodings.pop("offset_mapping")
 
     # Intent labels
-    train_intent_labels = _remap_clusters(train_intents)
+    train_intent_labels = _remap_clusters(train_intents)[0]
 
     nlu_model = NLUModel.from_pretrained(base_model_path,
                                          st_num_labels=len(unique_tags),

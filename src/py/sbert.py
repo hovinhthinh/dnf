@@ -41,11 +41,15 @@ def _mean_pooling(model_output, attention_mask):
 def _cls(model_output):
     return model_output[0][:, 0, :]
 
-# map to 0,1,2...
 def _remap_clusters(clusters):
-    label_set = dict.fromkeys(clusters)
-    label_map = {l: i for i, l in enumerate(label_set)}
-    return [label_map[l] for l in clusters]
+    '''
+    Map clusters to 0-indexed ids
+    :param clusters:
+    :return: ids: List[int], id2label: List[str], label2id: dict
+    '''
+    id2label = list(dict.fromkeys(clusters).keys())
+    label2id = {l: i for i, l in enumerate(id2label)}
+    return [label2id[l] for l in clusters], id2label, label2id
 
 
 def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
