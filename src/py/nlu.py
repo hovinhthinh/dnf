@@ -38,10 +38,12 @@ class NLUModel(MPNetPreTrainedModel):
     def __init__(self, config, **kwargs):
         super().__init__(config)
 
-        if 'st_num_labels' in kwargs:
-            self.config.st_num_labels = kwargs.pop('st_num_labels')
-        if 'ic_num_labels' in kwargs:
-            self.config.ic_num_labels = kwargs.pop('ic_num_labels')
+        if 'id2st_label' in kwargs:
+            self.config.st_labels = kwargs.pop('id2st_label')
+            self.config.st_num_labels = len(self.config.st_labels)
+        if 'id2ic_label' in kwargs:
+            self.config.ic_labels = kwargs.pop('id2ic_label')
+            self.config.ic_num_labels = len(self.config.ic_labels)
 
         self.base = MPNetModel(config, add_pooling_layer=False)
 
@@ -94,19 +96,17 @@ def fine_tune_nlu_model(train_texts, train_slots, train_intents,
 
     train_texts, train_tags = _split_text_and_slots_into_tokens_and_tags(train_texts, train_slots)
     # Tag set
-    unique_tags = dict.fromkeys(tag for doc in train_tags for tag in doc)
-    tag2id = {tag: id for id, tag in enumerate(unique_tags)}
+    id2tag = list(dict.fromkeys(tag for doc in train_tags for tag in doc).keys())
+    tag2id = {tag: id for id, tag in enumerate(id2tag)}
     train_encodings = tokenizer(train_texts, is_split_into_words=True, return_offsets_mapping=True, padding=True,
                                 truncation=True, return_tensors='pt')
     train_slot_labels = _encode_tags(train_tags, train_encodings, tag2id)
     train_encodings.pop("offset_mapping")
 
     # Intent labels
-    train_intent_labels = _remap_clusters(train_intents)[0]
+    train_intent_labels, id2label, _ = _remap_clusters(train_intents)
 
-    nlu_model = NLUModel.from_pretrained(base_model_path,
-                                         st_num_labels=len(unique_tags),
-                                         ic_num_labels=len(dict.fromkeys(train_intent_labels)))
+    nlu_model = NLUModel.from_pretrained(base_model_path, id2st_label=id2tag, id2ic_label=id2label)
 
     train_dataset = NLUTrainingDataset(train_encodings, train_slot_labels, train_intent_labels)
 
