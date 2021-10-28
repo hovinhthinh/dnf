@@ -4,6 +4,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import linear_sum_assignment
 from transformers import set_seed
 
+import nlu
 from data.entity import Utterance
 from sbert import _remap_clusters
 
@@ -724,6 +725,20 @@ class Pipeline(object):
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_type == 'INTENT'], advanced=advanced)
         }
+
+    def train_nlu_model(self, save_model_path=None):
+        utterances = self.utterances
+        if not self.use_unseen_in_training:
+            utterances = [u for u in utterances if u.part_type == 'TRAIN']
+
+        texts, slots, intents = [u.text for u in utterances], \
+                                [u.slots for u in utterances], \
+                                [u.intent_name for u in utterances]
+
+        nlu.fine_tune_nlu_model(texts, slots, intents)
+
+        if save_model_path is not None:
+            nlu.save_finetuned(save_model_path)
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={

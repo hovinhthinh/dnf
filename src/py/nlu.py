@@ -134,7 +134,7 @@ if __name__ == '__main__':
           [{'slot_1': {'start': 8, 'end': 18}, 'slot_2': {'start': 0, 'end': 4}},
            {'slot_1': {'start': 24, 'end': 49}, 'slot_2': {'start': 0, 'end': 4}}], \
           ['intent_1', 'intent_2'],
-    fine_tune_nlu_model(train_texts, train_slots, train_intents, n_train_epochs=1)
+    fine_tune_nlu_model(train_texts, train_slots, train_intents, n_train_epochs=3)
 
     save_finetuned('./models/temp_model')
     load_finetuned('./models/temp_model')
