@@ -747,7 +747,7 @@ class Pipeline(object):
                  u.feature_type == 'INTENT'], advanced=advanced)
         }
 
-    def train_nlu_model(self, save_model_path=None):
+    def train_nlu_model(self, save_model_path=None, n_train_epochs=None, early_stopping_patience=0):
         utterances = self.utterances
         if not self.use_unseen_in_training:
             utterances = [u for u in utterances if u.part_type == 'TRAIN']
@@ -756,7 +756,11 @@ class Pipeline(object):
                                 [u.slots for u in utterances], \
                                 [u.intent_name for u in utterances]
 
-        nlu.fine_tune_nlu_model(texts, slots, intents)
+        nlu.fine_tune_nlu_model(texts, slots, intents,
+                                n_train_epochs=n_train_epochs,
+                                eval_callback=None,  # TODO: add code for validation
+                                early_stopping=True if n_train_epochs is None else False,
+                                early_stopping_patience=early_stopping_patience)
 
         if save_model_path is not None:
             nlu.save_finetuned(save_model_path)
