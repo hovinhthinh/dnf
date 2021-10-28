@@ -667,17 +667,17 @@ class Pipeline(object):
                             [self.test_utterances[idx].text for idx in indices if test_predicted_clusters[idx] == pl]))
                     f.write('\n')
 
+        matrix = numpy.zeros((len(true_clusters), k), dtype=numpy.int32)
+        for tc in range(len(true_clusters)):
+            indices = [i for i, l in enumerate(test_true_clusters) if l == tc]
+            for idx in indices:
+                matrix[tc][test_predicted_clusters[idx]] += 1
+
+        sum_by_true_clusters = numpy.sum(matrix, axis=1)
+        sum_by_predicted_clusters = numpy.sum(matrix, axis=0)
+
         if contingency_matrix_log_file is not None:
             with open(contingency_matrix_log_file, 'w') as f:
-                matrix = numpy.zeros((len(true_clusters), k), dtype=numpy.int32)
-                for tc in range(len(true_clusters)):
-                    indices = [i for i, l in enumerate(test_true_clusters) if l == tc]
-                    for idx in indices:
-                        matrix[tc][test_predicted_clusters[idx]] += 1
-
-                sum_by_true_clusters = numpy.sum(matrix, axis=1)
-                sum_by_predicted_clusters = numpy.sum(matrix, axis=0)
-
                 f.write('Feature/Cluster')
                 for i in range(k):
                     f.write(
@@ -695,8 +695,29 @@ class Pipeline(object):
                     f.write('\t{:.1f}%'.format(numpy.max(matrix[:, i]) / sum_by_predicted_clusters[i] * 100))
                 f.write('\t\n')
 
+        # Compute number of well-aligned true/predicted clusters
+        aligned_60 = 0
+        aligned_70 = 0
+        aligned_80 = 0
+        aligned_90 = 0
+        for tc in range(len(true_clusters)):
+            for pc in range(k):
+                purity = matrix[tc][pc] / max(sum_by_true_clusters[tc], sum_by_predicted_clusters[pc])
+                if purity >= 0.6:
+                    aligned_60 += 1
+                if purity >= 0.7:
+                    aligned_70 += 1
+                if purity >= 0.8:
+                    aligned_80 += 1
+                if purity >= 0.9:
+                    aligned_90 += 1
+
         return {
             'k': k,
+            'aligned_60': aligned_60,
+            'aligned_70': aligned_70,
+            'aligned_80': aligned_80,
+            'aligned_90': aligned_90,
             'all': get_clustering_quality(test_true_clusters, test_predicted_clusters, advanced=advanced),
             # Filter intents by part type
             'train_dev': get_clustering_quality(
