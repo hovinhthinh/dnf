@@ -299,7 +299,7 @@ def save_finetuned(model_path):
     nlu_model.save_pretrained(model_path)
 
 
-def get_intents_and_slots(utterances: List[str], batch_size=64):
+def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
     def extract_intent_and_slots_from_logits(st_logits, ic_logits, tokenized_text,
                                              input_ids, attention_mask, offset_mapping):
         # intent
@@ -377,12 +377,10 @@ def get_intents_and_slots(utterances: List[str], batch_size=64):
             'tokens': list(zip(tokenized_text, tags[1:n + 1], [p.item() for p in prob[1:n + 1]]))
         }
 
-    tokenized_utterances = [u.split() for u in utterances]
-
     outputs = []
     cur = 0
-    while cur < len(utterances):
-        last = min(len(utterances), cur + batch_size)
+    while cur < len(tokenized_utterances):
+        last = min(len(tokenized_utterances), cur + batch_size)
         # Tokenize sentences
         encoded_input = tokenizer(tokenized_utterances[cur: last], is_split_into_words=True, padding=True,
                                   truncation=True,
@@ -404,8 +402,9 @@ def get_intents_and_slots(utterances: List[str], batch_size=64):
                                                                 offset_mapping[i].numpy()))
 
         cur = last
-        print('\rInferencing: {}/{} ({:.1f}%)'.format(cur, len(utterances), 100 * cur / len(utterances)),
-              end='' if cur < len(utterances) else '\n')
+        print('\rInferencing: {}/{} ({:.1f}%)'.format(cur, len(tokenized_utterances),
+                                                      100 * cur / len(tokenized_utterances)),
+              end='' if cur < len(tokenized_utterances) else '\n')
 
     return outputs
 
@@ -422,4 +421,4 @@ if __name__ == '__main__':
     # load_finetuned('./models/temp_model')
 
     load_finetuned('models/snips_inter-intent_nlu/inter_intent/nlu_model')
-    print(json.dumps(get_intents_and_slots(['I want to see movie times at 11:12']), indent=2))
+    print(json.dumps(get_intents_and_slots(['I want to see movie times at 11:12'.split()]), indent=2))
