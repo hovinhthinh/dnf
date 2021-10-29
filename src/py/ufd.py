@@ -6,7 +6,7 @@ from transformers import set_seed
 
 import nlu
 from data.entity import Utterance
-from sbert import _remap_clusters
+from sbert import _remap_clusters, _split_text_and_slots_into_tokens_and_tags
 
 Axes3D = Axes3D
 
@@ -764,6 +764,40 @@ class Pipeline(object):
 
         if save_model_path is not None:
             nlu.save_finetuned(save_model_path)
+
+    def _get_nlu_quality(self, nlu_outputs, true_intents, true_tags):
+        n_true_intents = 0
+        n_true_mic_tags = 0
+
+        tag_prec = []
+        for i in range(len(nlu_outputs)):
+            if nlu_outputs[i]['intent'][0] == true_intents[i]:
+                n_true_intents += 1
+            n_true_tags = 0
+            for j in range(len(true_tags[i])):
+                if nlu_outputs[i]['tokens'][j][1] == true_tags[i][j]:
+                    n_true_tags += 1
+
+            tag_prec.append(n_true_tags / len(true_tags[i]))
+            n_true_mic_tags += n_true_tags
+
+        return {
+            'intent_prec': round(n_true_intents / len(nlu_outputs), 3),
+            'slot_mac_avg_prec': round(sum(tag_prec) / len(nlu_outputs), 3),
+            'slot_mic_avg_prec': round(n_true_mic_tags / sum([len(tags) for tags in true_tags]), 3)
+        }
+
+    def get_nlu_dev_quality(self):
+        if self.squashing_train_dev:
+            utterances = [self.utterances[i] for i in self.dev_indices]
+        else:
+            utterances = [u for u in self.utterances if u.part_type != 'TRAIN']
+
+        texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in utterances],
+                                                                 [u.slots for u in utterances])
+        nlu_outputs = nlu.get_intents_and_slots(texts)
+
+        return self._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
 
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
