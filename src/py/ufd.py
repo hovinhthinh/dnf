@@ -799,6 +799,42 @@ class Pipeline(object):
 
         return self._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
 
+    def get_nlu_test_quality(self):
+        texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in self.test_utterances],
+                                                                 [u.slots for u in self.test_utterances])
+        nlu_outputs = nlu.get_intents_and_slots(texts)
+        return {
+            'all': self._get_nlu_quality(nlu_outputs, [u.intent_name for u in self.test_utterances], tags),
+            # Filter intents by part type
+            'train_dev': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if
+                 u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')],
+                [tags[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')]),
+            'test': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')]),
+            # Filter intents by feature type
+            'slot': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'SLOT'],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_type == 'SLOT'],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'SLOT']
+            ),
+            'slot_value': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'SLOT+VALUE'],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_type == 'SLOT+VALUE'],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'SLOT+VALUE']
+            ),
+            'intent': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'INTENT'],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_type == 'INTENT'],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'INTENT']
+            )
+        }
+
     def run(self, report_folder=None, steps=['SMC+US', 'PC'], save_model=True, plot_3d=False,
             config={
                 'SMC_n_train_epochs': None,
