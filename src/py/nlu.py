@@ -8,8 +8,8 @@ from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, MPNetPreTrainedModel, MPNetModel
 
-from sbert import ClassificationHead, TaggerHead, _cls, _split_text_and_slots_into_tokens_and_tags, _encode_tags, \
-    _remap_clusters, _finetune_model
+from sbert import ClassificationHead, TaggerHead, _cls, _remap_clusters, _finetune_model, \
+    _split_text_and_slots_into_tokens_and_tags, _encode_tags
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
@@ -87,6 +87,169 @@ class NLUModel(MPNetPreTrainedModel):
         output = (st_logits, ic_logits) + outputs[2:]
 
         return ((loss,) + output) if loss is not None else output
+
+
+def _split_into_tokens_and_tags(texts, slots):
+    train_encodings = tokenizer(texts, padding=True, truncation=True, return_offsets_mapping=True, return_tensors='pt')
+    tags = []
+    for i in range(len(texts)):
+        input_ids, attention_mask, offset_mapping = \
+            train_encodings['input_ids'][i], train_encodings['attention_mask'][i], train_encodings['offset_mapping'][i]
+        u_tags = [None] * len(attention_mask)
+
+        n = torch.sum(attention_mask).item() - 2
+
+        for j in range(1, n + 1):
+            tag = None
+            for slot, info in slots[i].items():
+                if offset_mapping[j][0] == info['start']:
+                    assert offset_mapping[j][0] <= info['end']
+                    assert tag is None
+                    tag = 'B_' + slot
+                    last_b = tag
+                elif info['start'] < offset_mapping[j][0] < info['end']:
+                    assert offset_mapping[j][1] <= info['end']
+                    assert tag is None
+                    assert last_b == 'B_' + slot
+                    tag = 'I_' + slot
+
+            if tag is None:
+                last_b = None
+            u_tags[j] = 'O' if tag is None else tag
+
+        tags.append(u_tags)
+
+    train_encodings.pop("offset_mapping")
+    return train_encodings, tags
+
+
+def fine_tune_nlu_model_2(train_texts, train_slots, train_intents,
+                          n_train_epochs=None, n_train_steps=None,
+                          base_model_path='./models/sentence-transformers.paraphrase-mpnet-base-v2',
+                          eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0):
+    global nlu_model, tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(base_model_path)
+
+    train_encodings, train_tags = _split_into_tokens_and_tags(train_texts, train_slots)
+    # Tag set
+    id2tag = list(dict.fromkeys(tag for doc in train_tags for tag in doc if tag is not None).keys())
+    tag2id = {tag: id for id, tag in enumerate(id2tag)}
+
+    train_slot_labels = [[-100 if tag is None else tag2id[tag] for tag in doc] for doc in train_tags]
+
+    # Intent labels
+    train_intent_labels, id2label, _ = _remap_clusters(train_intents)
+
+    nlu_model = NLUModel.from_pretrained(base_model_path, id2st_label=id2tag, id2ic_label=id2label)
+
+    train_dataset = NLUTrainingDataset(train_encodings, train_slot_labels, train_intent_labels)
+
+    _finetune_model(nlu_model, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
+                    eval_callback=eval_callback,
+                    early_stopping=early_stopping,
+                    early_stopping_patience=early_stopping_patience)
+
+
+def get_intents_and_slots_2(utterances: List[str], batch_size=64):
+    def extract_intent_and_slots_from_logits(st_logits, ic_logits, text, input_ids, attention_mask, offset_mapping):
+        # intent
+        ic_prob = softmax(ic_logits, axis=-1)
+        ic_idx = numpy.argmax(ic_prob)
+
+        # slots
+        st_prob = softmax(st_logits, axis=-1)
+        n = numpy.sum(attention_mask) - 2
+
+        # DP decoding
+        cost = numpy.zeros((n + 1, nlu_model.config.st_num_labels))
+        trace = numpy.zeros((n + 1, nlu_model.config.st_num_labels), dtype=int)
+        for t in range(nlu_model.config.st_num_labels):
+            cost[0][t] == 0 if nlu_model.config.st_labels[t] == 'O' else -1
+        for c in range(1, n + 1):
+            for t in range(nlu_model.config.st_num_labels):
+                label = nlu_model.config.st_labels[t]
+                if label == 'O' or label.startswith('B_'):
+                    best_previous_t = numpy.argmax(cost[c - 1])
+                    cost[c][t] = -1 if cost[c - 1][best_previous_t] == -1 else cost[c - 1][best_previous_t] + \
+                                                                               st_prob[c][t]
+                    trace[c][t] = best_previous_t
+                else:
+                    cost[c][t] = -1
+                    for p in range(nlu_model.config.st_num_labels):
+                        if nlu_model.config.st_labels[p] not in [label, 'B_' + label[2:]] or cost[c - 1][p] == -1:
+                            continue
+                        if cost[c - 1][p] + st_prob[c][t] > cost[c][t]:
+                            cost[c][t] = cost[c - 1][p] + st_prob[c][t]
+                            trace[c][t] = p
+        # decode
+        tags = [0] * (n + 1)
+        prob = [0] * (n + 1)
+
+        t = numpy.argmax(cost[n])
+        total_prob = cost[n][t] / n
+        assert total_prob >= 0
+
+        c = n
+        while c > 0:
+            tags[c] = nlu_model.config.st_labels[t]
+            prob[c] = st_prob[c][t]
+            t = trace[c][t]
+            c -= 1
+
+        # resolve
+        slots = []
+        for c in range(1, n + 1):
+            if tags[c].startswith('B_'):
+                j = c
+                while j < n and tags[j + 1].startswith('I_'):
+                    j += 1
+                slots.append(
+                    {
+                        'slot': tags[c][2:],
+                        'start': offset_mapping[c][0],
+                        'end': offset_mapping[j][1],
+                        'value': text[offset_mapping[c][0]:offset_mapping[j][1]],
+                        'prob': numpy.average(prob[c:j + 1])
+                        # prob of a slot is the average prob of its constituent tags
+                    }
+                )
+
+        return {
+            'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx]),
+            'slots': {
+                'total_prob': total_prob,
+                'slots': slots
+            }
+        }
+
+    outputs = []
+    cur = 0
+    while cur < len(utterances):
+        last = min(len(utterances), cur + batch_size)
+        # Tokenize sentences
+        encoded_input = tokenizer(utterances[cur: last], padding=True, truncation=True, return_offsets_mapping=True,
+                                  return_tensors='pt')
+        encoded_input.to(device)
+
+        offset_mapping = encoded_input.pop('offset_mapping')
+
+        # Compute token embeddings
+        with torch.no_grad():
+            model_output = nlu_model(**encoded_input)
+        st_logits, ic_logits = model_output[0], model_output[1]
+
+        for i in range(len(st_logits)):
+            outputs.append(extract_intent_and_slots_from_logits(st_logits[i], ic_logits[i],
+                                                                utterances[cur + i],
+                                                                encoded_input['input_ids'][i].numpy(),
+                                                                encoded_input['attention_mask'][i].numpy(),
+                                                                offset_mapping[i].numpy()))
+
+        cur = last
+        print('\rInferencing: {}/{} ({:.1f}%)'.format(cur, len(utterances), 100 * cur / len(utterances)),
+              end='' if cur < len(utterances) else '\n')
+
+    return outputs
 
 
 def fine_tune_nlu_model(train_texts, train_slots, train_intents,
