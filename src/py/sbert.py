@@ -41,6 +41,7 @@ def _mean_pooling(model_output, attention_mask):
 def _cls(model_output):
     return model_output[0][:, 0, :]
 
+
 def _remap_clusters(clusters):
     '''
     Map clusters to 0-indexed ids

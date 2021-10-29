@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Callable, List
 
@@ -206,20 +207,25 @@ def get_intents_and_slots_2(utterances: List[str], batch_size=64):
                 slots.append(
                     {
                         'slot': tags[c][2:],
-                        'start': offset_mapping[c][0],
-                        'end': offset_mapping[j][1],
+                        'start': offset_mapping[c][0].item(),
+                        'end': offset_mapping[j][1].item(),
                         'value': text[offset_mapping[c][0]:offset_mapping[j][1]],
-                        'prob': numpy.average(prob[c:j + 1])
+                        'prob': numpy.average(prob[c:j + 1]).item()
                         # prob of a slot is the average prob of its constituent tags
                     }
                 )
 
         return {
-            'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx]),
+            'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx].item()),
             'slots': {
                 'total_prob': total_prob,
                 'slots': slots
-            }
+            },
+            'tokens': list(zip(
+                tokenizer.convert_ids_to_tokens(input_ids[1:n + 1]),
+                tags[1:n + 1],
+                [p.item() for p in prob[1:n + 1]]
+            ))
         }
 
     outputs = []
@@ -239,7 +245,7 @@ def get_intents_and_slots_2(utterances: List[str], batch_size=64):
         st_logits, ic_logits = model_output[0], model_output[1]
 
         for i in range(len(st_logits)):
-            outputs.append(extract_intent_and_slots_from_logits(st_logits[i], ic_logits[i],
+            outputs.append(extract_intent_and_slots_from_logits(st_logits[i].numpy(), ic_logits[i].numpy(),
                                                                 utterances[cur + i],
                                                                 encoded_input['input_ids'][i].numpy(),
                                                                 encoded_input['attention_mask'][i].numpy(),
@@ -294,12 +300,18 @@ def save_finetuned(model_path):
 
 
 def get_intents_and_slots(utterances: List[str], batch_size=64):
-    def extract_intent_and_slots_from_logits(st_logits, ic_logits, text, input_ids, attention_mask, offset_mapping):
+    def extract_intent_and_slots_from_logits(st_logits, ic_logits, tokenized_text,
+                                             input_ids, attention_mask, offset_mapping):
         # intent
         ic_prob = softmax(ic_logits, axis=-1)
         ic_idx = numpy.argmax(ic_prob)
 
         # slots
+        active_ids = [i for i, offset in enumerate(offset_mapping) if offset[0] == 0]
+        st_logits = st_logits[active_ids]
+        input_ids = input_ids[active_ids]
+        attention_mask = attention_mask[active_ids]
+
         st_prob = softmax(st_logits, axis=-1)
         n = numpy.sum(attention_mask) - 2
 
@@ -349,29 +361,32 @@ def get_intents_and_slots(utterances: List[str], batch_size=64):
                 slots.append(
                     {
                         'slot': tags[c][2:],
-                        'start': offset_mapping[c][0],
-                        'end': offset_mapping[j][1],
-                        'value': text[offset_mapping[c][0]:offset_mapping[j][1]],
-                        'prob': numpy.average(prob[c:j + 1])
-                        # prob of a slot is the average prob of its constituent tags
+                        'start_token': c - 1,
+                        'end_token': j,
+                        'value': ' '.join(tokenized_text[c - 1:j]),
+                        'prob': numpy.average(prob[c:j + 1]).item()
                     }
                 )
 
         return {
-            'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx]),
+            'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx].item()),
             'slots': {
                 'total_prob': total_prob,
                 'slots': slots
-            }
+            },
+            'tokens': list(zip(tokenized_text, tags[1:n + 1], [p.item() for p in prob[1:n + 1]]))
         }
+
+    tokenized_utterances = [u.split() for u in utterances]
 
     outputs = []
     cur = 0
     while cur < len(utterances):
         last = min(len(utterances), cur + batch_size)
         # Tokenize sentences
-        encoded_input = tokenizer(utterances[cur: last], padding=True, truncation=True, return_offsets_mapping=True,
-                                  return_tensors='pt')
+        encoded_input = tokenizer(tokenized_utterances[cur: last], is_split_into_words=True, padding=True,
+                                  truncation=True,
+                                  return_offsets_mapping=True, return_tensors='pt')
         encoded_input.to(device)
 
         offset_mapping = encoded_input.pop('offset_mapping')
@@ -382,8 +397,8 @@ def get_intents_and_slots(utterances: List[str], batch_size=64):
         st_logits, ic_logits = model_output[0], model_output[1]
 
         for i in range(len(st_logits)):
-            outputs.append(extract_intent_and_slots_from_logits(st_logits[i], ic_logits[i],
-                                                                utterances[cur + i],
+            outputs.append(extract_intent_and_slots_from_logits(st_logits[i].numpy(), ic_logits[i].numpy(),
+                                                                tokenized_utterances[cur + i],
                                                                 encoded_input['input_ids'][i].numpy(),
                                                                 encoded_input['attention_mask'][i].numpy(),
                                                                 offset_mapping[i].numpy()))
@@ -407,4 +422,4 @@ if __name__ == '__main__':
     # load_finetuned('./models/temp_model')
 
     load_finetuned('models/snips_inter-intent_nlu/inter_intent/nlu_model')
-    print(get_intents_and_slots(['I love you', 'I want to check movie times']))
+    print(json.dumps(get_intents_and_slots(['I want to see movie times at 11:12']), indent=2))
