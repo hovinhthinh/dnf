@@ -148,7 +148,8 @@ def fine_tune_nlu_model_2(train_texts, train_slots, train_intents,
     _finetune_model(nlu_model, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
                     eval_callback=eval_callback,
                     early_stopping=early_stopping,
-                    early_stopping_patience=early_stopping_patience)
+                    early_stopping_patience=early_stopping_patience,
+                    save_fct=save_finetuned, load_fct=load_finetuned)
 
 
 def get_intents_and_slots_2(utterances: List[str], batch_size=64):
@@ -245,11 +246,13 @@ def get_intents_and_slots_2(utterances: List[str], batch_size=64):
         st_logits, ic_logits = model_output[0], model_output[1]
 
         for i in range(len(st_logits)):
-            outputs.append(extract_intent_and_slots_from_logits(st_logits[i].numpy(), ic_logits[i].numpy(),
+            outputs.append(extract_intent_and_slots_from_logits(st_logits[i].detach().cpu().numpy(),
+                                                                ic_logits[i].detach().cpu().numpy(),
                                                                 utterances[cur + i],
-                                                                encoded_input['input_ids'][i].numpy(),
-                                                                encoded_input['attention_mask'][i].numpy(),
-                                                                offset_mapping[i].numpy()))
+                                                                encoded_input['input_ids'][i].detach().cpu().numpy(),
+                                                                encoded_input['attention_mask'][
+                                                                    i].detach().cpu().numpy(),
+                                                                offset_mapping[i].detach().cpu().numpy()))
 
         cur = last
         print('\rInferencing: {}/{} ({:.1f}%)'.format(cur, len(utterances), 100 * cur / len(utterances)),
@@ -284,13 +287,14 @@ def fine_tune_nlu_model(train_texts, train_slots, train_intents,
     _finetune_model(nlu_model, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
                     eval_callback=eval_callback,
                     early_stopping=early_stopping,
-                    early_stopping_patience=early_stopping_patience)
+                    early_stopping_patience=early_stopping_patience,
+                    save_fct=save_finetuned, load_fct=load_finetuned)
 
 
-def load_finetuned(model_path):
+def load_finetuned(model_path, from_tf=False):
     global tokenizer, nlu_model
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    nlu_model = NLUModel.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, from_tf=from_tf)
+    nlu_model = NLUModel.from_pretrained(model_path, from_tf=from_tf)
     nlu_model.to(device)
 
 
@@ -395,11 +399,13 @@ def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
         st_logits, ic_logits = model_output[0], model_output[1]
 
         for i in range(len(st_logits)):
-            outputs.append(extract_intent_and_slots_from_logits(st_logits[i].numpy(), ic_logits[i].numpy(),
+            outputs.append(extract_intent_and_slots_from_logits(st_logits[i].detach().cpu().numpy(),
+                                                                ic_logits[i].detach().cpu().numpy(),
                                                                 tokenized_utterances[cur + i],
-                                                                encoded_input['input_ids'][i].numpy(),
-                                                                encoded_input['attention_mask'][i].numpy(),
-                                                                offset_mapping[i].numpy()))
+                                                                encoded_input['input_ids'][i].detach().cpu().numpy(),
+                                                                encoded_input['attention_mask'][
+                                                                    i].detach().cpu().numpy(),
+                                                                offset_mapping[i].detach().cpu().numpy()))
 
         cur = last
         print('\rInferencing: {}/{} ({:.1f}%)'.format(cur, len(tokenized_utterances),

@@ -76,7 +76,8 @@ def get_embeddings(utterances: List[str], batch_size=64) -> numpy.ndarray:
 
 
 def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_steps=None,
-                    eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0):
+                    eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0,
+                    save_fct=save, load_fct=load):
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
     optim = AdamW(finetune_model.parameters(), lr=5e-5, weight_decay=0.01)
 
@@ -150,11 +151,11 @@ def _finetune_model(finetune_model, train_dataset, n_train_epochs=None, n_train_
                     best_eval = eval
                     best_epoch = epoch
                     print(' -> Save model')
-                    save(temp_dir)
+                    save_fct(temp_dir)
                 else:
                     if epoch > best_epoch + early_stopping_patience:
                         print(' -> Stop')
-                        load(temp_dir)
+                        load_fct(temp_dir)
                         break
                     else:
                         print(' -> Be patient')

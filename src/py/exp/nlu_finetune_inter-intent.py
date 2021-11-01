@@ -12,7 +12,9 @@ _, inter_intent_data = snips.get_train_test_data(use_dev=True)
 print('Train NLU model')
 
 p = Pipeline(inter_intent_data, dataset_name='inter_intent')
-# p.train_nlu_model(save_model_path=os.path.join(report_folder, 'inter_intent', 'nlu_model'), n_train_epochs=5)
+p.train_nlu_model(save_model_path=os.path.join(report_folder, 'inter_intent', 'nlu_model'))
 
-load_finetuned('models/snips_inter-intent_nlu/inter_intent/nlu_model')
-print(json.dumps(p.get_nlu_test_quality(), indent=2))
+load_finetuned(os.path.join(report_folder, 'inter_intent', 'nlu_model'))
+test_quality = json.dumps(p.get_nlu_test_quality(), indent=2)
+with open(os.path.join(report_folder, 'inter_intent', 'stats.txt'), 'w') as f:
+    f.write(test_quality)

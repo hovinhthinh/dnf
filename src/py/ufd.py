@@ -758,7 +758,7 @@ class Pipeline(object):
 
         nlu.fine_tune_nlu_model(texts, slots, intents,
                                 n_train_epochs=n_train_epochs,
-                                eval_callback=None,  # TODO: add code for validation
+                                eval_callback=self.get_nlu_train_quality,
                                 early_stopping=True if n_train_epochs is None else False,
                                 early_stopping_patience=early_stopping_patience)
 
@@ -787,17 +787,25 @@ class Pipeline(object):
             'slot_mic_avg_prec': round(n_true_mic_tags / sum([len(tags) for tags in true_tags]), 3)
         }
 
-    def get_nlu_dev_quality(self):
-        if self.squashing_train_dev:
-            utterances = [self.utterances[i] for i in self.dev_indices]
-        else:
-            utterances = [u for u in self.utterances if u.part_type != 'TRAIN']
+    def get_nlu_train_quality(self):
+        # Using both TRAIN + DEV
+        utterances = self.utterances
+        if not self.use_unseen_in_training:
+            utterances = [u for u in utterances if u.part_type == 'TRAIN']
+
+        # Uncomment below for using DEV utterances only
+        # if self.squashing_train_dev:
+        #     utterances = [self.utterances[i] for i in self.dev_indices]
+        # else:
+        #     utterances = [u for u in self.utterances if u.part_type != 'TRAIN']
 
         texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in utterances],
                                                                  [u.slots for u in utterances])
         nlu_outputs = nlu.get_intents_and_slots(texts)
 
-        return self._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
+        quality = self._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
+        print(quality)
+        return quality['slot_mac_avg_prec']
 
     def get_nlu_test_quality(self):
         texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in self.test_utterances],
