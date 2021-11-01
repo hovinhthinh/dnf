@@ -17,4 +17,5 @@ p.train_nlu_model(save_model_path=os.path.join(report_folder, 'inter_intent', 'n
 load_finetuned(os.path.join(report_folder, 'inter_intent', 'nlu_model'))
 test_quality = json.dumps(p.get_nlu_test_quality(), indent=2)
 with open(os.path.join(report_folder, 'inter_intent', 'stats.txt'), 'w') as f:
+    print(test_quality)
     f.write(test_quality)
