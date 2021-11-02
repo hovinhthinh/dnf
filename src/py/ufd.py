@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy
 import umap
 from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.metrics import pairwise_distances, euclidean_distances, silhouette_score
+from sklearn.metrics import pairwise_distances, euclidean_distances, silhouette_score, classification_report
 
 import sbert
 from cluster import cop_kmeans, get_clustering_quality
@@ -767,36 +767,33 @@ class Pipeline(object):
 
     def _get_nlu_quality(self, nlu_outputs, true_intents, true_tags):
         n_true_intents = 0
-        n_true_mic_tags = 0
-        n_true_mic_tags_exclude_O = 0
 
-        tag_prec = []
-        tag_prec_exclude_O = []  # looking from the groundtruth
+        acc = []
+        acc_exclude_O = []
+        prec, recall, f1 = [], [], []  # mac.avg
+
         for i in range(len(nlu_outputs)):
             if nlu_outputs[i]['intent'][0] == true_intents[i]:
                 n_true_intents += 1
 
-            n_true_tags = 0
-            n_true_tags_exclude_O = 0
-
-            for j in range(len(true_tags[i])):
-                if nlu_outputs[i]['tokens'][j][1] == true_tags[i][j]:
-                    n_true_tags += 1
-                    if true_tags[i][j] != 'O':
-                        n_true_tags_exclude_O += 1
-
-            tag_prec.append(n_true_tags / len(true_tags[i]))
-            tag_prec_exclude_O.append(n_true_tags_exclude_O / len([t for t in true_tags[i] if t != 'O']))
-            n_true_mic_tags += n_true_tags
-            n_true_mic_tags_exclude_O += n_true_tags_exclude_O
+            pred_tags = [nlu_outputs[i]['tokens'][j][1] for j in range(len(true_tags[i]))]
+            # classification report
+            report = classification_report(pred_tags, true_tags[i], output_dict=True)
+            report_without_O = classification_report([pred_tags[j] for j, t in enumerate(true_tags[i]) if t != 'O'],
+                                                     [t for t in true_tags[i] if t != 'O'], output_dict=True)
+            acc.append(report['accuracy'])
+            prec.append(report['macro avg']['precision'])
+            recall.append(report['macro avg']['recall'])
+            f1.append(report['macro avg']['f1-score'])
+            acc_exclude_O.append(report_without_O['accuracy'])
 
         return {
-            'intent_prec': round(n_true_intents / len(nlu_outputs), 3),
-            'slot_mac_avg_prec': round(sum(tag_prec) / len(nlu_outputs), 3),
-            'slot_mic_avg_prec': round(n_true_mic_tags / sum([len(tags) for tags in true_tags]), 3),
-            'slot_mac_avg_prec_exclude_O': round(sum(tag_prec_exclude_O) / len(nlu_outputs), 3),
-            'slot_mic_avg_prec_exclude_O': round(
-                n_true_mic_tags_exclude_O / sum([len([t for t in tags if t != 'O']) for tags in true_tags]), 3)
+            'intent_acc': round(n_true_intents / len(nlu_outputs), 3),
+            'slot_acc': round(sum(acc) / len(nlu_outputs), 3),
+            'slot_acc_exclude_O': round(sum(acc_exclude_O) / len(nlu_outputs), 3),
+            'slot_prec': round(sum(prec) / len(nlu_outputs), 3),
+            'slot_rec': round(sum(recall) / len(nlu_outputs), 3),
+            'slot_f1': round(sum(f1) / len(nlu_outputs), 3),
         }
 
     def get_nlu_train_quality(self):
@@ -817,7 +814,7 @@ class Pipeline(object):
 
         quality = self._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
         print(quality)
-        return quality['slot_mac_avg_prec']
+        return quality['slot_acc']
 
     def get_nlu_test_quality(self):
         texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in self.test_utterances],
