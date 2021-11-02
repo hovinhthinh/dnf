@@ -768,23 +768,35 @@ class Pipeline(object):
     def _get_nlu_quality(self, nlu_outputs, true_intents, true_tags):
         n_true_intents = 0
         n_true_mic_tags = 0
+        n_true_mic_tags_exclude_O = 0
 
         tag_prec = []
+        tag_prec_exclude_O = []  # looking from the groundtruth
         for i in range(len(nlu_outputs)):
             if nlu_outputs[i]['intent'][0] == true_intents[i]:
                 n_true_intents += 1
+
             n_true_tags = 0
+            n_true_tags_exclude_O = 0
+
             for j in range(len(true_tags[i])):
                 if nlu_outputs[i]['tokens'][j][1] == true_tags[i][j]:
                     n_true_tags += 1
+                    if true_tags[i][j] != 'O':
+                        n_true_tags_exclude_O += 1
 
             tag_prec.append(n_true_tags / len(true_tags[i]))
+            tag_prec_exclude_O.append(n_true_tags_exclude_O / len([t for t in true_tags[i] if t != 'O']))
             n_true_mic_tags += n_true_tags
+            n_true_mic_tags_exclude_O += n_true_tags_exclude_O
 
         return {
             'intent_prec': round(n_true_intents / len(nlu_outputs), 3),
             'slot_mac_avg_prec': round(sum(tag_prec) / len(nlu_outputs), 3),
-            'slot_mic_avg_prec': round(n_true_mic_tags / sum([len(tags) for tags in true_tags]), 3)
+            'slot_mic_avg_prec': round(n_true_mic_tags / sum([len(tags) for tags in true_tags]), 3),
+            'slot_mac_avg_prec_exclude_O': round(sum(tag_prec_exclude_O) / len(nlu_outputs), 3),
+            'slot_mic_avg_prec_exclude_O': round(
+                n_true_mic_tags_exclude_O / sum([len([t for t in tags if t != 'O']) for tags in true_tags]), 3)
         }
 
     def get_nlu_train_quality(self):
