@@ -778,17 +778,17 @@ class Pipeline(object):
 
             pred_tags = [nlu_outputs[i]['tokens'][j][1] for j in range(len(true_tags[i]))]
             # classification report
-            report = classification_report(pred_tags, true_tags[i], output_dict=True)
+            report = classification_report(true_tags[i], pred_tags, output_dict=True)
             report_without_O = classification_report(
-                [pred_tags[j] for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'],
-                [t for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'], output_dict=True)
+                [t for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'],
+                [pred_tags[j] for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'], output_dict=True)
             acc.append(report['accuracy'])
             prec.append(report['macro avg']['precision'])
             recall.append(report['macro avg']['recall'])
             f1.append(report['macro avg']['f1-score'])
             acc_exclude_O.append(report_without_O['accuracy'])
 
-        return {
+        stats = {
             'intent_acc': round(n_true_intents / len(nlu_outputs), 3),
             'tag_acc': round(sum(acc) / len(nlu_outputs), 3),
             'tag_acc_exclude_O': round(sum(acc_exclude_O) / len(nlu_outputs), 3),
@@ -796,6 +796,45 @@ class Pipeline(object):
             'tag_rec': round(sum(recall) / len(nlu_outputs), 3),
             'tag_f1': round(sum(f1) / len(nlu_outputs), 3),
         }
+
+        # Now compute quality at slot level
+        def _slot_quality(true, pred):
+            total = 0
+            valid = 0
+            for i in range(len(true)):
+                if not true[i].startswith('B_'):
+                    continue
+                total += 1
+                inside_tag = 'I_' + true[i][2:]
+                j = i
+                while j + 1 < len(true) and true[j + 1] == inside_tag:
+                    j += 1
+                good = True
+                for k in range(i, j + 1):
+                    if pred[k] != true[k]:
+                        good = False
+                        break
+                if good and (j + 1 >= len(true) or pred[j + 1] != inside_tag):
+                    valid += 1
+            return valid / total if total > 0 else 0
+
+        prec, recall, f1 = [], [], []
+        for i in range(len(nlu_outputs)):
+            pred_tags = [nlu_outputs[i]['tokens'][j][1] for j in range(len(true_tags[i]))]
+
+            prec.append(_slot_quality(pred_tags, true_tags[i]))
+            recall.append(_slot_quality(true_tags[i], pred_tags))
+
+            denom = prec[-1] + recall[-1]
+            f1.append(2 * prec[-1] * recall[-1] / denom if denom > 0 else 0)
+
+        stats.update({
+            'slot_prec': round(sum(prec) / len(nlu_outputs), 3),
+            'slot_rec': round(sum(recall) / len(nlu_outputs), 3),
+            'slot_f1': round(sum(f1) / len(nlu_outputs), 3),
+        })
+
+        return stats
 
     def get_nlu_train_quality(self):
         # Using both TRAIN + DEV
