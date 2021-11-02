@@ -779,8 +779,9 @@ class Pipeline(object):
             pred_tags = [nlu_outputs[i]['tokens'][j][1] for j in range(len(true_tags[i]))]
             # classification report
             report = classification_report(pred_tags, true_tags[i], output_dict=True)
-            report_without_O = classification_report([pred_tags[j] for j, t in enumerate(true_tags[i]) if t != 'O'],
-                                                     [t for t in true_tags[i] if t != 'O'], output_dict=True)
+            report_without_O = classification_report(
+                [pred_tags[j] for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'],
+                [t for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'], output_dict=True)
             acc.append(report['accuracy'])
             prec.append(report['macro avg']['precision'])
             recall.append(report['macro avg']['recall'])
@@ -789,11 +790,11 @@ class Pipeline(object):
 
         return {
             'intent_acc': round(n_true_intents / len(nlu_outputs), 3),
-            'slot_acc': round(sum(acc) / len(nlu_outputs), 3),
-            'slot_acc_exclude_O': round(sum(acc_exclude_O) / len(nlu_outputs), 3),
-            'slot_prec': round(sum(prec) / len(nlu_outputs), 3),
-            'slot_rec': round(sum(recall) / len(nlu_outputs), 3),
-            'slot_f1': round(sum(f1) / len(nlu_outputs), 3),
+            'tag_acc': round(sum(acc) / len(nlu_outputs), 3),
+            'tag_acc_exclude_O': round(sum(acc_exclude_O) / len(nlu_outputs), 3),
+            'tag_prec': round(sum(prec) / len(nlu_outputs), 3),
+            'tag_rec': round(sum(recall) / len(nlu_outputs), 3),
+            'tag_f1': round(sum(f1) / len(nlu_outputs), 3),
         }
 
     def get_nlu_train_quality(self):
@@ -814,7 +815,7 @@ class Pipeline(object):
 
         quality = self._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
         print(quality)
-        return quality['slot_acc']
+        return quality['tag_acc']
 
     def get_nlu_test_quality(self):
         texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in self.test_utterances],
