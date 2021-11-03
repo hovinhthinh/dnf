@@ -188,8 +188,8 @@ def get_intents_and_slots_2(utterances: List[str], batch_size=64):
         prob = [0] * (n + 1)
 
         t = numpy.argmax(cost[n])
-        total_prob = cost[n][t] / n
-        assert total_prob >= 0
+        tag_prob = cost[n][t] / n
+        assert tag_prob >= 0
 
         c = n
         while c > 0:
@@ -219,7 +219,10 @@ def get_intents_and_slots_2(utterances: List[str], batch_size=64):
         return {
             'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx].item()),
             'slots': {
-                'total_prob': total_prob,
+                # average prob over tags, including O
+                'tag_prob': tag_prob,
+                # average prob over slots
+                'slot_prob': 0.0 if len(slots) == 0 else sum([s['prob'] for s in slots]) / len(slots),
                 'slots': slots
             },
             'tokens': list(zip(
@@ -345,8 +348,8 @@ def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
         prob = [0] * (n + 1)
 
         t = numpy.argmax(cost[n])
-        total_prob = cost[n][t] / n
-        assert total_prob >= 0
+        tag_prob = cost[n][t] / n
+        assert tag_prob >= 0
 
         c = n
         while c > 0:
@@ -375,7 +378,10 @@ def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
         return {
             'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx].item()),
             'slots': {
-                'total_prob': total_prob,
+                # average prob over tags, including O
+                'tag_prob': tag_prob,
+                # average prob over slots
+                'slot_prob': 0.0 if len(slots) == 0 else sum([s['prob'] for s in slots]) / len(slots),
                 'slots': slots
             },
             'tokens': list(zip(tokenized_text, tags[1:n + 1], [p.item() for p in prob[1:n + 1]]))

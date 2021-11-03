@@ -834,6 +834,15 @@ class Pipeline(object):
             'slot_f1': round(sum(f1) / len(nlu_outputs), 3),
         })
 
+        # Tagging confidence
+        stats.update({
+            'conf': {
+                'intent': round(sum([u['intent'][1] for u in nlu_outputs]) / len(nlu_outputs), 3),
+                'tag': round(sum([u['slots']['tag_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
+                'slot': round(sum([u['slots']['slot_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
+            }
+        })
+
         return stats
 
     def get_nlu_train_quality(self):
