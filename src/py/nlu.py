@@ -432,5 +432,5 @@ if __name__ == '__main__':
     # save_finetuned('./models/temp_model')
     # load_finetuned('./models/temp_model')
 
-    load_finetuned('models/snips_inter-intent_nlu/inter_intent/nlu_model')
+    load_finetuned('./models/snips_nlu/inter_intent/nlu_model')
     print(json.dumps(get_intents_and_slots(['I want to see movie times at 11:12'.split()]), indent=2))
