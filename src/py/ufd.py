@@ -599,17 +599,35 @@ class Pipeline(object):
         else:
             raise Exception('Invalid method:', method)
 
-    def get_test_clusters(self, k):
+    def _get_test_cluster_purity(self, test_cluster_ids: List[int]):
+        utterances = [self.test_utterances[i] for i in test_cluster_ids]
+        count = {}
+        for u in utterances:
+            count[u.feature_name] = count.get(u.feature_name, 0) + 1
+
+        main_feature, c = max(count.items(), key=lambda o: o[1])
+
+        # main feature, cluster purity, feature recall
+        return main_feature, c / len(utterances), c / len(
+            [u for u in self.test_utterances if u.feature_name == main_feature])
+
+    def get_test_clusters(self, k, kmeans_random_state=None):
         if self.dev_test_clustering_method == 'k-means':
-            return KMeans(n_clusters=k).fit(self.test_embeddings).labels_
+            clusters = KMeans(n_clusters=k, random_state=kmeans_random_state).fit(self.test_embeddings).labels_
         elif self.dev_test_clustering_method == 'hac-complete':
-            return AgglomerativeClustering(n_clusters=k, linkage='complete').fit(self.test_embeddings).labels_
+            clusters = AgglomerativeClustering(n_clusters=k, linkage='complete').fit(self.test_embeddings).labels_
         elif self.dev_test_clustering_method == 'hac-average':
-            return AgglomerativeClustering(n_clusters=k, linkage='average').fit(self.test_embeddings).labels_
+            clusters = AgglomerativeClustering(n_clusters=k, linkage='average').fit(self.test_embeddings).labels_
         elif self.dev_test_clustering_method == 'hac-single':
-            return AgglomerativeClustering(n_clusters=k, linkage='single').fit(self.test_embeddings).labels_
+            clusters = AgglomerativeClustering(n_clusters=k, linkage='single').fit(self.test_embeddings).labels_
         else:
             raise Exception('Invalid clustering method')
+
+        purities = []
+        for c in range(k):
+            purities.append(self._get_test_cluster_purity([i for i, v in enumerate(clusters) if v == c]))
+
+        return clusters, purities
 
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
                                     contingency_matrix_log_file=None,
@@ -627,7 +645,7 @@ class Pipeline(object):
 
         k = k if k is not None else len(true_cluster_2_index_map)
 
-        test_predicted_clusters = self.get_test_clusters(k)
+        test_predicted_clusters = self.get_test_clusters(k)[0]
 
         if predicted_clusters_log_file is not None:
             with open(predicted_clusters_log_file, 'w') as f:
