@@ -883,7 +883,14 @@ class Pipeline(object):
         print(quality)
         return quality['tag_acc']
 
-    def get_nlu_test_quality(self):
+    def get_nlu_test_quality(self, test_ids: List[int] = None):
+        # Compute only for a subset of test utterances
+        if test_ids is not None:
+            texts, tags = _split_text_and_slots_into_tokens_and_tags([self.test_utterances[i].text for i in test_ids],
+                                                                     [self.test_utterances[i].slots for i in test_ids])
+            nlu_outputs = nlu.get_intents_and_slots(texts)
+            return self._get_nlu_quality(nlu_outputs, [self.test_utterances[i].intent_name for i in test_ids], tags)
+
         texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in self.test_utterances],
                                                                  [u.slots for u in self.test_utterances])
         nlu_outputs = nlu.get_intents_and_slots(texts)
