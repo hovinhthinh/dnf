@@ -599,6 +599,18 @@ class Pipeline(object):
         else:
             raise Exception('Invalid method:', method)
 
+    def get_test_clusters(self, k):
+        if self.dev_test_clustering_method == 'k-means':
+            return KMeans(n_clusters=k).fit(self.test_embeddings).labels_
+        elif self.dev_test_clustering_method == 'hac-complete':
+            return AgglomerativeClustering(n_clusters=k, linkage='complete').fit(self.test_embeddings).labels_
+        elif self.dev_test_clustering_method == 'hac-average':
+            return AgglomerativeClustering(n_clusters=k, linkage='average').fit(self.test_embeddings).labels_
+        elif self.dev_test_clustering_method == 'hac-single':
+            return AgglomerativeClustering(n_clusters=k, linkage='single').fit(self.test_embeddings).labels_
+        else:
+            raise Exception('Invalid clustering method')
+
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
                                     contingency_matrix_log_file=None,
                                     advanced=False):
@@ -615,19 +627,7 @@ class Pipeline(object):
 
         k = k if k is not None else len(true_cluster_2_index_map)
 
-        if self.dev_test_clustering_method == 'k-means':
-            test_predicted_clusters = KMeans(n_clusters=k).fit(self.test_embeddings).labels_
-        elif self.dev_test_clustering_method == 'hac-complete':
-            test_predicted_clusters = AgglomerativeClustering(n_clusters=k, linkage='complete').fit(
-                self.test_embeddings).labels_
-        elif self.dev_test_clustering_method == 'hac-average':
-            test_predicted_clusters = AgglomerativeClustering(n_clusters=k, linkage='average').fit(
-                self.test_embeddings).labels_
-        elif self.dev_test_clustering_method == 'hac-single':
-            test_predicted_clusters = AgglomerativeClustering(n_clusters=k, linkage='single').fit(
-                self.test_embeddings).labels_
-        else:
-            raise Exception('Invalid clustering method')
+        test_predicted_clusters = self.get_test_clusters(k)
 
         if predicted_clusters_log_file is not None:
             with open(predicted_clusters_log_file, 'w') as f:
