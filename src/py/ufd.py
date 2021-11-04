@@ -608,8 +608,15 @@ class Pipeline(object):
         main_feature, c = max(count.items(), key=lambda o: o[1])
 
         # main feature, cluster purity, feature recall
-        return main_feature, c / len(utterances), c / len(
-            [u for u in self.test_utterances if u.feature_name == main_feature])
+        purity = c / len(utterances)
+        recall = c / len([u for u in self.test_utterances if u.feature_name == main_feature])
+        novelty = 2 * purity * recall / (purity + recall)
+        return {
+            'main_feature': main_feature,
+            'purity': purity,
+            'recall': recall,
+            'novelty': novelty
+        }
 
     def get_test_clusters(self, k, kmeans_random_state=None):
         if self.dev_test_clustering_method == 'k-means':
