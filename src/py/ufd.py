@@ -599,7 +599,7 @@ class Pipeline(object):
         else:
             raise Exception('Invalid method:', method)
 
-    def _get_test_cluster_purity(self, test_cluster_ids: List[int]):
+    def _get_test_cluster_quality(self, test_cluster_ids: List[int]):
         utterances = [self.test_utterances[i] for i in test_cluster_ids]
         count = {}
         for u in utterances:
@@ -623,11 +623,11 @@ class Pipeline(object):
         else:
             raise Exception('Invalid clustering method')
 
-        purities = []
+        quality = []
         for c in range(k):
-            purities.append(self._get_test_cluster_purity([i for i, v in enumerate(clusters) if v == c]))
+            quality.append(self._get_test_cluster_quality([i for i, v in enumerate(clusters) if v == c]))
 
-        return clusters, purities
+        return clusters, quality
 
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
                                     contingency_matrix_log_file=None,
