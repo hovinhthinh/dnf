@@ -830,10 +830,11 @@ class Pipeline(object):
 
             pred_tags = [nlu_outputs[i]['tokens'][j][1] for j in range(len(true_tags[i]))]
             # classification report
-            report = classification_report(true_tags[i], pred_tags, output_dict=True)
+            report = classification_report(true_tags[i], pred_tags, output_dict=True, zero_division=0)
             report_without_O = classification_report(
                 [t for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'],
-                [pred_tags[j] for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'], output_dict=True)
+                [pred_tags[j] for j, t in enumerate(true_tags[i]) if t != 'O' or pred_tags[j] != 'O'],
+                output_dict=True, zero_division=0)
             acc.append(report['accuracy'])
             prec.append(report['macro avg']['precision'])
             recall.append(report['macro avg']['recall'])
