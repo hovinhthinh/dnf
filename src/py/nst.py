@@ -24,13 +24,24 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
     for f in feature2label:
         test_ids = [i for i, u in enumerate(pipeline.test_utterances) if u.feature_name == f]
 
-        conf = pipeline.get_nlu_test_quality(test_ids)['conf']
+        nlu_stats = pipeline.get_nlu_test_quality(test_ids)
+        conf = nlu_stats['conf']
         supported = 1 if nst_callback(conf) else 0
         feature2label[f] = 1 - supported if f.endswith('_TEST') else supported
 
+        utterances = []
+        individual_stats = nlu_stats['individual']
+        for i, id in enumerate(test_ids):
+            utterances.append('{}    ic_conf: {:.3f}    ner_conf: {:.3f}'.format(
+                pipeline.test_utterances[id].text,
+                individual_stats['conf']['intent'][i],
+                individual_stats['conf']['slot'][i]
+            ))
+
         details[f] = {
             'conf': conf,
-            'supported': supported
+            'supported': supported,
+            'utterances': utterances
         }
 
     def _quality(labels: list[int]):
