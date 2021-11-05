@@ -1,3 +1,4 @@
+import json
 import tempfile
 
 from mpl_toolkits.mplot3d import Axes3D
@@ -599,25 +600,6 @@ class Pipeline(object):
         else:
             raise Exception('Invalid method:', method)
 
-    def _get_test_cluster_quality(self, test_cluster_ids: List[int]):
-        utterances = [self.test_utterances[i] for i in test_cluster_ids]
-        count = {}
-        for u in utterances:
-            count[u.feature_name] = count.get(u.feature_name, 0) + 1
-
-        main_feature, c = max(count.items(), key=lambda o: o[1])
-
-        # main feature, cluster purity, feature recall
-        purity = c / len(utterances)
-        recall = c / len([u for u in self.test_utterances if u.feature_name == main_feature])
-        novelty = 2 * purity * recall / (purity + recall)
-        return {
-            'main_feature': main_feature,
-            'purity': purity,
-            'recall': recall,
-            'novelty': novelty
-        }
-
     def get_test_clusters(self, k, kmeans_random_state=None):
         if self.dev_test_clustering_method == 'k-means':
             clusters = KMeans(n_clusters=k, random_state=kmeans_random_state).fit(self.test_embeddings).labels_
@@ -630,14 +612,10 @@ class Pipeline(object):
         else:
             raise Exception('Invalid clustering method')
 
-        quality = []
-        for c in range(k):
-            quality.append(self._get_test_cluster_quality([i for i, v in enumerate(clusters) if v == c]))
+        return clusters
 
-        return clusters, quality
-
-    def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, true_clusters_log_file=None,
-                                    contingency_matrix_log_file=None,
+    def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, predicted_clusters_stats_file=None,
+                                    true_clusters_log_file=None, contingency_matrix_log_file=None,
                                     advanced=False):
         true_clusters = dict.fromkeys(
             [u.feature_name for u in self.test_utterances if u.feature_name.endswith('_TRAIN')])
@@ -652,7 +630,7 @@ class Pipeline(object):
 
         k = k if k is not None else len(true_cluster_2_index_map)
 
-        test_predicted_clusters = self.get_test_clusters(k)[0]
+        test_predicted_clusters = self.get_test_clusters(k)
 
         if predicted_clusters_log_file is not None:
             with open(predicted_clusters_log_file, 'w') as f:
@@ -672,6 +650,53 @@ class Pipeline(object):
                         f.write('    {}\n'.format(
                             [self.test_utterances[idx].text for idx in indices if test_true_clusters[idx] == tl]))
                     f.write('\n')
+
+        if predicted_clusters_stats_file is not None:
+            with open(predicted_clusters_stats_file, 'w') as f:
+                clusters = []
+                for c in range(k):
+                    indices = [i for i, l in enumerate(test_predicted_clusters) if l == c]
+
+                    true_label_2_count = {}
+                    for idx in indices:
+                        tl = test_true_clusters[idx]
+                        true_label_2_count[tl] = true_label_2_count.get(tl, 0) + 1
+
+                    tl, cnt = max(true_label_2_count.items(), key=lambda o: o[1])
+
+                    precision, recall = cnt / len(indices), cnt / len([l for l in test_true_clusters if l == tl])
+                    f1 = 2 * precision * recall / (precision + recall)
+
+                    cluster_stats = {
+                        'cid': c,
+                        'size': len(indices),
+                        'rsize': len(indices) / len(self.test_utterances),
+                        'main_feature': true_clusters[tl],
+                        'quality': {
+                            'precision': precision,
+                            'recall': recall,
+                            'f1': f1,
+                            'novelty': f1 if true_clusters[tl].endswith('_TEST') else 0
+                        },
+                        'test_utterance_ids': indices,
+                    }
+                    clusters.append(cluster_stats)
+
+                clusters = sorted(clusters, key=lambda o: o['quality']['novelty'], reverse=True)
+
+                discovered = len(dict.fromkeys([c['main_feature'] for c in clusters]))
+                precision, recall = discovered / k, discovered / len(true_cluster_2_index_map),
+                f1 = 2 * precision * recall / (precision + recall)
+                stats = {
+                    'total': k,
+                    'discovered': discovered,
+                    'precision': precision,
+                    'recall': recall,
+                    'f1': f1,
+                    'clusters': clusters
+                }
+
+                f.write(json.dumps(stats, indent=2))
 
         if true_clusters_log_file is not None:
             with open(true_clusters_log_file, 'w') as f:
@@ -984,6 +1009,8 @@ class Pipeline(object):
             k=k,
             predicted_clusters_log_file=
             os.path.join(report_folder, '0_test.predicted_clusters.log') if report_folder is not None else None,
+            predicted_clusters_stats_file=
+            os.path.join(report_folder, '0_test.predicted_clusters.stats.json') if report_folder is not None else None,
             true_clusters_log_file=
             os.path.join(report_folder, '0_test.true_clusters.log') if report_folder is not None else None,
             contingency_matrix_log_file=
@@ -1056,6 +1083,9 @@ class Pipeline(object):
                 k=k,
                 predicted_clusters_log_file=
                 os.path.join(report_folder, '{}_{}_test.predicted_clusters.log'.format(i + 1, step))
+                if report_folder is not None else None,
+                predicted_clusters_stats_file=
+                os.path.join(report_folder, '{}_{}_test.predicted_clusters.stats.json'.format(i + 1, step))
                 if report_folder is not None else None,
                 true_clusters_log_file=
                 os.path.join(report_folder, '{}_{}_test.true_clusters.log'.format(i + 1, step))
@@ -1143,6 +1173,8 @@ def run_all_intents(pipeline_steps, intra_intent_data, inter_intent_data,
                 test_quality = p.get_test_clustering_quality(
                     k=k,
                     predicted_clusters_log_file=os.path.join(folder, intent_name + '.predicted_clusters.log')
+                    if folder is not None else None,
+                    predicted_clusters_stats_file=os.path.join(folder, intent_name + '.predicted_clusters.stats.json')
                     if folder is not None else None,
                     true_clusters_log_file=os.path.join(folder, intent_name + '.true_clusters.log')
                     if folder is not None else None,
