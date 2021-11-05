@@ -27,6 +27,7 @@ with open('reports/nst/snips_inter_intent_stats.txt', 'w') as f:
 
     for c in clusters:
         nlu_quality = p.get_nlu_test_quality(c.pop('test_utterance_ids'))
+        nlu_quality.pop('individual')
         nlu_conf = nlu_quality.pop('conf')
         cluster_quality = c.pop('quality')
 

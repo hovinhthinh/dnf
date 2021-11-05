@@ -817,16 +817,14 @@ class Pipeline(object):
         if save_model_path is not None:
             nlu.save_finetuned(save_model_path)
 
-    def _get_nlu_quality(self, nlu_outputs, true_intents, true_tags):
-        n_true_intents = 0
-
+    def _get_nlu_quality(self, nlu_outputs, true_intents, true_tags, keep_individual_stats=False):
+        intent = []
         acc = []
         acc_exclude_O = []
         prec, recall, f1 = [], [], []  # mac.avg
 
         for i in range(len(nlu_outputs)):
-            if nlu_outputs[i]['intent'][0] == true_intents[i]:
-                n_true_intents += 1
+            intent.append(1 if nlu_outputs[i]['intent'][0] == true_intents[i] else 0)
 
             pred_tags = [nlu_outputs[i]['tokens'][j][1] for j in range(len(true_tags[i]))]
             # classification report
@@ -842,12 +840,21 @@ class Pipeline(object):
             acc_exclude_O.append(report_without_O['accuracy'])
 
         stats = {
-            'intent_acc': round(n_true_intents / len(nlu_outputs), 3),
+            'intent_acc': round(sum(intent) / len(nlu_outputs), 3),
             'tag_acc': round(sum(acc) / len(nlu_outputs), 3),
             'tag_acc_exclude_O': round(sum(acc_exclude_O) / len(nlu_outputs), 3),
             'tag_prec': round(sum(prec) / len(nlu_outputs), 3),
             'tag_rec': round(sum(recall) / len(nlu_outputs), 3),
             'tag_f1': round(sum(f1) / len(nlu_outputs), 3),
+        }
+
+        individual = {
+            'intent_acc': intent,
+            'tag_acc': acc,
+            'tag_acc_exclude_O': acc_exclude_O,
+            'tag_prec': prec,
+            'tag_rec': recall,
+            'tag_f1': f1
         }
 
         # Now compute quality at slot level
@@ -887,6 +894,12 @@ class Pipeline(object):
             'slot_f1': round(sum(f1) / len(nlu_outputs), 3),
         })
 
+        individual.update({
+            'slot_prec': prec,
+            'slot_rec': recall,
+            'slot_f1': f1,
+        })
+
         # Tagging confidence
         stats.update({
             'conf': {
@@ -895,6 +908,19 @@ class Pipeline(object):
                 'slot': round(sum([u['slots']['slot_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
             }
         })
+
+        individual.update({
+            'conf': {
+                'intent': [u['intent'][1] for u in nlu_outputs],
+                'tag': [u['slots']['tag_prob'] for u in nlu_outputs],
+                'slot': [u['slots']['slot_prob'] for u in nlu_outputs]
+            }
+        })
+
+        if keep_individual_stats:
+            stats.update({
+                'individual': individual
+            })
 
         return stats
 
@@ -924,7 +950,8 @@ class Pipeline(object):
             texts, tags = _split_text_and_slots_into_tokens_and_tags([self.test_utterances[i].text for i in test_ids],
                                                                      [self.test_utterances[i].slots for i in test_ids])
             nlu_outputs = nlu.get_intents_and_slots(texts)
-            return self._get_nlu_quality(nlu_outputs, [self.test_utterances[i].intent_name for i in test_ids], tags)
+            return self._get_nlu_quality(nlu_outputs, [self.test_utterances[i].intent_name for i in test_ids], tags,
+                                         keep_individual_stats=True)
 
         texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in self.test_utterances],
                                                                  [u.slots for u in self.test_utterances])
