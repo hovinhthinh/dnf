@@ -614,6 +614,29 @@ class Pipeline(object):
 
         return clusters
 
+    def _get_test_cluster_quality(self, test_ids: List[int] = None):
+        true_label_2_count = {}
+        for id in test_ids:
+            tl = self.test_utterances[id].feature_name
+            true_label_2_count[tl] = true_label_2_count.get(tl, 0) + 1
+
+        tl, cnt = max(true_label_2_count.items(), key=lambda o: o[1])
+
+        precision, recall = cnt / len(test_ids), cnt / len([u for u in self.test_utterances if u.feature_name == tl])
+        f1 = 2 * precision * recall / (precision + recall)
+
+        return {
+            'size': len(test_ids),
+            'rsize': len(test_ids) / len(self.test_utterances),
+            'main_feature': tl,
+            'quality': {
+                'precision': precision,
+                'recall': recall,
+                'f1': f1,
+                'novelty': f1 if tl.endswith('_TEST') else 0
+            }
+        }
+
     def get_test_clustering_quality(self, k=None, predicted_clusters_log_file=None, predicted_clusters_stats_file=None,
                                     true_clusters_log_file=None, contingency_matrix_log_file=None,
                                     advanced=False):
@@ -656,30 +679,9 @@ class Pipeline(object):
                 clusters = []
                 for c in range(k):
                     indices = [i for i, l in enumerate(test_predicted_clusters) if l == c]
-
-                    true_label_2_count = {}
-                    for idx in indices:
-                        tl = test_true_clusters[idx]
-                        true_label_2_count[tl] = true_label_2_count.get(tl, 0) + 1
-
-                    tl, cnt = max(true_label_2_count.items(), key=lambda o: o[1])
-
-                    precision, recall = cnt / len(indices), cnt / len([l for l in test_true_clusters if l == tl])
-                    f1 = 2 * precision * recall / (precision + recall)
-
-                    cluster_stats = {
-                        'cid': c,
-                        'size': len(indices),
-                        'rsize': len(indices) / len(self.test_utterances),
-                        'main_feature': true_clusters[tl],
-                        'quality': {
-                            'precision': precision,
-                            'recall': recall,
-                            'f1': f1,
-                            'novelty': f1 if true_clusters[tl].endswith('_TEST') else 0
-                        },
-                        'test_utterance_ids': indices,
-                    }
+                    cluster_stats = {'cid': c}
+                    cluster_stats.update(self._get_test_cluster_quality(indices))
+                    cluster_stats['test_utterance_ids'] = indices
                     clusters.append(cluster_stats)
 
                 clusters = sorted(clusters, key=lambda o: o['quality']['novelty'], reverse=True)
