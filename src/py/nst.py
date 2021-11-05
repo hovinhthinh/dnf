@@ -61,6 +61,6 @@ p = Pipeline(inter_intent_data, dataset_name='inter_intent')
 print(json.dumps(
     evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
                                              nst_callback=lambda conf: conf['intent'] >= 0.9 and conf['slot'] >= 0.9,
-                                             output_file='models/snips_nlu/inter_intent/nst/stats.txt'
+                                             output_file='models/snips_nlu/inter_intent/nst.stats.txt'
                                              ),
     indent=2))
