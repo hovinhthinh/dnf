@@ -7,7 +7,8 @@ from data import snips
 from ufd import Pipeline
 
 
-def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str, nst_callback: Callable):
+def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str, nst_callback: Callable,
+                                             output_file=None):
     nlu.load_finetuned(nlu_trained_model_path)
 
     feature2label = dict.fromkeys(
@@ -38,7 +39,7 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
             'accuracy': statistics.mean(labels)
         }
 
-    return {
+    stats = {
         'all': _quality([l for _, l in feature2label.items()]),
         'TRAIN': _quality([l for f, l in feature2label.items() if f.endswith('_TRAIN')]),
         'DEV': _quality([l for f, l in feature2label.items() if f.endswith('_DEV')]),
@@ -47,11 +48,19 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
         'details': details
     }
 
+    if output_file is not None:
+        with open(output_file, 'w') as f:
+            f.write(json.dumps(stats, indent=2))
+
+    return stats
+
 
 _, inter_intent_data = snips.get_train_test_data(use_dev=True)
 p = Pipeline(inter_intent_data, dataset_name='inter_intent')
 
 print(json.dumps(
     evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
-                                             nst_callback=lambda conf: conf['intent'] >= 0.9 and conf['slot'] >= 0.9),
+                                             nst_callback=lambda conf: conf['intent'] >= 0.9 and conf['slot'] >= 0.9,
+                                             output_file='models/snips_nlu/inter_intent/nst/stats.txt'
+                                             ),
     indent=2))
