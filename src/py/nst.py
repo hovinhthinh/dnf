@@ -18,9 +18,7 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
     feature2label.update(
         dict.fromkeys([u.feature_name for u in pipeline.test_utterances if u.feature_name.endswith('_TEST')]))
 
-    details = {
-
-    }
+    details = {}
     for f in feature2label:
         test_ids = [i for i, u in enumerate(pipeline.test_utterances) if u.feature_name == f]
 
@@ -51,11 +49,15 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
         }
 
     stats = {
-        'all': _quality([l for _, l in feature2label.items()]),
-        'TRAIN': _quality([l for f, l in feature2label.items() if f.endswith('_TRAIN')]),
-        'DEV': _quality([l for f, l in feature2label.items() if f.endswith('_DEV')]),
-        'TRAIN+DEV': _quality([l for f, l in feature2label.items() if not f.endswith('_TEST')]),
-        'TEST': _quality([l for f, l in feature2label.items() if f.endswith('_TEST')]),
+        'accuracy': {
+            'all': _quality([l for _, l in feature2label.items()]),
+            'predict_supported': _quality([l for f, l in feature2label.items() if details[f]['supported'] == 1]),
+            'predict_novel': _quality([l for f, l in feature2label.items() if details[f]['supported'] == 0]),
+            'TRAIN': _quality([l for f, l in feature2label.items() if f.endswith('_TRAIN')]),
+            'DEV': _quality([l for f, l in feature2label.items() if f.endswith('_DEV')]),
+            'TRAIN+DEV': _quality([l for f, l in feature2label.items() if not f.endswith('_TEST')]),
+            'TEST': _quality([l for f, l in feature2label.items() if f.endswith('_TEST')])
+        },
         'details': details
     }
 
