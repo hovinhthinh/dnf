@@ -776,10 +776,10 @@ class JointUtteranceSimilarityAndSlotClassificationDataset(torch.utils.data.Data
             item['us_labels'] = torch.tensor(1.0)
         elif idx < self.negative_from_seen_bound:
             idx, idx2 = self._get_negative_pair_from_seen(idx % self.n_seen_utterances)
-            item['us_labels'] = torch.tensor(-1.0)
+            item['us_labels'] = torch.tensor(0.0)
         else:
             idx, idx2 = self._get_negative_pair_from_unseen()
-            item['us_labels'] = torch.tensor(-1.0)
+            item['us_labels'] = torch.tensor(0.0)
 
         for key, val in self.encodings.items():
             item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
@@ -795,18 +795,17 @@ class JointUtteranceSimilarityAndSlotClassificationDataset(torch.utils.data.Data
 
 class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
     def __init__(self, base_model, smc_num_labels, us_loss_weight=0.5, smc_loss_weight=0.5,
-                 us_negative_to_positive_rate=3):
+                 us_negative_to_positive_rate=3, negative_margin=-1.0):
         super().__init__()
         self.base_model = base_model
         self.us_loss_weight = us_loss_weight
         self.smc_loss_weight = smc_loss_weight
 
-        self.us_loss_fct = MSELoss()
-
         self.smc_classifier = ClassificationHead(base_model.config, smc_num_labels)
         self.smc_loss_fct = BCEWithLogitsLoss()
 
         self.us_negative_to_positive_rate = us_negative_to_positive_rate
+        self.negative_margin = negative_margin
 
     def forward(
             self,
@@ -823,7 +822,9 @@ class JointUtteranceSimilarityAndSlotClassificationModel(nn.Module):
         mean_0 = _mean_pooling(output_0, attention_mask_0)
         mean_1 = _mean_pooling(self.base_model(input_ids_1, attention_mask=attention_mask_1), attention_mask_1)
 
-        us_loss = self.us_loss_fct(cosine_similarity(mean_0, mean_1), us_labels)
+        cos_sim = cosine_similarity(mean_0, mean_1)  # margin-based contrastive loss
+        us_loss = torch.mean(us_labels * torch.square(cos_sim - 1.0)
+                             + (1 - us_labels) * torch.square(torch.clamp(cos_sim - self.negative_margin, min=0.0)))
 
         # smc_logits = self.smc_classifier(cls=_cls(output_0))
         smc_logits = self.smc_classifier(mean=mean_0)
@@ -844,7 +845,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
         train_texts, train_slots, train_cluster_labels,
         us_loss_weight=0.5, smc_loss_weight=0.5,
         n_train_epochs=None, n_train_steps=None,
-        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0,
+        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0, negative_margin=-1.0,
         eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
 ):
     # Prepare for slot multiclass classification
@@ -874,7 +875,8 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
     )
 
     estimator = JointUtteranceSimilarityAndSlotClassificationModel(
-        model, len(unique_tags), us_loss_weight=us_loss_weight, smc_loss_weight=smc_loss_weight)
+        model, len(unique_tags), us_loss_weight=us_loss_weight, smc_loss_weight=smc_loss_weight,
+        negative_margin=negative_margin)
 
     _finetune_model(estimator, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
                     eval_callback=eval_callback,
@@ -888,7 +890,8 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationDatase
     # intent_labels: \in {0,1,2,3,...}, None for unseen
     def __init__(self, encodings, cluster_labels, slot_labels, intent_labels,
                  us_negative_sampling_rate_from_seen: int = 3,
-                 us_negative_sampling_rate_from_unseen: float = 0.0):
+                 us_negative_sampling_rate_from_unseen: float = 0.0,
+                 negative_margin=-1.0):
         self.unseen_indices = []
         self.n_seen_utterances = 0
         self.seen_indices = [[] for _ in range(max(cluster_labels) + 1)]
@@ -908,6 +911,7 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationDatase
         self.negative_from_seen_bound = self.positive_bound + self.n_seen_utterances * us_negative_sampling_rate_from_seen
         self.negative_from_unseen_bound = self.negative_from_seen_bound + int(
             len(self.unseen_indices) * us_negative_sampling_rate_from_unseen)
+        self.negative_margin = negative_margin
 
     def _get_positive_pair(self, idx):
         for c in self.seen_indices:
@@ -949,10 +953,10 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationDatase
             item['us_labels'] = torch.tensor(1.0)
         elif idx < self.negative_from_seen_bound:
             idx, idx2 = self._get_negative_pair_from_seen(idx % self.n_seen_utterances)
-            item['us_labels'] = torch.tensor(-1.0)
+            item['us_labels'] = torch.tensor(0.0)
         else:
             idx, idx2 = self._get_negative_pair_from_unseen()
-            item['us_labels'] = torch.tensor(-1.0)
+            item['us_labels'] = torch.tensor(0.0)
 
         for key, val in self.encodings.items():
             item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
@@ -977,8 +981,6 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationModel(
         self.us_loss_weight = us_loss_weight
         self.smc_loss_weight = smc_loss_weight
         self.ic_loss_weight = ic_loss_weight
-
-        self.us_loss_fct = MSELoss()
 
         self.smc_classifier = ClassificationHead(base_model.config, smc_num_labels)
         self.smc_loss_fct = BCEWithLogitsLoss()
@@ -1005,7 +1007,9 @@ class JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationModel(
         mean_0 = _mean_pooling(output_0, attention_mask_0)
         mean_1 = _mean_pooling(self.base_model(input_ids_1, attention_mask=attention_mask_1), attention_mask_1)
 
-        us_loss = self.us_loss_fct(cosine_similarity(mean_0, mean_1), us_labels)
+        cos_sim = cosine_similarity(mean_0, mean_1)  # margin-based contrastive loss
+        us_loss = torch.mean(us_labels * torch.square(cos_sim - 1.0)
+                             + (1 - us_labels) * torch.square(torch.clamp(cos_sim - self.negative_margin, min=0.0)))
 
         # smc_logits = self.smc_classifier(cls=_cls(output_0))
         smc_logits = self.smc_classifier(mean=mean_0)
@@ -1034,7 +1038,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_
         train_texts, train_slots, train_cluster_labels, train_intents,
         us_loss_weight=0.4, smc_loss_weight=0.4, ic_loss_weight=0.2,
         n_train_epochs=None, n_train_steps=None,
-        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0,
+        us_negative_sampling_rate_from_seen=3, us_negative_sampling_rate_from_unseen=0.0, negative_margin=-1.0,
         eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
 ):
     # Prepare for slot multiclass classification
@@ -1068,7 +1072,8 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_
 
     estimator = JointUtteranceSimilarityAndSlotClassificationAndIntentClassificationModel(
         model, len(unique_tags), len(unique_intents),
-        us_loss_weight=us_loss_weight, smc_loss_weight=smc_loss_weight, ic_loss_weight=ic_loss_weight)
+        us_loss_weight=us_loss_weight, smc_loss_weight=smc_loss_weight, ic_loss_weight=ic_loss_weight,
+        negative_margin=negative_margin)
 
     _finetune_model(estimator, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
                     eval_callback=eval_callback,
@@ -1076,7 +1081,7 @@ def fine_tune_joint_slot_multiclass_classification_and_utterance_similarity_and_
                     early_stopping_patience=early_stopping_patience)
 
 
-class JointClassificationPseudoAndIntentClassificationDataset(torch.utils.data.Dataset):
+class JointPseudoClassificationAndIntentClassificationDataset(torch.utils.data.Dataset):
     # labels \in {0,1,2,3,...} (for single-class) or tuple[Literal[0.0,1.0]] (for multi-class)
     def __init__(self, encodings, pseudo_labels, intent_labels, pseudo_sample_weights=None):
         self.encodings = encodings
@@ -1141,7 +1146,7 @@ def fine_tune_joint_pseudo_classification_and_intent_classification(
         train_texts, train_cluster_ids, train_intent_ids, train_sample_weights=None,
         intent_classifier_weight=0.1, previous_classifier=None, previous_optim=None):
     train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
-    train_dataset = JointClassificationPseudoAndIntentClassificationDataset(train_encodings, train_cluster_ids,
+    train_dataset = JointPseudoClassificationAndIntentClassificationDataset(train_encodings, train_cluster_ids,
                                                                             train_intent_ids,
                                                                             pseudo_sample_weights=train_sample_weights)
 
