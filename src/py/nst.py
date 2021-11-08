@@ -30,8 +30,10 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
         utterances = []
         individual_stats = nlu_stats['individual']
         for i, id in enumerate(test_ids):
-            utterances.append('{}    ic_conf: {:.3f}    ner_conf: {:.3f}'.format(
-                pipeline.test_utterances[id].text,
+            utterances.append('{}    ic_conf: {:.3f}    ner_conf: {:.3f}'
+                .format(
+                ' '.join(['{} ({}{})'.format(t[0], '' if t[1] == 'O' else t[1][:2] + ',', round(t[2], 3))
+                          for t in individual_stats['tokens'][i]]),
                 individual_stats['conf']['ic'][i],
                 individual_stats['conf']['ner_slot'][i]
             ))

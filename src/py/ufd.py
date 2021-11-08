@@ -849,6 +849,7 @@ class Pipeline(object):
         }
 
         individual = {
+            'tokens': [o['tokens'] for o in nlu_outputs],
             'ic_intent_acc': intent,
             'ner_tag_acc': acc,
             'ner_tag_acc_exclude_O': acc_exclude_O,
