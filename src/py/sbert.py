@@ -7,7 +7,7 @@ from typing import List, Callable
 import numpy
 import torch
 from torch import nn
-from torch.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
+from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
 from torch.nn.functional import cosine_similarity
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModel, set_seed, AdamW
@@ -460,10 +460,10 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
             item['labels'] = torch.tensor(1.0)
         elif idx < self.negative_from_seen_bound:
             idx, idx2 = self._get_negative_pair_from_seen(idx % self.n_seen_utterances)
-            item['labels'] = torch.tensor(-1.0)
+            item['labels'] = torch.tensor(0.0)
         else:
             idx, idx2 = self._get_negative_pair_from_unseen()
-            item['labels'] = torch.tensor(-1.0)
+            item['labels'] = torch.tensor(0.0)
         for key, val in self.encodings.items():
             item[key] = torch.stack((val[idx].clone().detach(), val[idx2].clone().detach()))
 
@@ -474,10 +474,11 @@ class UtteranceSimilarityDataset(torch.utils.data.Dataset):
 
 
 class UtteranceSimilarityModel(nn.Module):
-    def __init__(self, base_model):
+    def __init__(self, base_model, negative_margin=-1.0):
         super().__init__()
         self.config = base_model.config
         self.base_model = base_model
+        self.negative_margin = negative_margin
 
     def forward(
             self,
@@ -491,8 +492,10 @@ class UtteranceSimilarityModel(nn.Module):
                                       attention_mask_0)
         second_outputs = _mean_pooling(self.base_model(input_ids_1, attention_mask=attention_mask_1),
                                        attention_mask_1)
-        loss_fct = MSELoss()
-        loss = loss_fct(cosine_similarity(first_outputs, second_outputs), labels)
+
+        cos_sim = cosine_similarity(first_outputs, second_outputs)  # margin-based contrastive loss
+        loss = torch.mean(labels * torch.square(cos_sim - 1.0)
+                          + (1 - labels) * torch.square(torch.clamp(cos_sim - self.negative_margin, min=0.0)))
 
         return (loss,)
 
@@ -501,7 +504,7 @@ class UtteranceSimilarityModel(nn.Module):
 def fine_tune_utterance_similarity(
         train_texts, train_labels,
         n_train_epochs=None, n_train_steps=None,
-        negative_sampling_rate_from_seen=3, negative_sampling_rate_from_unseen=0.0,
+        negative_sampling_rate_from_seen=3, negative_sampling_rate_from_unseen=0.0, negative_margin=-1.0,
         eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0
 ):
     label_set = dict.fromkeys(train_labels)
@@ -518,7 +521,7 @@ def fine_tune_utterance_similarity(
                                                negative_sampling_rate_from_seen=negative_sampling_rate_from_seen,
                                                negative_sampling_rate_from_unseen=negative_sampling_rate_from_unseen)
 
-    estimator = UtteranceSimilarityModel(model)
+    estimator = UtteranceSimilarityModel(model, negative_margin=negative_margin)
 
     _finetune_model(estimator, train_dataset, n_train_epochs=n_train_epochs, n_train_steps=n_train_steps,
                     eval_callback=eval_callback,
