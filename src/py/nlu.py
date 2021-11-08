@@ -7,7 +7,7 @@ import torch
 from scipy.special import softmax
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, MPNetPreTrainedModel, MPNetModel
+from transformers import AutoTokenizer, BertPreTrainedModel, BertModel
 
 from sbert import ClassificationHead, TaggerHead, _cls, _remap_clusters, _finetune_model, \
     _split_text_and_slots_into_tokens_and_tags, _encode_tags
@@ -37,7 +37,7 @@ class NLUTrainingDataset(torch.utils.data.Dataset):
         return len(self.intent_labels)
 
 
-class NLUModel(MPNetPreTrainedModel):
+class NLUModel(BertPreTrainedModel):
     def __init__(self, config, **kwargs):
         super().__init__(config)
 
@@ -48,7 +48,7 @@ class NLUModel(MPNetPreTrainedModel):
             self.config.ic_labels = kwargs.pop('id2ic_label')
             self.config.ic_num_labels = len(self.config.ic_labels)
 
-        self.base = MPNetModel(config, add_pooling_layer=False)
+        self.base = BertModel(config, add_pooling_layer=False)
 
         self.slot_tagger = TaggerHead(config, self.config.st_num_labels)
         self.st_loss_fct = CrossEntropyLoss()
@@ -267,7 +267,7 @@ def get_intents_and_slots_2(utterances: List[str], batch_size=64):
 
 def fine_tune_nlu_model(train_texts, train_slots, train_intents,
                         n_train_epochs=None, n_train_steps=None,
-                        base_model_path='sentence-transformers/paraphrase-mpnet-base-v2',
+                        base_model_path='bert-base-cased',
                         eval_callback: Callable[..., float] = None, early_stopping=False, early_stopping_patience=0):
     global nlu_model, tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model_path)
