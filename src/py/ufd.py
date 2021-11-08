@@ -900,6 +900,36 @@ class Pipeline(object):
             'ner_slot_f1': f1,
         })
 
+        def _smc_quality(true, pred):
+            true_set = dict.fromkeys([t for t in true if t.startswith('B_')])
+            pred_set = dict.fromkeys([t for t in pred if t.startswith('B_')])
+
+            total = len(true_set)
+            valid = len([t for t in true_set if t in pred_set])
+            return valid / total if total > 0 else 0
+
+        prec, recall, f1 = [], [], []
+        for i in range(len(nlu_outputs)):
+            pred_tags = [nlu_outputs[i]['tokens'][j][1] for j in range(len(true_tags[i]))]
+
+            prec.append(_smc_quality(pred_tags, true_tags[i]))
+            recall.append(_smc_quality(true_tags[i], pred_tags))
+
+            denom = prec[-1] + recall[-1]
+            f1.append(2 * prec[-1] * recall[-1] / denom if denom > 0 else 0)
+
+        stats.update({
+            'ner_smc_prec': round(sum(prec) / len(nlu_outputs), 3),
+            'ner_smc_rec': round(sum(recall) / len(nlu_outputs), 3),
+            'ner_smc_f1': round(sum(f1) / len(nlu_outputs), 3),
+        })
+
+        individual.update({
+            'ner_smc_prec': prec,
+            'ner_smc_rec': recall,
+            'ner_smc_f1': f1,
+        })
+
         # Tagging confidence
         stats.update({
             'conf': {
