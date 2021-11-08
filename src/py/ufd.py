@@ -425,18 +425,16 @@ class Pipeline(object):
 
     def fine_tune_utterance_similarity(self, n_train_epochs=None):
         if self.use_unseen_in_training:
-            sbert.fine_tune_utterance_similarity([u.text for u in self.utterances],
-                                                 [u.feature_name if u.part_type == 'TRAIN' else None for u in
-                                                  self.utterances],
-                                                 n_train_epochs=n_train_epochs,
-                                                 eval_callback=self.get_validation_score,
-                                                 early_stopping=True if n_train_epochs is None else False)
+            utterances, clusters = [u.text for u in self.utterances], \
+                                   [u.feature_name if u.part_type == 'TRAIN' else None for u in self.utterances]
         else:
-            sbert.fine_tune_utterance_similarity([u.text for u in self.utterances if u.part_type == 'TRAIN'],
-                                                 [u.feature_name for u in self.utterances if u.part_type == 'TRAIN'],
-                                                 n_train_epochs=n_train_epochs,
-                                                 eval_callback=self.get_validation_score,
-                                                 early_stopping=True if n_train_epochs is None else False)
+            utterances, clusters = [u.text for u in self.utterances if u.part_type == 'TRAIN'], \
+                                   [u.feature_name for u in self.utterances if u.part_type == 'TRAIN']
+
+        sbert.fine_tune_utterance_similarity(utterances, clusters,
+                                             n_train_epochs=n_train_epochs,
+                                             eval_callback=self.get_validation_score,
+                                             early_stopping=True if n_train_epochs is None else False)
 
     @DeprecationWarning
     def fine_tune_slot_tagging(self):
