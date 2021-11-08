@@ -19,7 +19,7 @@ clusters = predicted_clusters.pop('clusters')
 
 
 def supported(conf):
-    return conf['intent'] >= 0.9 and conf['slot'] >= 0.9
+    return conf['ic'] >= 0.9 and conf['ner_slot'] >= 0.9
 
 
 with open('reports/nst/snips_inter_intent_stats.txt', 'w') as f:

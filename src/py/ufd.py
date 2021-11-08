@@ -840,21 +840,21 @@ class Pipeline(object):
             acc_exclude_O.append(report_without_O['accuracy'])
 
         stats = {
-            'intent_acc': round(sum(intent) / len(nlu_outputs), 3),
-            'tag_acc': round(sum(acc) / len(nlu_outputs), 3),
-            'tag_acc_exclude_O': round(sum(acc_exclude_O) / len(nlu_outputs), 3),
-            'tag_prec': round(sum(prec) / len(nlu_outputs), 3),
-            'tag_rec': round(sum(recall) / len(nlu_outputs), 3),
-            'tag_f1': round(sum(f1) / len(nlu_outputs), 3),
+            'ic_intent_acc': round(sum(intent) / len(nlu_outputs), 3),
+            'ner_tag_acc': round(sum(acc) / len(nlu_outputs), 3),
+            'ner_tag_acc_exclude_O': round(sum(acc_exclude_O) / len(nlu_outputs), 3),
+            'ner_tag_prec': round(sum(prec) / len(nlu_outputs), 3),
+            'ner_tag_rec': round(sum(recall) / len(nlu_outputs), 3),
+            'ner_tag_f1': round(sum(f1) / len(nlu_outputs), 3),
         }
 
         individual = {
-            'intent_acc': intent,
-            'tag_acc': acc,
-            'tag_acc_exclude_O': acc_exclude_O,
-            'tag_prec': prec,
-            'tag_rec': recall,
-            'tag_f1': f1
+            'ic_intent_acc': intent,
+            'ner_tag_acc': acc,
+            'ner_tag_acc_exclude_O': acc_exclude_O,
+            'ner_tag_prec': prec,
+            'ner_tag_rec': recall,
+            'ner_tag_f1': f1
         }
 
         # Now compute quality at slot level
@@ -889,31 +889,31 @@ class Pipeline(object):
             f1.append(2 * prec[-1] * recall[-1] / denom if denom > 0 else 0)
 
         stats.update({
-            'slot_prec': round(sum(prec) / len(nlu_outputs), 3),
-            'slot_rec': round(sum(recall) / len(nlu_outputs), 3),
-            'slot_f1': round(sum(f1) / len(nlu_outputs), 3),
+            'ner_slot_prec': round(sum(prec) / len(nlu_outputs), 3),
+            'ner_slot_rec': round(sum(recall) / len(nlu_outputs), 3),
+            'ner_slot_f1': round(sum(f1) / len(nlu_outputs), 3),
         })
 
         individual.update({
-            'slot_prec': prec,
-            'slot_rec': recall,
-            'slot_f1': f1,
+            'ner_slot_prec': prec,
+            'ner_slot_rec': recall,
+            'ner_slot_f1': f1,
         })
 
         # Tagging confidence
         stats.update({
             'conf': {
-                'intent': round(sum([u['intent'][1] for u in nlu_outputs]) / len(nlu_outputs), 3),
-                'tag': round(sum([u['slots']['tag_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
-                'slot': round(sum([u['slots']['slot_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
+                'ic': round(sum([u['intent'][1] for u in nlu_outputs]) / len(nlu_outputs), 3),
+                'ner_tag': round(sum([u['slots']['tag_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
+                'ner_slot': round(sum([u['slots']['slot_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
             }
         })
 
         individual.update({
             'conf': {
-                'intent': [u['intent'][1] for u in nlu_outputs],
-                'tag': [u['slots']['tag_prob'] for u in nlu_outputs],
-                'slot': [u['slots']['slot_prob'] for u in nlu_outputs]
+                'ic': [u['intent'][1] for u in nlu_outputs],
+                'ner_tag': [u['slots']['tag_prob'] for u in nlu_outputs],
+                'ner_slot': [u['slots']['slot_prob'] for u in nlu_outputs]
             }
         })
 

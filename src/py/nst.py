@@ -32,8 +32,8 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
         for i, id in enumerate(test_ids):
             utterances.append('{}    ic_conf: {:.3f}    ner_conf: {:.3f}'.format(
                 pipeline.test_utterances[id].text,
-                individual_stats['conf']['intent'][i],
-                individual_stats['conf']['slot'][i]
+                individual_stats['conf']['ic'][i],
+                individual_stats['conf']['ner_slot'][i]
             ))
 
         details[f] = {
@@ -45,7 +45,7 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
     def _quality(labels: list[int]):
         return {
             'total': len(labels),
-            'accuracy': statistics.mean(labels)
+            'acc': statistics.mean(labels)
         }
 
     stats = {
@@ -73,7 +73,7 @@ p = Pipeline(inter_intent_data, dataset_name='inter_intent')
 
 print(json.dumps(
     evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
-                                             nst_callback=lambda conf: conf['intent'] >= 0.9 and conf['slot'] >= 0.9,
+                                             nst_callback=lambda conf: conf['ic'] >= 0.9 and conf['ner_slot'] >= 0.9,
                                              output_file='models/snips_nlu/inter_intent/nst.stats.txt'
                                              ),
     indent=2))
