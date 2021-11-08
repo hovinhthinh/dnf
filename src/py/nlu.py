@@ -60,6 +60,7 @@ class NLUModel(MPNetPreTrainedModel):
             self,
             input_ids=None,
             attention_mask=None,
+            token_type_ids=None,
             st_labels=None,
             ic_labels=None,
     ):

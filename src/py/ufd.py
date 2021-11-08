@@ -971,7 +971,7 @@ class Pipeline(object):
 
         quality = self._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
         print(quality)
-        return quality['tag_acc']
+        return quality['ner_tag_acc']
 
     def get_nlu_test_quality(self, test_ids: List[int] = None):
         # Compute only for a subset of test utterances
