@@ -465,7 +465,8 @@ class Pipeline(object):
                                           [u.feature_name for u in self.utterances if u.part_type == 'TRAIN']
         sbert.fine_tune_joint_slot_multiclass_classification_and_utterance_similarity(
             utterances, slots, clusters,
-            us_loss_weight=0.5, smc_loss_weight=0.5, negative_margin=0,
+            us_loss_weight=0.5, smc_loss_weight=0.5,
+            negative_margin=0,  # TODO: set to -1 to disable margin-based contrastive loss
             n_train_epochs=n_train_epochs,
             eval_callback=self.get_validation_score,
             early_stopping=True if n_train_epochs is None else False,
