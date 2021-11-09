@@ -250,7 +250,8 @@ class Pipeline(object):
         return self.get_dev_clustering_quality()['NMI']
 
     def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None, align_clusters=True,
-                                        early_stopping_patience=0, min_iterations=None, max_iterations=None):
+                                        early_stopping_patience=0, min_iterations=None, max_iterations=None,
+                                        save_model_path=None):
         classifier, optim, previous_clusters = None, None, None
         if iterations is None:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -332,6 +333,9 @@ class Pipeline(object):
                                                                           previous_classifier=classifier if align_clusters else None,
                                                                           previous_optim=optim if align_clusters else None)
                 print('Validation score: {:.3f}'.format(self.get_validation_score()))
+
+        if save_model_path is not None:
+            classifier.save_model(save_model_path)
 
     def fine_tune_joint_pseudo_classification_and_intent_classification(
             self, use_pseudo_sample_weights=True, align_clusters=True, intent_classifier_weight=0.2,
@@ -1103,6 +1107,7 @@ class Pipeline(object):
                     iterations=config.get('PC_iterations', None),
                     early_stopping_patience=3,
                     min_iterations=1, max_iterations=config.get('PC_max_iterations', 10),
+                    save_model_path=None if report_folder is None else os.path.join(report_folder, 'pc_trained_model')
                 )
             elif step == 'PC+IC':
                 self.fine_tune_joint_pseudo_classification_and_intent_classification(
