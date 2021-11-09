@@ -34,9 +34,9 @@ def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_t
         conf = nlu_stats['conf']
         pc_conf = get_pseudo_classifier_confidence([pipeline.test_utterances[i].text for i in test_ids], pc)
         conf['pc'] = statistics.mean(pc_conf).item()
-        conf['ic*ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
-        conf['ner_tag_min*pc'] = conf['pc'] * conf['ner_tag_min']
-        conf['ic*ner_tag_min*pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
+        conf['ic x ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
+        conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
+        conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
 
         metrics = conf.keys()
 
