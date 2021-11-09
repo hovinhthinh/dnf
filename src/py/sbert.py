@@ -6,6 +6,7 @@ from typing import List, Callable
 
 import numpy
 import torch
+from scipy.special import softmax
 from torch import nn
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
 from torch.nn.functional import cosine_similarity
@@ -352,14 +353,39 @@ class PseudoClassificationModel(nn.Module):
         )
         logits = self.classifier(mean=_mean_pooling(outputs, attention_mask))
 
-        per_sample_loss = self.loss_fct(logits, labels)
-        if sample_weights is not None:
-            per_sample_loss = torch.mul(per_sample_loss, sample_weights)
-        loss = torch.mean(per_sample_loss)
+        loss = None
+        if labels is not None:
+            per_sample_loss = self.loss_fct(logits, labels)
+            if sample_weights is not None:
+                per_sample_loss = torch.mul(per_sample_loss, sample_weights)
+            loss = torch.mean(per_sample_loss)
 
         output = (logits,) + outputs[2:]
         # The first should be loss, used by trainer. The second should be logits, used by compute_metrics
         return (loss,) + output
+
+    def save_model(self, path):
+        # Save base
+        save(path)
+        # Save classifier
+        torch.save({
+            'params': self.classifier.state_dict(),
+            'num_labels': self.num_labels,
+        }, os.path.join(path, 'pseudo_classifier'))
+
+    @staticmethod
+    def load_model(path):
+        # Save base
+        load(path)
+        # Save classifier
+        data = torch.load(os.path.join(path, 'pseudo_classifier'))
+
+        print(data['num_labels'])
+        loaded_model = PseudoClassificationModel(model, data['num_labels'])
+        loaded_model.classifier.load_state_dict(data['params'])
+        loaded_model.eval()
+
+        return loaded_model
 
 
 def fine_tune_pseudo_classification(train_texts, train_cluster_ids, train_sample_weights=None,
@@ -1180,6 +1206,26 @@ def fine_tune_joint_pseudo_classification_and_intent_classification(
     classifier.eval()
 
     return classifier, optim
+
+
+def get_pseudo_classifier_confidence(utterances, classifier, batch_size=64):
+    batches = []
+    cur = 0
+    while cur < len(utterances):
+        last = min(len(utterances), cur + batch_size)
+        # Tokenize sentences
+        encoded_input = tokenizer(utterances[cur: last], padding=True, truncation=True, return_tensors='pt')
+        encoded_input.to(device)
+        # Compute token embeddings
+        with torch.no_grad():
+            model_output = classifier(**encoded_input)
+
+        batches.append(model_output[1].detach().cpu().numpy())
+        cur = last
+        print('\rInferencing: {}/{} ({:.1f}%)'.format(cur, len(utterances), 100 * cur / len(utterances)),
+              end='' if cur < len(utterances) else '\n')
+    logits = numpy.concatenate(batches)
+    return numpy.max(softmax(logits, axis=-1), axis=-1)
 
 
 if __name__ == '__main__':
