@@ -1,11 +1,78 @@
 import json
+import os
 import statistics
 from typing import Callable
+
+import numpy
+from matplotlib import pyplot as plt
+from sklearn.metrics import precision_recall_curve, auc
 
 import nlu
 from data import snips
 from sbert import PseudoClassificationModel, get_pseudo_classifier_confidence
 from ufd import Pipeline
+
+
+def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str,
+                                                       pseudo_classification_trained_model_path: str,
+                                                       output_folder: str):
+    os.makedirs(output_folder, exist_ok=True)
+
+    nlu.load_finetuned(nlu_trained_model_path)
+
+    feature2novel = {u.feature_name: 0 for u in pipeline.test_utterances if u.feature_name.endswith('_TRAIN')}
+    feature2novel.update({u.feature_name: 0 for u in pipeline.test_utterances if u.feature_name.endswith('_DEV')})
+    feature2novel.update({u.feature_name: 1 for u in pipeline.test_utterances if u.feature_name.endswith('_TEST')})
+
+    pc = PseudoClassificationModel.load_model(pseudo_classification_trained_model_path)
+    feature2conf = {}
+
+    for f in feature2novel:
+        test_ids = [i for i, u in enumerate(pipeline.test_utterances) if u.feature_name == f]
+
+        nlu_stats = pipeline.get_nlu_test_quality(test_ids)
+        conf = nlu_stats['conf']
+        pc_conf = get_pseudo_classifier_confidence([pipeline.test_utterances[i].text for i in test_ids], pc)
+        conf['pc'] = statistics.mean(pc_conf).item()
+
+        # TODO: more approaches
+
+        metrics = conf.keys()
+
+        feature2conf[f] = conf
+
+    pr_auc_results = {}
+
+    baseline_prec = sum([feature2novel[f] for f in feature2novel]) / len(feature2novel)
+    for m in metrics:
+        prec, rec, threshold = precision_recall_curve([feature2novel[f] for f in feature2novel],
+                                                      [-feature2conf[f][m] for f in feature2novel])
+        f1 = [0 if prec[i] + rec[i] == 0 else 2 * prec[i] * rec[i] / (prec[i] + rec[i]) for i in range(len(prec))]
+
+        best_id = numpy.argmax(numpy.asarray(f1))
+        pr_auc_results[m] = {
+            'auc_score': round(auc(rec, prec), 3),
+            'optimal_f1': round(f1[best_id], 3),
+            'threshold': round(-threshold[best_id], 3),
+            'prec': round(prec[best_id], 3),
+            'rec': round(rec[best_id], 3),
+        }
+
+        # Plot PR curve
+        plt.plot([0, 1], [baseline_prec, baseline_prec], linestyle='--', label='random')  # Baseline
+        plt.plot(rec, prec, marker='.', linestyle='-', label=m)
+        plt.xlabel('recall')
+        plt.ylabel('precision')
+        plt.legend()
+        plt.grid(linestyle='--')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_folder, 'pr_curve.{}.pdf'.format(m)), bbox_inches='tight')
+        plt.close()
+
+    with open(os.path.join(output_folder, 'stats.txt'), 'w') as f:
+        f.write(json.dumps(pr_auc_results, indent=2))
+
+    return pr_auc_results
 
 
 def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str,
@@ -84,10 +151,11 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
 _, inter_intent_data = snips.get_train_test_data(use_dev=True)
 p = Pipeline(inter_intent_data, dataset_name='inter_intent')
 
-print(json.dumps(
-    evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
-                                             './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
-                                             nst_callback=lambda conf: conf['ic'] >= 0.9 and conf['ner_slot'] >= 0.9,
-                                             output_file='models/snips_nlu/inter_intent/nst.stats.txt'
-                                             ),
-    indent=2))
+compute_pr_auc_for_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
+                                                   './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
+                                                   './reports/nst/nlu_validation/snips_inter_intent/')
+# print(evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
+#                                                './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
+#                                                nst_callback=lambda conf: conf['ic'] >= 0.9 and conf['ner_slot'] >= 0.9,
+#                                                output_file='./reports/nst/snips_inter_intent_stats.txt'
+#                                                ))
