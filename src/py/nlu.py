@@ -351,11 +351,13 @@ def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
         t = numpy.argmax(cost[n])
         tag_prob = cost[n][t] / n
         assert tag_prob >= 0
+        tag_prob_min = 1.0
 
         c = n
         while c > 0:
             tags[c] = nlu_model.config.st_labels[t]
             prob[c] = st_prob[c][t]
+            tag_prob_min = min(tag_prob_min, prob[c])
             t = trace[c][t]
             c -= 1
 
@@ -381,6 +383,8 @@ def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
             'slots': {
                 # average prob over tags, including O
                 'tag_prob': tag_prob,
+                # min prob over tags, including O
+                'tag_prob_min': tag_prob_min,
                 # average prob over slots
                 'slot_prob': 0.0 if len(slots) == 0 else sum([s['prob'] for s in slots]) / len(slots),
                 'slots': slots
