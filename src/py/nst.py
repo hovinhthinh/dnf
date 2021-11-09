@@ -34,8 +34,9 @@ def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_t
         conf = nlu_stats['conf']
         pc_conf = get_pseudo_classifier_confidence([pipeline.test_utterances[i].text for i in test_ids], pc)
         conf['pc'] = statistics.mean(pc_conf).item()
-
-        # TODO: more approaches
+        conf['ic*ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
+        conf['ner_tag_min*pc'] = conf['pc'] * conf['ner_tag_min']
+        conf['ic*ner_tag_min*pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
 
         metrics = conf.keys()
 
@@ -51,7 +52,7 @@ def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_t
 
         best_id = numpy.argmax(numpy.asarray(f1))
         pr_auc_results[m] = {
-            'auc_score': round(auc(rec, prec), 3),
+            'pr_auc_score': round(auc(rec, prec), 3),
             'optimal_f1': round(f1[best_id], 3),
             'threshold': round(-threshold[best_id], 3),
             'prec': round(prec[best_id], 3),
@@ -60,7 +61,7 @@ def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_t
 
         # Plot PR curve
         plt.plot([0, 1], [baseline_prec, baseline_prec], linestyle='--', label='random')  # Baseline
-        plt.plot(rec, prec, marker='.', linestyle='-', label=m)
+        plt.plot(rec, prec, marker='.', linestyle='-', label='conf: {}'.format(m))
         plt.xlabel('recall')
         plt.ylabel('precision')
         plt.legend()
