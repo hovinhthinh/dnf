@@ -1000,6 +1000,14 @@ class Pipeline(object):
                  u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')],
                 [tags[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_name.endswith('_TRAIN') or u.feature_name.endswith('_DEV')]),
+            'train': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TRAIN')],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TRAIN')],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TRAIN')]),
+            'dev': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_DEV')],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_DEV')],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_DEV')]),
             'test': self._get_nlu_quality(
                 [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')],
                 [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_name.endswith('_TEST')],
