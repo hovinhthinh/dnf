@@ -378,7 +378,7 @@ class PseudoClassificationModel(nn.Module):
         # Save base
         load(path)
         # Save classifier
-        data = torch.load(os.path.join(path, 'pseudo_classifier'))
+        data = torch.load(os.path.join(path, 'pseudo_classifier'), map_location=device)
 
         print(data['num_labels'])
         loaded_model = PseudoClassificationModel(model, data['num_labels'])
