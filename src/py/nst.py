@@ -4,10 +4,13 @@ from typing import Callable
 
 import nlu
 from data import snips
+from sbert import PseudoClassificationModel, get_pseudo_classifier_confidence
 from ufd import Pipeline
 
 
-def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str, nst_callback: Callable,
+def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str,
+                                             pseudo_classification_trained_model_path: str,
+                                             nst_callback: Callable,
                                              output_file=None):
     nlu.load_finetuned(nlu_trained_model_path)
 
@@ -18,24 +21,32 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
     feature2label.update(
         dict.fromkeys([u.feature_name for u in pipeline.test_utterances if u.feature_name.endswith('_TEST')]))
 
+    pc = PseudoClassificationModel.load_model(pseudo_classification_trained_model_path) \
+        if pseudo_classification_trained_model_path is not None else None
     details = {}
     for f in feature2label:
         test_ids = [i for i, u in enumerate(pipeline.test_utterances) if u.feature_name == f]
 
         nlu_stats = pipeline.get_nlu_test_quality(test_ids)
         conf = nlu_stats['conf']
+
+        if pc is not None:
+            pc_conf = get_pseudo_classifier_confidence([pipeline.test_utterances[i].text for i in test_ids], pc)
+            conf['pc'] = statistics.mean(pc_conf).item()
+
         supported = 1 if nst_callback(conf) else 0
         feature2label[f] = 1 - supported if f.endswith('_TEST') else supported
 
         utterances = []
         individual_stats = nlu_stats['individual']
         for i, id in enumerate(test_ids):
-            utterances.append('{}    ic_conf: {:.3f}    ner_conf: {:.3f}'
+            utterances.append('{}    ic_conf: {:.3f}    ner_conf: {:.3f}    pc_conf: {:.3f}'
                 .format(
                 ' '.join(['{} ({}{})'.format(t[0], '' if t[1] == 'O' else t[1][:2] + ',', round(t[2], 3))
                           for t in individual_stats['tokens'][i]]),
                 individual_stats['conf']['ic'][i],
-                individual_stats['conf']['ner_slot'][i]
+                individual_stats['conf']['ner_slot'][i],
+                pc_conf[i].item() if pc is not None else None
             ))
 
         details[f] = {
@@ -75,6 +86,7 @@ p = Pipeline(inter_intent_data, dataset_name='inter_intent')
 
 print(json.dumps(
     evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
+                                             './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
                                              nst_callback=lambda conf: conf['ic'] >= 0.9 and conf['ner_slot'] >= 0.9,
                                              output_file='models/snips_nlu/inter_intent/nst.stats.txt'
                                              ),
