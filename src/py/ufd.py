@@ -947,6 +947,7 @@ class Pipeline(object):
         individual.update({
             'conf': {
                 'ic': [u['intent'][1] for u in nlu_outputs],
+                'ner_tag': [u['slots']['tag_prob'] for u in nlu_outputs],
                 'ner_tag_min': [u['slots']['tag_prob_min'] for u in nlu_outputs],
                 'ner_slot': [u['slots']['slot_prob'] for u in nlu_outputs]
             }
