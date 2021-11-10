@@ -74,6 +74,7 @@ def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_t
         conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
         conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
 
+        conf.pop('ic')
         metrics = conf.keys()
 
         feature2conf[f] = conf
@@ -112,6 +113,7 @@ def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, n
         conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
         conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
 
+        conf.pop('ic')
         metrics = conf.keys()
 
         feature2conf[f] = conf
