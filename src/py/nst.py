@@ -14,13 +14,14 @@ from sbert import PseudoClassificationModel, get_pseudo_classifier_confidence, \
 from ufd import Pipeline
 
 
-def _populate_pr_auc_results(metrics, feature2novel, feature2conf, output_folder):
+def _populate_pr_auc_results(metrics, novelty, conf, output_folder):
+    os.makedirs(output_folder, exist_ok=True)
+
     pr_auc_results = {}
 
-    baseline_prec = sum([feature2novel[f] for f in feature2novel]) / len(feature2novel)
+    baseline_prec = sum(novelty) / len(novelty)
     for m in metrics:
-        prec, rec, threshold = precision_recall_curve([feature2novel[f] for f in feature2novel],
-                                                      [-feature2conf[f][m] for f in feature2novel])
+        prec, rec, threshold = precision_recall_curve(novelty, [-c[m] for c in conf])
         f1 = [0 if prec[i] + rec[i] == 0 else 2 * prec[i] * rec[i] / (prec[i] + rec[i]) for i in range(len(prec))]
 
         best_id = numpy.argmax(numpy.asarray(f1))
@@ -49,13 +50,19 @@ def _populate_pr_auc_results(metrics, feature2novel, feature2conf, output_folder
     return pr_auc_results
 
 
+def _update_conf(conf):
+    conf['ic x ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
+    conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
+    conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
+    conf.pop('ic')
+
+
 def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str,
                                                        pseudo_classification_trained_model_path: str,
                                                        output_folder: str):
-    os.makedirs(output_folder, exist_ok=True)
-
     nlu.load_finetuned(nlu_trained_model_path)
 
+    # Cluster level
     feature2novel = {u.feature_name: 0 for u in pipeline.test_utterances if u.feature_name.endswith('_TRAIN')}
     feature2novel.update({u.feature_name: 0 for u in pipeline.test_utterances if u.feature_name.endswith('_DEV')})
     feature2novel.update({u.feature_name: 1 for u in pipeline.test_utterances if u.feature_name.endswith('_TEST')})
@@ -70,25 +77,33 @@ def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_t
         conf = nlu_stats['conf']
         pc_conf = get_pseudo_classifier_confidence([pipeline.test_utterances[i].text for i in test_ids], pc)
         conf['pc'] = statistics.mean(pc_conf).item()
-        conf['ic x ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
-        conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
-        conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
-
-        conf.pop('ic')
-        metrics = conf.keys()
-
+        _update_conf(conf)
         feature2conf[f] = conf
 
-    return _populate_pr_auc_results(metrics, feature2novel, feature2conf, output_folder)
+    # Utterance level
+    utterance_novelty = [1 if u.feature_name.endswith('_TEST') else 0 for u in pipeline.test_utterances]
+    individual_conf = pipeline.get_nlu_test_quality(list(range(len(pipeline.test_utterances))))['individual']['conf']
+    pc_conf = get_pseudo_classifier_confidence([u.text for u in pipeline.test_utterances], pc)
+    utterance_conf = []
+    for i in range(len(pipeline.test_utterances)):
+        conf = {k: float(v[i]) for k, v in individual_conf.items()}
+        conf['pc'] = float(pc_conf[i])
+        _update_conf(conf)
+        utterance_conf.append(conf)
+
+    _populate_pr_auc_results(conf.keys(), [feature2novel[f] for f in feature2novel],
+                             [feature2conf[f] for f in feature2novel],
+                             os.path.join(output_folder, 'cluster_level'))
+    _populate_pr_auc_results(conf.keys(), utterance_novelty, utterance_conf,
+                             os.path.join(output_folder, 'utterance_level'))
 
 
 def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str,
                                                            pseudo_classification_trained_model_path: str,
                                                            output_folder: str):
-    os.makedirs(output_folder, exist_ok=True)
-
     nlu.load_finetuned(nlu_trained_model_path)
 
+    # Cluster level
     feature2novel = {u.feature_name: 0 for u in pipeline.utterances if
                      u.feature_name.endswith('_TRAIN') and u.part_type == 'DEV'}
     feature2novel.update(
@@ -101,7 +116,8 @@ def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, n
         texts, tags = _split_text_and_slots_into_tokens_and_tags([u.text for u in utterances],
                                                                  [u.slots for u in utterances])
         nlu_outputs = nlu.get_intents_and_slots(texts)
-        return pipeline._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags)
+        return pipeline._get_nlu_quality(nlu_outputs, [u.intent_name for u in utterances], tags,
+                                         keep_individual_stats=True)
 
     for f in feature2novel:
         utterances = [u for u in pipeline.utterances if u.feature_name == f and u.part_type == 'DEV']
@@ -109,16 +125,27 @@ def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, n
         conf = nlu_stats['conf']
         pc_conf = get_pseudo_classifier_confidence([u.text for u in utterances], pc)
         conf['pc'] = statistics.mean(pc_conf).item()
-        conf['ic x ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
-        conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
-        conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
-
-        conf.pop('ic')
-        metrics = conf.keys()
-
+        _update_conf(conf)
         feature2conf[f] = conf
 
-    return _populate_pr_auc_results(metrics, feature2novel, feature2conf, output_folder)
+    # Utterance level
+    utterance_novelty = [1 if u.feature_name.endswith('_DEV') else 0 for u in pipeline.utterances if
+                         u.part_type == 'DEV']
+    utterances = [u for u in pipeline.utterances if u.part_type == 'DEV']
+    individual_conf = _get_nlu_dev_quality(utterances)['individual']['conf']
+    pc_conf = get_pseudo_classifier_confidence([u.text for u in utterances], pc)
+    utterance_conf = []
+    for i in range(len(utterances)):
+        conf = {k: float(v[i]) for k, v in individual_conf.items()}
+        conf['pc'] = float(pc_conf[i])
+        _update_conf(conf)
+        utterance_conf.append(conf)
+
+    _populate_pr_auc_results(conf.keys(), [feature2novel[f] for f in feature2novel],
+                             [feature2conf[f] for f in feature2novel],
+                             os.path.join(output_folder, 'cluster_level'))
+    _populate_pr_auc_results(conf.keys(), utterance_novelty, utterance_conf,
+                             os.path.join(output_folder, 'utterance_level'))
 
 
 def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str,
@@ -198,8 +225,8 @@ _, inter_intent_data = snips.get_train_test_data(use_dev=True)
 p = Pipeline(inter_intent_data, dataset_name='inter_intent')
 
 compute_dev_pr_auc_for_nlu_model_for_support_detection(p, './models/snips_nlu_exclude_unseen/inter_intent/nlu_model',
-                                                   './reports/global/snips_SMC+US_PC_exclude_unseen/inter_intent/pc_trained_model',
-                                                   './reports/nst/nlu_validation/snips_inter_intent_exclude_unseen/')
+                                                       './reports/global/snips_SMC+US_PC_exclude_unseen/inter_intent/pc_trained_model',
+                                                       './reports/nst/nlu_validation/snips_inter_intent_exclude_unseen/')
 compute_pr_auc_for_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
                                                    './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
                                                    './reports/nst/nlu_validation/snips_inter_intent/')
