@@ -937,10 +937,10 @@ class Pipeline(object):
         # Tagging confidence
         stats.update({
             'conf': {
-                'ic': round(sum([u['intent'][1] for u in nlu_outputs]) / len(nlu_outputs), 3),
-                'ner_tag': round(sum([u['slots']['tag_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
-                'ner_tag_min': round(sum([u['slots']['tag_prob_min'] for u in nlu_outputs]) / len(nlu_outputs), 3),
-                'ner_slot': round(sum([u['slots']['slot_prob'] for u in nlu_outputs]) / len(nlu_outputs), 3),
+                'ic': sum([u['intent'][1] for u in nlu_outputs]) / len(nlu_outputs),
+                'ner_tag': sum([u['slots']['tag_prob'] for u in nlu_outputs]) / len(nlu_outputs),
+                'ner_tag_min': sum([u['slots']['tag_prob_min'] for u in nlu_outputs]) / len(nlu_outputs),
+                'ner_slot': sum([u['slots']['slot_prob'] for u in nlu_outputs]) / len(nlu_outputs),
             }
         })
 
