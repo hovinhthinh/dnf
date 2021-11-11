@@ -28,7 +28,7 @@ def _populate_pr_auc_results(metrics, novelty, conf, output_folder):
         pr_auc_results[m] = {
             'pr_auc_score': round(auc(rec, prec), 3),
             'optimal_f1': round(f1[best_id], 3),
-            'threshold': round(-threshold[best_id], 3),
+            'threshold': -threshold[best_id],
             'prec': round(prec[best_id], 3),
             'rec': round(rec[best_id], 3),
         }
