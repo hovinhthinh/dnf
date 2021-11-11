@@ -54,7 +54,7 @@ def _update_conf(conf):
     conf['ic x ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
     conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
     conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
-    conf.pop('ic')
+    # conf.pop('ic')
 
 
 def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_model_path: str,
