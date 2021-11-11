@@ -185,7 +185,7 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
                 ' '.join(['{} ({}{})'.format(t[0], '' if t[1] == 'O' else t[1][:2] + ',', round(t[2], 3))
                           for t in individual_stats['tokens'][i]]),
                 individual_stats['conf']['ic'][i],
-                individual_stats['conf']['ner_slot'][i],
+                individual_stats['conf']['ner_tag_min'][i],
                 pc_conf[i].item() if pc is not None else None
             ))
 
