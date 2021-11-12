@@ -1,7 +1,7 @@
 import json
 import os
 import statistics
-from typing import Callable
+from typing import Callable, List
 
 import numpy
 from matplotlib import pyplot as plt
@@ -9,12 +9,14 @@ from sklearn.metrics import precision_recall_curve, auc
 
 import nlu
 from data import snips
+from data.entity import Utterance
 from sbert import PseudoClassificationModel, get_pseudo_classifier_confidence, \
     _split_text_and_slots_into_tokens_and_tags
 from ufd import Pipeline
 
 
-def _populate_pr_auc_results(metrics, novelty, conf, output_folder):
+def _populate_pr_auc_results(metrics, novelty, conf, output_folder,
+                             feature_names: List[str] = None, utterances: List[Utterance] = None):
     os.makedirs(output_folder, exist_ok=True)
 
     pr_auc_results = {}
@@ -43,6 +45,26 @@ def _populate_pr_auc_results(metrics, novelty, conf, output_folder):
         plt.tight_layout()
         plt.savefig(os.path.join(output_folder, 'pr_curve.{}.pdf'.format(m)), bbox_inches='tight')
         plt.close()
+
+        # Computing utterance-level stats for cluster-level
+        if utterances is not None:
+            truly_novel_features = set([feature_names[i] for i in range(len(novelty)) if novelty[i] == 1])
+            predicted_novel_features = set(
+                [feature_names[i] for i in range(len(novelty)) if conf[i][m] <= -threshold[best_id] + 1e-6])
+
+            tp = len([u for u in utterances if
+                      u.feature_name in truly_novel_features and u.feature_name in predicted_novel_features])
+            prec_denom = len([u for u in utterances if u.feature_name in predicted_novel_features])
+            rec_denom = len([u for u in utterances if u.feature_name in truly_novel_features])
+            prec = 0 if prec_denom == 0 else tp / prec_denom
+            rec = 0 if rec_denom == 0 else tp / rec_denom
+            f1 = 0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
+
+            pr_auc_results[m].update({
+                'utr.prec': round(prec, 3),
+                'utr.rec': round(rec, 3),
+                'utr.f1': round(f1, 3),
+            })
 
     with open(os.path.join(output_folder, 'stats.txt'), 'w') as f:
         f.write(json.dumps(pr_auc_results, indent=2))
@@ -93,7 +115,8 @@ def compute_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, nlu_t
 
     _populate_pr_auc_results(conf.keys(), [feature2novel[f] for f in feature2novel],
                              [feature2conf[f] for f in feature2novel],
-                             os.path.join(output_folder, 'cluster_level'))
+                             os.path.join(output_folder, 'cluster_level'),
+                             feature_names=[f for f in feature2novel], utterances=pipeline.test_utterances)
     _populate_pr_auc_results(conf.keys(), utterance_novelty, utterance_conf,
                              os.path.join(output_folder, 'utterance_level'))
 
@@ -129,9 +152,8 @@ def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, n
         feature2conf[f] = conf
 
     # Utterance level
-    utterance_novelty = [1 if u.feature_name.endswith('_DEV') else 0 for u in pipeline.utterances if
-                         u.part_type == 'DEV']
     utterances = [u for u in pipeline.utterances if u.part_type == 'DEV']
+    utterance_novelty = [1 if u.feature_name.endswith('_DEV') else 0 for u in utterances]
     individual_conf = _get_nlu_dev_quality(utterances)['individual']['conf']
     pc_conf = get_pseudo_classifier_confidence([u.text for u in utterances], pc)
     utterance_conf = []
@@ -143,7 +165,8 @@ def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, n
 
     _populate_pr_auc_results(conf.keys(), [feature2novel[f] for f in feature2novel],
                              [feature2conf[f] for f in feature2novel],
-                             os.path.join(output_folder, 'cluster_level'))
+                             os.path.join(output_folder, 'cluster_level'),
+                             feature_names=[f for f in feature2novel], utterances=utterances)
     _populate_pr_auc_results(conf.keys(), utterance_novelty, utterance_conf,
                              os.path.join(output_folder, 'utterance_level'))
 
