@@ -73,9 +73,12 @@ def _populate_pr_auc_results(metrics, novelty, conf, output_folder,
 
 
 def _update_conf(conf):
-    conf['ic x ner_tag_min'] = conf['ic'] * conf['ner_tag_min']
+    conf['ner_tag_min x ic'] = conf['ic'] * conf['ner_tag_min']
     conf['ner_tag_min x pc'] = conf['pc'] * conf['ner_tag_min']
-    conf['ic x ner_tag_min x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
+    conf['ner_tag_min x ic x pc'] = conf['ic'] * conf['ner_tag_min'] * conf['pc']
+    conf['mean(ner_tag_min, ic)'] = (conf['ic'] + conf['ner_tag_min']) / 2
+    conf['mean(ner_tag_min, pc)'] = (conf['ner_tag_min'] + conf['pc']) / 2
+    conf['mean(ner_tag_min, ic, pc)'] = (conf['ic'] + conf['ner_tag_min'] + conf['pc']) / 3
     # conf.pop('ic')
 
 
