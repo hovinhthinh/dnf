@@ -28,12 +28,13 @@ def _populate_pr_auc_results(metrics, novelty, conf, output_folder,
 
         best_id = numpy.argmax(numpy.asarray(f1))
         pr_auc_results[m] = {
-            'pr_auc_score': round(auc(rec, prec), 3),
-            'optimal_f1': round(f1[best_id], 3),
-            'threshold': -threshold[best_id],
-            'prec': round(prec[best_id], 3),
-            'rec': round(rec[best_id], 3),
+            'unseen.pr_auc_score': round(auc(rec, prec), 3),
+            'unseen.optimal_f1': round(f1[best_id], 3),
+            'unseen.threshold': -threshold[best_id],
+            'unseen.prec': round(prec[best_id], 3),
+            'unseen.rec': round(rec[best_id], 3),
         }
+        unseen_f1 = f1[best_id]
 
         # Plot PR curve
         plt.plot([0, 1], [baseline_prec, baseline_prec], linestyle='--', label='random')  # Baseline
@@ -61,10 +62,31 @@ def _populate_pr_auc_results(metrics, novelty, conf, output_folder,
             f1 = 0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
 
             pr_auc_results[m].update({
-                'utr.prec': round(prec, 3),
-                'utr.rec': round(rec, 3),
-                'utr.f1': round(f1, 3),
+                'unseen.utr.prec': round(prec, 3),
+                'unseen.utr.rec': round(rec, 3),
+                'unseen.utr.f1': round(f1, 3),
             })
+
+        # Computing for negative
+        tp = len([i for i in range(len(novelty)) if novelty[i] == 0 and conf[i][m] > -threshold[best_id] + 1e-6])
+        prec_denom = len([c for c in conf if c[m] > -threshold[best_id] + 1e-6])
+        rec_denom = len([n for n in novelty if n == 0])
+        prec = 0 if prec_denom == 0 else tp / prec_denom
+        rec = 0 if rec_denom == 0 else tp / rec_denom
+        f1 = 0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
+
+        pr_auc_results[m].update({
+            'seen.prec': round(prec, 3),
+            'seen.rec': round(rec, 3),
+            'seen.f1': round(f1, 3),
+        })
+
+        # Computing acc
+        pr_auc_results[m].update({
+            'seen+unseen.acc': round(sum([1 if (1 if conf[i][m] <= -threshold[best_id] + 1e-6 else 0) == novelty[i]
+                                          else 0 for i in range(len(novelty))]) / len(novelty), 3),
+            'seen+unseen.avg_f1': round((unseen_f1 + f1) / 2, 3)
+        })
 
     with open(os.path.join(output_folder, 'stats.txt'), 'w') as f:
         f.write(json.dumps(pr_auc_results, indent=2))
