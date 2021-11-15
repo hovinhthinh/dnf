@@ -180,23 +180,5 @@ def print_train_dev_test_stats(intent_data):
 if __name__ == '__main__':
     set_seed(12993)
 
-    inter_intent_data = get_train_test_data(generate_data=True)
-    print_train_dev_test_stats(inter_intent_data)
-
-    # Write utterances to file
-    if False:
-        f = open('./data/alexa/fr/slot_based_clusters/utterances.txt', 'w')
-        intents = dict.fromkeys(u.feature_name[:u.feature_name.find('_')] for u in inter_intent_data)
-        for intent in intents:
-            data = [u for u in inter_intent_data if u.feature_name.startswith(intent)]
-            sets = dict.fromkeys(u.feature_name for u in data)
-            print('======== Intent:', intent, '========', file=f)
-            sets = [s for s in sets if s.endswith('TRAIN')] + \
-                   [s for s in sets if s.endswith('DEV')] + \
-                   [s for s in sets if s.endswith('TEST')]
-            for s in sets:
-                utrs = [u.text for u in data if u.feature_name == s]
-                print('Feature:', s[s.find('_') + 1:], file=f)
-                print(utrs, file=f)
-                print(file=f)
-        f.close()
+    alexa_data = get_train_test_data(generate_data=True)
+    print_train_dev_test_stats(alexa_data)
