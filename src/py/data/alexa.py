@@ -66,6 +66,8 @@ def read_live_data(folder='./data/alexa/fr/frXX_live_traffic/'):
 
 
 def get_train_test_data(generate_data=False):
+    set_seed(12993)
+
     train_test_data_file = './data/alexa/fr/slot_based_clusters/train_test_data_global.json'
 
     if generate_data:
@@ -178,7 +180,5 @@ def print_train_dev_test_stats(intent_data):
 
 
 if __name__ == '__main__':
-    set_seed(12993)
-
     alexa_data = get_train_test_data(generate_data=True)
     print_train_dev_test_stats(alexa_data)
