@@ -364,6 +364,14 @@ class Pipeline(object):
             self, use_pseudo_sample_weights=True, align_clusters=True, intent_classifier_weight=0.2,
             iterations=None, early_stopping_patience=0, min_iterations=None, max_iterations=None):
         classifier, optim, previous_clusters = None, None, None
+
+        n_clusters = None
+        if not self.dev_feature_available:
+            n_clusters = elbow_analysis(self.embeddings,
+                                        min_n_clusters=len(self.cluster_label_2_index_map),
+                                        max_n_clusters=int(len(self.cluster_label_2_index_map) * 1.5))[0]
+            print('Pseudo-Classification with Elbow analysis: k={}'.format(n_clusters))
+
         if iterations is None:
             with tempfile.TemporaryDirectory() as temp_dir:
                 best_iter = None
@@ -375,7 +383,7 @@ class Pipeline(object):
                     # self.update_embeddings() # No need to update, already called in self.get_validation_score()
                     utterances = self.utterances
                     embeddings = self.embeddings
-                    pseudo_clusters, weights = self.get_pseudo_clusters()
+                    pseudo_clusters, weights = self.get_pseudo_clusters(k=n_clusters)
 
                     if not self.use_unseen_in_training:
                         utterances = [u for u in utterances if u.part_type == 'TRAIN']
@@ -392,6 +400,7 @@ class Pipeline(object):
                     previous_clusters = pseudo_clusters
 
                     print('Pseudo-cluster quality:',
+                          None if self.use_unseen_in_training and not self.dev_feature_available else
                           get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                                  pseudo_clusters))
                     classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
@@ -423,7 +432,7 @@ class Pipeline(object):
                 # self.update_embeddings() # No need to update
                 utterances = self.utterances
                 embeddings = self.embeddings
-                pseudo_clusters, weights = self.get_pseudo_clusters()
+                pseudo_clusters, weights = self.get_pseudo_clusters(k=n_clusters)
 
                 if not self.use_unseen_in_training:
                     utterances = [u for u in utterances if u.part_type == 'TRAIN']
@@ -439,6 +448,7 @@ class Pipeline(object):
                 previous_clusters = pseudo_clusters
 
                 print('Pseudo-cluster quality:',
+                      None if self.use_unseen_in_training and not self.dev_feature_available else
                       get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                              pseudo_clusters))
                 classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
