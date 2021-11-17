@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 import numpy
 import umap
 from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.metrics import pairwise_distances, euclidean_distances, silhouette_score, classification_report
+from sklearn.metrics import pairwise_distances, euclidean_distances, classification_report
 
 import sbert
-from cluster import cop_kmeans, get_clustering_quality
+from cluster import cop_kmeans, get_clustering_quality, silhouette_analysis, elbow_analysis
 from data.snips import print_train_dev_test_stats
 
 
@@ -41,7 +41,10 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
         if l not in u_labels:
             continue
         idx = [i for i, _ in enumerate(labels) if _ == l]
-        l = l.replace('_TRAIN', '_TRAIN_L').replace('_DEV', '_TRAIN_U')  # rename cluster names
+        if l is not None:
+            l = l.replace('_TRAIN', '_TRAIN_L').replace('_DEV', '_TRAIN_U')  # rename cluster names
+        else:
+            l = 'NO_FEATURE_LABEL_TRAIN_U'
         if plot_3d:
             if sample_type is None:
                 ax.scatter([embeddings[i][0] for i in idx],
@@ -115,8 +118,16 @@ class Pipeline(object):
         self.squashing_train_dev = squashing_train_dev
         self.dev_indices = [i for i, u in enumerate(self.utterances) if u.part_type != 'TRAIN']
 
+        self.dev_feature_available = None
+        for i in self.dev_indices:
+            set_value = self.utterances[i].feature_name is not None
+            if self.dev_feature_available is not None and self.dev_feature_available != set_value:
+                raise Exception('DEV feature not completely available')
+            self.dev_feature_available = set_value
+
         self.cluster_label_2_index_map = dict(
-            (n, i) for i, n in enumerate(dict.fromkeys([u.feature_name for u in self.utterances])))
+            (n, i) for i, n in
+            enumerate(dict.fromkeys([u.feature_name for u in self.utterances if u.feature_name is not None])))
 
         self.embeddings = None
         self.test_embeddings = None
@@ -154,6 +165,8 @@ class Pipeline(object):
             self.test_embeddings = self.embeddings[indices]
 
     def get_true_clusters(self, including_train=True, including_dev=True):
+        if including_dev and not self.dev_feature_available:
+            raise Exception('DEV feature not provided')
         return [self.cluster_label_2_index_map[u.feature_name] for u in self.utterances if
                 (including_train and u.part_type == 'TRAIN') or (including_dev and u.part_type != 'TRAIN')]
 
@@ -247,12 +260,20 @@ class Pipeline(object):
 
     def get_validation_score(self):
         self.update_embeddings()
-        return self.get_dev_clustering_quality()['NMI']
+        return self.get_dev_clustering_quality()['NMI'] if self.dev_feature_available else -1
 
     def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None, align_clusters=True,
                                         early_stopping_patience=0, min_iterations=None, max_iterations=None,
                                         save_model_path=None):
         classifier, optim, previous_clusters = None, None, None
+
+        n_clusters = None
+        if not self.dev_feature_available:
+            n_clusters = elbow_analysis(self.embeddings,
+                                        min_n_clusters=len(self.cluster_label_2_index_map),
+                                        max_n_clusters=int(len(self.cluster_label_2_index_map) * 1.5))[0]
+            print('Pseudo-Classification with Elbow analysis: k={}'.format(n_clusters))
+
         if iterations is None:
             with tempfile.TemporaryDirectory() as temp_dir:
                 best_iter = None
@@ -264,7 +285,7 @@ class Pipeline(object):
                     # self.update_embeddings() # No need to update, already called in self.get_validation_score()
                     utterances = self.utterances
                     embeddings = self.embeddings
-                    pseudo_clusters, weights = self.get_pseudo_clusters()
+                    pseudo_clusters, weights = self.get_pseudo_clusters(k=n_clusters)
 
                     if not self.use_unseen_in_training:
                         utterances = [u for u in utterances if u.part_type == 'TRAIN']
@@ -281,6 +302,7 @@ class Pipeline(object):
                     previous_clusters = pseudo_clusters
 
                     print('Pseudo-cluster quality:',
+                          None if self.use_unseen_in_training and not self.dev_feature_available else
                           get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                                  pseudo_clusters))
                     classifier, optim = sbert.fine_tune_pseudo_classification([u.text for u in utterances],
@@ -310,7 +332,7 @@ class Pipeline(object):
                 # self.update_embeddings() # No need to update
                 utterances = self.utterances
                 embeddings = self.embeddings
-                pseudo_clusters, weights = self.get_pseudo_clusters()
+                pseudo_clusters, weights = self.get_pseudo_clusters(k=n_clusters)
 
                 if not self.use_unseen_in_training:
                     utterances = [u for u in utterances if u.part_type == 'TRAIN']
@@ -326,6 +348,7 @@ class Pipeline(object):
                 previous_clusters = pseudo_clusters
 
                 print('Pseudo-cluster quality:',
+                      None if self.use_unseen_in_training and not self.dev_feature_available else
                       get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
                                              pseudo_clusters))
                 classifier, optim = sbert.fine_tune_pseudo_classification([u.text for u in utterances], pseudo_clusters,
@@ -436,6 +459,7 @@ class Pipeline(object):
                                    [u.feature_name for u in self.utterances if u.part_type == 'TRAIN']
 
         sbert.fine_tune_utterance_similarity(utterances, clusters,
+                                             negative_margin=0.5,
                                              n_train_epochs=n_train_epochs,
                                              eval_callback=self.get_validation_score,
                                              early_stopping=True if n_train_epochs is None else False)
@@ -494,6 +518,9 @@ class Pipeline(object):
             early_stopping_patience=early_stopping_patience)
 
     def get_dev_clustering_quality(self):
+        if not self.dev_feature_available:
+            return None
+
         if self.dev_test_clustering_method == 'k-means':
             clusterer = KMeans(n_clusters=len(self.cluster_label_2_index_map))
         elif self.dev_test_clustering_method == 'hac-complete':
@@ -522,30 +549,7 @@ class Pipeline(object):
         if method is None or self.dev_test_clustering_method != 'k-means':  # tuning support k-means only
             return groundtruth
         elif method == 'elbow':
-            sse = {}
-            optimal_k = 1
-
-            for k in range(1, groundtruth * 2 + 1):
-                kmeans = KMeans(n_clusters=k).fit(self.test_embeddings)
-                if k == 1:
-                    max_sse = kmeans.inertia_
-                sse[k] = kmeans.inertia_ / max_sse
-
-            delta_1 = {}
-            delta_2 = {}
-            strength = {}
-            for k in sse:
-                if k >= 2:
-                    delta_1[k] = sse[k - 1] - sse[k]
-            for k in sse:
-                if k >= 3:
-                    delta_2[k] = delta_1[k - 1] - delta_1[k]
-            for k in sse:
-                if k + 1 in delta_2 and delta_2[k + 1] > delta_1[k + 1]:
-                    strength[k] = (delta_2[k + 1] - delta_1[k + 1])  # / k # uncomment to compute relative strength
-
-            if len(strength) > 0:
-                optimal_k = max(strength, key=strength.get)
+            optimal_k, sse, strength = elbow_analysis(self.test_embeddings, max_n_clusters=int(groundtruth * 1.5))
 
             plot = plt.figure().add_subplot(111)
 
@@ -575,14 +579,8 @@ class Pipeline(object):
 
             return optimal_k
         elif method == 'silhouette':
-            sc = {}
-            optimal_k = None
-            for k in range(2, groundtruth * 2 + 1):
-                kmeans = KMeans(n_clusters=k).fit(self.test_embeddings)
-                sc[k] = silhouette_score(self.test_embeddings, kmeans.labels_)
+            optimal_k, sc = silhouette_analysis(self.test_embeddings, max_n_clusters=int(groundtruth * 1.5))
 
-                if optimal_k is None or sc[k] > sc[optimal_k]:
-                    optimal_k = k
             plt.figure()
             plt.plot(list(sc.keys()), list(sc.values()))
             plt.xlabel('#clusters (selected={}, ground-truth={})'.format(

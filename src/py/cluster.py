@@ -3,9 +3,10 @@ from typing import List
 
 import numpy
 from scipy.optimize import linear_sum_assignment
+from sklearn.cluster import KMeans
 from sklearn.cluster._kmeans import _tolerance
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score, adjusted_mutual_info_score, \
-    fowlkes_mallows_score
+    fowlkes_mallows_score, silhouette_score
 
 
 # Disjoint set
@@ -220,6 +221,57 @@ def get_clustering_quality(labels_true, labels_pred, advanced=False):
             'FMI': round(fowlkes_mallows_score(labels_true, labels_pred), 3),
         })
     return quality
+
+
+def elbow_analysis(embeddings, min_n_clusters=1, max_n_clusters=100):
+    sse = {}
+    optimal_k = min_n_clusters
+
+    for k in range(1, max_n_clusters + 1):
+        if 1 < k < min_n_clusters - 1:
+            continue
+        print('\rElbow analysis: {}/{}'.format(k, max_n_clusters), end='' if k < max_n_clusters else '\n')
+
+        kmeans = KMeans(n_clusters=k).fit(embeddings)
+        if k == 1:
+            max_sse = kmeans.inertia_
+        sse[k] = kmeans.inertia_ / max_sse
+
+    delta_1 = {}
+    delta_2 = {}
+    strength = {}
+    for k in sse:
+        if k >= max(2, min_n_clusters):
+            delta_1[k] = sse[k - 1] - sse[k]
+    for k in sse:
+        if k >= max(3, min_n_clusters + 1):
+            delta_2[k] = delta_1[k - 1] - delta_1[k]
+
+    for k in sse:
+        if k + 1 in delta_2 and delta_2[k + 1] > delta_1[k + 1]:
+            strength[k] = (delta_2[k + 1] - delta_1[k + 1])  # / k # uncomment to compute relative strength
+
+            if k >= min_n_clusters and (optimal_k not in strength or strength[k] > strength[optimal_k]):
+                optimal_k = k
+
+    return optimal_k, sse, strength
+
+
+def silhouette_analysis(embeddings, min_n_clusters=1, max_n_clusters=100):
+    sc = {}
+    optimal_k = min_n_clusters
+    for k in range(2, max_n_clusters + 1):
+        if k < min_n_clusters:
+            continue
+        print('\rSilhouette analysis: {}/{}'.format(k, max_n_clusters), end='' if k < max_n_clusters else '\n')
+
+        kmeans = KMeans(n_clusters=k).fit(embeddings)
+        sc[k] = silhouette_score(embeddings, kmeans.labels_)
+
+        if k >= min_n_clusters and (optimal_k not in sc or sc[k] > sc[optimal_k]):
+            optimal_k = k
+
+    return optimal_k, sc
 
 
 if __name__ == '__main__':

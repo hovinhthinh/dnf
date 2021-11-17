@@ -103,8 +103,8 @@ def get_train_test_data(generate_data=False):
         for c in clusters:
             cluster_data = [u for u in feature_data if u.feature_name == c]
             random.shuffle(cluster_data)
-            if len(cluster_data) > 2000:  # Down sample
-                cluster_data = cluster_data[:2000]
+            if len(cluster_data) > 800:  # Down sample
+                cluster_data = cluster_data[:800]
 
             if c in train_clusters:
                 for i, u in enumerate(cluster_data):
@@ -121,7 +121,8 @@ def get_train_test_data(generate_data=False):
         # Process live data
         live_data = read_live_data()
         random.shuffle(live_data)
-        sample_size = len([u for u in feature_data if u.part_type == 'TEST'])  # Sample same size as test data
+        sample_size = int(
+            len([u for u in feature_data if u.part_type == 'TRAIN']) * 0.7)  # Sample same size as test data
         live_data = live_data[:sample_size]
 
         for u in live_data:
