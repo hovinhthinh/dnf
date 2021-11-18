@@ -118,13 +118,6 @@ class Pipeline(object):
         self.squashing_train_dev = squashing_train_dev
         self.dev_indices = [i for i, u in enumerate(self.utterances) if u.part_type != 'TRAIN']
 
-        self.dev_feature_available = None
-        for i in self.dev_indices:
-            set_value = self.utterances[i].feature_name is not None
-            if self.dev_feature_available is not None and self.dev_feature_available != set_value:
-                raise Exception('DEV feature not completely available')
-            self.dev_feature_available = set_value
-
         self.cluster_label_2_index_map = dict(
             (n, i) for i, n in
             enumerate(dict.fromkeys([u.feature_name for u in self.utterances if u.feature_name is not None])))
@@ -165,9 +158,8 @@ class Pipeline(object):
             self.test_embeddings = self.embeddings[indices]
 
     def get_true_clusters(self, including_train=True, including_dev=True):
-        if including_dev and not self.dev_feature_available:
-            raise Exception('DEV feature not provided')
-        return [self.cluster_label_2_index_map[u.feature_name] for u in self.utterances if
+        return [None if u.feature_name is None else self.cluster_label_2_index_map[u.feature_name]
+                for u in self.utterances if
                 (including_train and u.part_type == 'TRAIN') or (including_dev and u.part_type != 'TRAIN')]
 
     # Returns pseudo clusters and assignment confidences
@@ -260,7 +252,7 @@ class Pipeline(object):
 
     def get_validation_score(self):
         self.update_embeddings()
-        return self.get_dev_clustering_quality()['NMI'] if self.dev_feature_available else -1
+        return self.get_dev_clustering_quality()['NMI']
 
     def fine_tune_pseudo_classification(self, use_sample_weights=True, iterations=None, align_clusters=True,
                                         early_stopping_patience=0, min_iterations=None, max_iterations=None,
@@ -268,7 +260,7 @@ class Pipeline(object):
         classifier, optim, previous_clusters = None, None, None
 
         n_clusters = None
-        if not self.dev_feature_available:
+        if None in [u.feature_name for u in self.utterances]:
             n_clusters = elbow_analysis(self.embeddings,
                                         min_n_clusters=len(self.cluster_label_2_index_map),
                                         max_n_clusters=int(len(self.cluster_label_2_index_map) * 1.5))[0]
@@ -301,10 +293,6 @@ class Pipeline(object):
                                                                            pseudo_clusters)
                     previous_clusters = pseudo_clusters
 
-                    print('Pseudo-cluster quality:',
-                          None if self.use_unseen_in_training and not self.dev_feature_available else
-                          get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
-                                                 pseudo_clusters))
                     classifier, optim = sbert.fine_tune_pseudo_classification([u.text for u in utterances],
                                                                               pseudo_clusters,
                                                                               train_sample_weights=weights if use_sample_weights else None,
@@ -347,10 +335,6 @@ class Pipeline(object):
                     pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
                 previous_clusters = pseudo_clusters
 
-                print('Pseudo-cluster quality:',
-                      None if self.use_unseen_in_training and not self.dev_feature_available else
-                      get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
-                                             pseudo_clusters))
                 classifier, optim = sbert.fine_tune_pseudo_classification([u.text for u in utterances], pseudo_clusters,
                                                                           train_sample_weights=weights if use_sample_weights else None,
                                                                           previous_classifier=classifier if align_clusters else None,
@@ -366,7 +350,7 @@ class Pipeline(object):
         classifier, optim, previous_clusters = None, None, None
 
         n_clusters = None
-        if not self.dev_feature_available:
+        if None in [u.feature_name for u in self.utterances]:
             n_clusters = elbow_analysis(self.embeddings,
                                         min_n_clusters=len(self.cluster_label_2_index_map),
                                         max_n_clusters=int(len(self.cluster_label_2_index_map) * 1.5))[0]
@@ -399,10 +383,6 @@ class Pipeline(object):
                                                                            pseudo_clusters)
                     previous_clusters = pseudo_clusters
 
-                    print('Pseudo-cluster quality:',
-                          None if self.use_unseen_in_training and not self.dev_feature_available else
-                          get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
-                                                 pseudo_clusters))
                     classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
                         [u.text for u in utterances], pseudo_clusters,
                         _remap_clusters([u.intent_name for u in utterances])[0],
@@ -447,10 +427,6 @@ class Pipeline(object):
                     pseudo_clusters = self.get_aligned_pseudo_clusters(embeddings, previous_clusters, pseudo_clusters)
                 previous_clusters = pseudo_clusters
 
-                print('Pseudo-cluster quality:',
-                      None if self.use_unseen_in_training and not self.dev_feature_available else
-                      get_clustering_quality(self.get_true_clusters(including_dev=self.use_unseen_in_training),
-                                             pseudo_clusters))
                 classifier, optim = sbert.fine_tune_joint_pseudo_classification_and_intent_classification(
                     [u.text for u in utterances], pseudo_clusters,
                     _remap_clusters([u.intent_name for u in utterances])[0],
@@ -469,7 +445,7 @@ class Pipeline(object):
                                    [u.feature_name for u in self.utterances if u.part_type == 'TRAIN']
 
         sbert.fine_tune_utterance_similarity(utterances, clusters,
-                                             negative_margin=0.5,
+                                             negative_margin=0,
                                              n_train_epochs=n_train_epochs,
                                              eval_callback=self.get_validation_score,
                                              early_stopping=True if n_train_epochs is None else False)
@@ -528,9 +504,6 @@ class Pipeline(object):
             early_stopping_patience=early_stopping_patience)
 
     def get_dev_clustering_quality(self):
-        if not self.dev_feature_available:
-            return None
-
         if self.dev_test_clustering_method == 'k-means':
             clusterer = KMeans(n_clusters=len(self.cluster_label_2_index_map))
         elif self.dev_test_clustering_method == 'hac-complete':
@@ -543,16 +516,20 @@ class Pipeline(object):
             raise Exception('Invalid clustering method')
 
         if self.squashing_train_dev:
-            dev_predicted_clusters = clusterer.fit([self.embeddings[i] for i in self.dev_indices]).labels_
-            dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i].feature_name] for i in
-                                 self.dev_indices]
+            dev_predicted_clusters = clusterer.fit([self.embeddings[i] for i in self.dev_indices if
+                                                    self.utterances[i].feature_name is not None]).labels_
+            dev_true_clusters = [self.cluster_label_2_index_map[self.utterances[i].feature_name]
+                                 for i in self.dev_indices if self.utterances[i].feature_name is not None]
             return get_clustering_quality(dev_true_clusters, dev_predicted_clusters)
         else:
-            dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if u.part_type != 'TRAIN']
+            dev_embeddings = [self.embeddings[i] for i, u in enumerate(self.utterances) if
+                              u.part_type != 'TRAIN' and u.feature_name is not None]
             if len(dev_embeddings) == 0:
                 raise Exception('DEV set is unavailable')
             dev_predicted_clusters = clusterer.fit(dev_embeddings).labels_
-            return get_clustering_quality(self.get_true_clusters(including_train=False), dev_predicted_clusters)
+            return get_clustering_quality(
+                [c for c in self.get_true_clusters(including_train=False) if c is not None],
+                dev_predicted_clusters)
 
     def get_n_test_clusters(self, method=None, plot_file_path=None):
         groundtruth = len(dict.fromkeys([u.feature_name for u in self.test_utterances]))
