@@ -1,4 +1,5 @@
 import json
+import random
 import tempfile
 
 from mpl_toolkits.mplot3d import Axes3D
@@ -27,7 +28,13 @@ from data.snips import print_train_dev_test_stats
 
 
 def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=False, plot_3d=False,
-              label_plotting_order=None, output_file_path=None):
+              label_plotting_order=None, output_file_path=None, n_sampling_points=10000):
+    original_labels = labels
+    if n_sampling_points is not None and len(embeddings) > n_sampling_points:
+        idx = set(random.sample(list(range(len(embeddings))), n_sampling_points))
+        embeddings = [e for i, e in enumerate(embeddings) if i in idx]
+        labels = [l for i, l in enumerate(labels) if i in idx]
+
     if show_labels:
         plt.rcParams["figure.figsize"] = (10, 4)
     embeddings = umap.UMAP(n_components=3 if plot_3d else 2, random_state=42).fit_transform(embeddings)
@@ -41,6 +48,7 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
         if l not in u_labels:
             continue
         idx = [i for i, _ in enumerate(labels) if _ == l]
+        label_cnt = len([_ for _ in original_labels if _ == l])
         if l is not None:
             l = l.replace('_TRAIN', '_TRAIN_L').replace('_DEV', '_TRAIN_U')  # rename cluster names
         else:
@@ -49,13 +57,13 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
             if sample_type is None:
                 ax.scatter([embeddings[i][0] for i in idx],
                            [embeddings[i][1] for i in idx],
-                           [embeddings[i][2] for i in idx], label='{} ({})'.format(l, len(idx)), s=10, color=lc)
+                           [embeddings[i][2] for i in idx], label='{} ({})'.format(l, label_cnt), s=10, color=lc)
             else:
                 # sample_type is provided, draw them with different markers
                 color = ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'TEST'],
                                    [embeddings[i][1] for i in idx if sample_type[i] == 'TEST'],
                                    [embeddings[i][2] for i in idx if sample_type[i] == 'TEST'],
-                                   label='{} ({})'.format(l, len(idx)), s=10, marker='o', color=lc).get_facecolor()[0]
+                                   label='{} ({})'.format(l, label_cnt), s=10, marker='o', color=lc).get_facecolor()[0]
                 ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'DEV'],
                            [embeddings[i][1] for i in idx if sample_type[i] == 'DEV'],
                            [embeddings[i][2] for i in idx if sample_type[i] == 'DEV'],
@@ -67,12 +75,12 @@ def umap_plot(embeddings, labels, sample_type=None, title=None, show_labels=Fals
         else:
             if sample_type is None:
                 ax.scatter([embeddings[i][0] for i in idx],
-                           [embeddings[i][1] for i in idx], label='{} ({})'.format(l, len(idx)), s=10, color=lc)
+                           [embeddings[i][1] for i in idx], label='{} ({})'.format(l, label_cnt), s=10, color=lc)
             else:
                 # sample_type is provided, draw them with different markers
                 color = ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'TEST'],
                                    [embeddings[i][1] for i in idx if sample_type[i] == 'TEST'],
-                                   label='{} ({})'.format(l, len(idx)), s=10, marker='o', color=lc).get_facecolor()[0]
+                                   label='{} ({})'.format(l, label_cnt), s=10, marker='o', color=lc).get_facecolor()[0]
                 ax.scatter([embeddings[i][0] for i in idx if sample_type[i] == 'DEV'],
                            [embeddings[i][1] for i in idx if sample_type[i] == 'DEV'],
                            s=10, color=color, marker='x')
