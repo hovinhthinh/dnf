@@ -135,10 +135,10 @@ def get_train_test_data(generate_data=False):
 
         # Split into train/dev/test utterances
         max_utrs_per_train_feature = -1
-        max_utrs_per_dev_feature = 200
+        max_utrs_per_dev_feature = -1
         max_utrs_per_test_feature = -1
         splitted_data = []
-        for c in clusters:
+        for c in train_clusters + dev_clusters + test_clusters:
             cluster_data = [u for u in feature_data if u.feature_name == c]
             random.shuffle(cluster_data)
 
@@ -219,40 +219,74 @@ def get_train_test_data(generate_data=False):
             for u in json_data
         ]
 
+    return final_data
+
+
+def print_train_dev_test_stats(intent_data):
     print('======== Cluster information ========')
-    clusters = dict.fromkeys(u.feature_name for u in final_data)
+    clusters = dict.fromkeys(u.feature_name for u in intent_data if u.feature_name is not None)
     all_clusters = []
     train_clusters = []
     dev_clusters = []
     test_clusters = []
     for c in clusters:
-        total = len([u for u in final_data if u.feature_name == c])
+        total = len([u for u in intent_data if u.feature_name == c])
         if c is None:
             all_clusters.append((c, total))
             dev_clusters.append((c, total))
         elif c.endswith('_TRAIN'):
             all_clusters.append((c[:-6], total))
             train_clusters.append((c, total))
+        elif c.endswith('_DEV'):
+            all_clusters.append((c[:-4], total))
+            dev_clusters.append((c, total))
         elif c.endswith('_TEST'):
             all_clusters.append((c[:-5], total))
             test_clusters.append((c, total))
 
-    print('All ({}):'.format(len(all_clusters)), all_clusters)
+    print('Total features:', len(all_clusters))
     print('Train ({}):'.format(len(train_clusters)), train_clusters)
     print('Dev ({}):'.format(len(dev_clusters)), dev_clusters)
     print('Test ({}):'.format(len(test_clusters)), test_clusters)
 
-    return final_data
+    # Stats by features:
+    features = dict.fromkeys([u.feature_name for u in intent_data if u.feature_name is not None])
+    print('######## Stats by feature ########')
+    for f in features:
+        cnt = {'TRAIN': 0, 'DEV': 0, 'TEST': 0}
+        utrs = [u for u in intent_data if u.feature_name == f]
+        for u in utrs:
+            cnt[u.part_type] += 1
+        print('  {}: Train/Dev/Test: {}/{}/{} ({:.1f}%,{:.1f}%,{:.1f}%)'.format(
+            f, cnt['TRAIN'], cnt['DEV'], cnt['TEST'],
+            100 * cnt['TRAIN'] / len(utrs),
+            100 * cnt['DEV'] / len(utrs),
+            100 * cnt['TEST'] / len(utrs)))
 
+    print('######## Stats by part type ########')
+    for t in ['TRAIN', 'DEV', 'TEST']:
+        print(f'{t}:')
+        utrs = [u for u in intent_data if u.part_type == t]
+        for f in dict.fromkeys([u.feature_name for u in utrs]):
+            print('  {}: {}'.format(f, len([u for u in utrs if u.feature_name == f])))
 
-def print_train_dev_test_stats(intent_data):
+    print('######## Summary ########')
     train_size = len([u for u in intent_data if u.part_type == 'TRAIN'])
     dev_size = len([u for u in intent_data if u.part_type == 'DEV'])
+    dev_live_size = len([u for u in intent_data if u.part_type == 'DEV' and u.feature_name is None])
     test_size = len([u for u in intent_data if u.part_type == 'TEST'])
-    print('Train/Dev/Test utterances: {}/{}/{} ({:.1f}%,{:.1f}%,{:.1f}%)'.format(train_size, dev_size, test_size,
-                                                                                 100 * train_size / len(intent_data),
-                                                                                 100 * dev_size / len(intent_data),
-                                                                                 100 * test_size / len(intent_data)))
+    print('Train/Dev/Test: {}/{}({} live)/{} ({:.1f}%,{:.1f}%,{:.1f}%)'.format(
+        train_size, dev_size, dev_live_size, test_size,
+        100 * train_size / len(intent_data),
+        100 * dev_size / len(intent_data),
+        100 * test_size / len(intent_data)))
+
+    supported_test = len([u for u in intent_data if u.part_type == 'TEST' and not u.feature_name.endswith('_TEST')])
+    unsupport_test = len([u for u in intent_data if u.part_type == 'TEST' and u.feature_name.endswith('_TEST')])
+
+    print('Supported/Unsupported TEST utterances: {}/{} ({:.1f}%,{:.1f}%)'.format(
+        supported_test, unsupport_test, 100 * supported_test / test_size, 100 * unsupport_test / test_size,
+    ))
 
 
 if __name__ == '__main__':
