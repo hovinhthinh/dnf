@@ -75,54 +75,129 @@ def get_train_test_data(generate_data=False):
         feature_data = read_feature_data()
 
         clusters = dict.fromkeys([u.feature_name for u in feature_data])
-        predefined_clusters = {  # TODO: pre-define TRAIN/TEST features?
-            'TRAIN': [],
-            'TEST': []
+        predefined_clusters = {
+            'TRAIN': [
+                'alexa,_print_a_note',
+                'alexa_print_games',
+                'ambience_control_device_control_utterances_for_powell',
+                'artist_experiences',
+                'ask_for_subscribe_--_fast-follow_effort',
+                'calendar_recurrence_patterns',
+                'catapult_-_adding_appliance_slot_to_starttutorialintent',
+                'covid-19_vaccination_local_search',
+                'customer_reviews_on_alexa_shopping',
+                'dab_radio_band_and_stations_recognition_by_nlu',
+                'enable_speaker_mode_for_calling',
+                'evi_deprecation_for_recipe_domain',
+                'follow_me:_move_with_me_fast-follow',
+                'gallery_view',
+                'hide_photos',
+                'kindle_-_navigation_v2',
+                'notes_for_you',
+                'podcast_ask_for_subscribe',
+                'recipes_-_recipe_search',
+                'recipes_-_save_recipes',
+                'reminder_assignment_bug_fixes_v3',
+                'stickynotes-surprisenotes-notesforyou-reminderassignment_-_additions',
+                'sticky_notes_-_widgets',
+                'tell_me_when_central_cancel_and_browse',
+                'tell_me_when_–_info_graphiq_scheduled_events',
+                'translateutteranceintent',
+                'vui_privacy_settings',
+            ],
+            'DEV': [
+                'browse_alarm-timer_volume',
+                'call_via_commprovider_ci',
+                'echo_mm_widgets_vui',
+                'stickynotes_-_enhancements',
+            ],
+            'TEST': [
+                'artist_experiences_-_fst_improvement',
+                'calendar_and_email_account_linking',
+                'countdown_feature',
+                'follow_me:_voice_move_-_expansion_to_radio_and_podcasts',
+                'pedestrian_navigation',
+                'photo_booth',
+                'sticky_notes_-_emoji',
+                'topicspecifiedfeedback',
+                'turn_on-off_calendar_notifications',
+                'voice_settings_-_accessibility',
+            ]
         }
-        predefined_clusters = None
-
-        if predefined_clusters is not None:
-            train_clusters = predefined_clusters['TRAIN']
-            test_clusters = predefined_clusters['TEST']
-            for c in train_clusters + test_clusters:
-                if c not in clusters:
-                    raise Exception('Invalid cluster:', c)
-        else:
-            # Filter clusters with small size
-            clusters = [c for c in clusters if sum([1 for u in feature_data if u.feature_name == c]) >= 100]
-
-            # Random train/dev/test clusters
-            random.shuffle(clusters)
-            train_clusters = clusters[:ceil(len(clusters) * 0.7)]
-            test_clusters = clusters[ceil(len(clusters) * 0.7):]
+        train_clusters = predefined_clusters['TRAIN']
+        dev_clusters = predefined_clusters['DEV']
+        test_clusters = predefined_clusters['TEST']
+        for c in train_clusters + dev_clusters + test_clusters:
+            if c not in clusters:
+                raise Exception('Invalid cluster:', c)
 
         # TODO: add feature_type
 
-        # Split into train/test utterances
+        # Split into train/dev/test utterances
+        max_utrs_per_train_feature = -1
+        max_utrs_per_dev_feature = 200
+        max_utrs_per_test_feature = -1
         splitted_data = []
         for c in clusters:
             cluster_data = [u for u in feature_data if u.feature_name == c]
             random.shuffle(cluster_data)
-            if len(cluster_data) > 800:  # Down sample
-                cluster_data = cluster_data[:800]
 
             if c in train_clusters:
                 for i, u in enumerate(cluster_data):
                     u.feature_name += '_TRAIN'
-                    u.part_type = 'TRAIN' if i < ceil(len(cluster_data) * 0.7) else 'TEST'
+                train_data = cluster_data[:ceil(len(cluster_data) * 0.4)]
+                dev_data = cluster_data[ceil(len(cluster_data) * 0.4): ceil(len(cluster_data) * 0.5)]
+                test_data = cluster_data[ceil(len(cluster_data) * 0.5):]
+                for u in train_data:
+                    u.part_type = 'TRAIN'
+                for u in dev_data:
+                    u.part_type = 'DEV'
+                for u in test_data:
+                    u.part_type = 'TEST'
+
+                if max_utrs_per_train_feature != -1 and len(train_data) > max_utrs_per_train_feature:
+                    train_data = train_data[:max_utrs_per_train_feature]
+                if max_utrs_per_dev_feature != -1 and len(dev_data) > max_utrs_per_dev_feature:
+                    dev_data = dev_data[:max_utrs_per_dev_feature]
+                if max_utrs_per_test_feature != -1 and len(test_data) > max_utrs_per_test_feature:
+                    test_data = test_data[:max_utrs_per_test_feature]
+
+                splitted_data.extend(train_data)
+                splitted_data.extend(dev_data)
+                splitted_data.extend(test_data)
+            elif c in dev_clusters:
+                for u in cluster_data:
+                    u.feature_name += '_DEV'
+                dev_data = cluster_data[:ceil(len(cluster_data) * 0.5)]
+                test_data = cluster_data[ceil(len(cluster_data) * 0.5):]
+                for u in dev_data:
+                    u.part_type = 'DEV'
+                for u in test_data:
+                    u.part_type = 'TEST'
+
+                if max_utrs_per_dev_feature != -1 and len(dev_data) > max_utrs_per_dev_feature:
+                    dev_data = dev_data[:max_utrs_per_dev_feature]
+                if max_utrs_per_test_feature != -1 and len(test_data) > max_utrs_per_test_feature:
+                    test_data = test_data[:max_utrs_per_test_feature]
+
+                splitted_data.extend(dev_data)
+                splitted_data.extend(test_data)
             elif c in test_clusters:
-                for i, u in enumerate(cluster_data):
+                for u in cluster_data:
                     u.feature_name += '_TEST'
                     u.part_type = 'TEST'
-            splitted_data.extend(cluster_data)
+
+                if max_utrs_per_test_feature != -1 and len(cluster_data) > max_utrs_per_test_feature:
+                    cluster_data = cluster_data[:max_utrs_per_test_feature]
+
+                splitted_data.extend(cluster_data)
 
         feature_data = splitted_data
 
         # Process live data
         live_data = read_live_data()
         random.shuffle(live_data)
-        sample_size = int(
-            len([u for u in feature_data if u.part_type == 'TRAIN']) * 0.7)  # Sample same size as test data
+        sample_size = int(len([u for u in feature_data if u.part_type == 'TRAIN']) * 0.5)
         live_data = live_data[:sample_size]
 
         for u in live_data:
