@@ -1,13 +1,13 @@
-# ./run.sh <py_module> <args...>
-args="${@:2}"
+# ./run.sh <cuda_id:0,1,...> <py_module> <args...>
+args="${@:3}"
 
 export PYTHONPATH=./src/py
 export PYTHONHASHSEED=6993
 
-if [ -e "$1" ]; then
+if [ -e "$2" ]; then
   echo 'Running script'
-  python $1 $args
+  CUDA_VISIBLE_DEVICES=$1 python $2 $args
 else
   echo 'Running module'
-  python -m $1 $args
+  CUDA_VISIBLE_DEVICES=$1 python -m $2 $args
 fi
