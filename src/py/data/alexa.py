@@ -32,10 +32,12 @@ def _parse_text_and_slots(utr):
 
 def read_utterances_from_file(file):
     utterances = []
+    uniq_domain = set()
     uniq_utrs = set()
     for line in open(file):
         parts = line.strip().split('\t')
 
+        uniq_domain.add(parts[0])
         ucheck = '\t'.join(parts[0:3])
         if ucheck in uniq_utrs:
             continue
@@ -45,6 +47,10 @@ def read_utterances_from_file(file):
         u = Utterance(domain=parts[0], intent_name=parts[1])
         u.text, u.slots = _parse_text_and_slots(parts[2])
         utterances.append(u)
+
+    for u in utterances:
+        u.feature_type = 'DOMAIN' if len(uniq_domain) <= 1 else 'CROSS_DOMAIN'
+
     return utterances
 
 
@@ -62,6 +68,8 @@ def read_live_data(folder='./data/alexa/fr/frXX_live_traffic/'):
     utterances = []
     for f in [f for f in os.listdir(folder)]:
         utterances.extend(read_utterances_from_file(os.path.join(folder, f)))
+    for u in utterances:
+        u.feature_type = None  # No feature label for live data
     return utterances
 
 

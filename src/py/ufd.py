@@ -792,7 +792,17 @@ class Pipeline(object):
                 [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
                  u.feature_type == 'INTENT'],
                 [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
-                 u.feature_type == 'INTENT'], advanced=advanced)
+                 u.feature_type == 'INTENT'], advanced=advanced),
+            'domain': get_clustering_quality(
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'DOMAIN'],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'DOMAIN'], advanced=advanced),
+            'cross_domain': get_clustering_quality(
+                [test_true_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'CROSS_DOMAIN'],
+                [test_predicted_clusters[i] for i, u in enumerate(self.test_utterances) if
+                 u.feature_type == 'CROSS_DOMAIN'], advanced=advanced),
         }
 
     def train_nlu_model(self, save_model_path=None, n_train_epochs=None, early_stopping_patience=0):
@@ -1022,6 +1032,16 @@ class Pipeline(object):
                 [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'INTENT'],
                 [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_type == 'INTENT'],
                 [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'INTENT']
+            ),
+            'domain': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'DOMAIN'],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_type == 'DOMAIN'],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'DOMAIN']
+            ),
+            'cross_domain': self._get_nlu_quality(
+                [nlu_outputs[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'CROSS_DOMAIN'],
+                [u.intent_name for i, u in enumerate(self.test_utterances) if u.feature_type == 'CROSS_DOMAIN'],
+                [tags[i] for i, u in enumerate(self.test_utterances) if u.feature_type == 'CROSS_DOMAIN']
             )
         }
 
