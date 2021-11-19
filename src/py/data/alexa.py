@@ -297,5 +297,5 @@ def print_train_dev_test_stats(intent_data):
 
 
 if __name__ == '__main__':
-    alexa_data = get_train_test_data(generate_data=True)
+    alexa_data = get_train_test_data(generate_data=False)
     print_train_dev_test_stats(alexa_data)
