@@ -6,7 +6,7 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.cluster import KMeans
 from sklearn.cluster._kmeans import _tolerance
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score, adjusted_mutual_info_score, \
-    fowlkes_mallows_score, silhouette_score
+    fowlkes_mallows_score, silhouette_score, homogeneity_completeness_v_measure
 
 
 # Disjoint set
@@ -214,6 +214,13 @@ def get_clustering_quality(labels_true, labels_pred, advanced=False):
 
     row_ind, col_ind = linear_sum_assignment(cost_matrix, maximize=True)
     quality['ACC'] = round(cost_matrix[row_ind, col_ind].sum() / len(labels_true), 3)
+
+    hom, com, vm = homogeneity_completeness_v_measure(labels_true, labels_pred)
+    quality.update({
+        'Homogeneity': round(hom, 3),
+        'Completeness': round(com, 3),
+        'V-measure': round(vm, 3),
+    })
 
     if advanced:
         quality.update({
