@@ -139,8 +139,6 @@ def get_train_test_data(generate_data=False):
             if c not in clusters:
                 raise Exception('Invalid cluster:', c)
 
-        # TODO: add feature_type
-
         # Split into train/dev/test utterances
         max_utrs_per_train_feature = -1
         max_utrs_per_dev_feature = -1
@@ -214,7 +212,7 @@ def get_train_test_data(generate_data=False):
         final_data = feature_data + live_data
 
         json_data = [
-            [u.text, u.feature_name, u.part_type, u.slots, u.intent_name, u.domain]
+            [u.text, u.feature_name, u.part_type, u.slots, u.intent_name, u.feature_type, u.domain]
             for u in final_data
         ]
         os.makedirs(os.path.dirname(train_test_data_file), exist_ok=True)
@@ -223,7 +221,8 @@ def get_train_test_data(generate_data=False):
     else:
         json_data = json.loads(open(train_test_data_file).read())
         final_data = [
-            Utterance(text=u[0], feature_name=u[1], part_type=u[2], slots=u[3], intent_name=u[4], domain=u[5])
+            Utterance
+            (text=u[0], feature_name=u[1], part_type=u[2], slots=u[3], intent_name=u[4], feature_type=u[5], domain=u[6])
             for u in json_data
         ]
 
