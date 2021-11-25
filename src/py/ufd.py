@@ -19,7 +19,8 @@ from typing import List
 import matplotlib.pyplot as plt
 import numpy
 import umap
-from sklearn.cluster import KMeans, AgglomerativeClustering
+from cluster import KMeans
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import pairwise_distances, euclidean_distances, classification_report
 
 import sbert
@@ -596,9 +597,9 @@ class Pipeline(object):
         else:
             raise Exception('Invalid method:', method)
 
-    def get_test_clusters(self, k, kmeans_random_state=None):
+    def get_test_clusters(self, k):
         if self.dev_test_clustering_method == 'k-means':
-            clusters = KMeans(n_clusters=k, random_state=kmeans_random_state).fit(self.test_embeddings).labels_
+            clusters = KMeans(n_clusters=k).fit(self.test_embeddings).labels_
         elif self.dev_test_clustering_method == 'hac-complete':
             clusters = AgglomerativeClustering(n_clusters=k, linkage='complete').fit(self.test_embeddings).labels_
         elif self.dev_test_clustering_method == 'hac-average':

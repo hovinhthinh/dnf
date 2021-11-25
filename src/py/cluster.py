@@ -1,12 +1,45 @@
+import os
 import random
 from typing import List
 
 import numpy
 from scipy.optimize import linear_sum_assignment
-from sklearn.cluster import KMeans
 from sklearn.cluster._kmeans import _tolerance
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score, adjusted_mutual_info_score, \
     fowlkes_mallows_score, silhouette_score, homogeneity_completeness_v_measure
+
+if os.getenv('KMEANS') == 'faiss':
+    import faiss
+
+
+    class KMeans(object):
+        def __init__(self, n_clusters=8, n_init=10, max_iter=300):
+            self.n_clusters = n_clusters
+            self.n_init = n_init
+            self.max_iter = max_iter
+            self.kmeans = None
+            self.cluster_centers_ = None
+            self.inertia_ = None
+            self.labels_ = None
+
+        def fit(self, X, y=None):
+            X = numpy.asarray(X)
+            self.kmeans = faiss.Kmeans(d=X.shape[1],
+                                       k=self.n_clusters,
+                                       niter=self.max_iter,
+                                       nredo=self.n_init)
+            self.kmeans.train(X.astype(numpy.float32))
+            self.cluster_centers_ = self.kmeans.centroids
+            self.inertia_ = self.kmeans.obj[-1]
+            self.labels_ = self.predict(X)
+
+            return self
+
+        def predict(self, X):
+            X = numpy.asarray(X)
+            return self.kmeans.index.search(X.astype(numpy.float32), 1)[1].reshape(-1)
+else:
+    from sklearn.cluster import KMeans
 
 
 # Disjoint set
