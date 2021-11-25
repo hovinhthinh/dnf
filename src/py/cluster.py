@@ -38,6 +38,8 @@ if os.getenv('KMEANS') == 'faiss':
         def predict(self, X):
             X = numpy.asarray(X)
             return self.kmeans.index.search(X.astype(numpy.float32), 1)[1].reshape(-1)
+
+    print('Using FAISS KMeans')
 else:
     from sklearn.cluster import KMeans
 
