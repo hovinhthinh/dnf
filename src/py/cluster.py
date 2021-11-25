@@ -27,7 +27,8 @@ if os.getenv('KMEANS') == 'faiss':
             self.kmeans = faiss.Kmeans(d=X.shape[1],
                                        k=self.n_clusters,
                                        niter=self.max_iter,
-                                       nredo=self.n_init)
+                                       nredo=self.n_init,
+                                       gpu=True)
             self.kmeans.train(X.astype(numpy.float32))
             self.cluster_centers_ = self.kmeans.centroids
             self.inertia_ = self.kmeans.obj[-1]
@@ -39,7 +40,8 @@ if os.getenv('KMEANS') == 'faiss':
             X = numpy.asarray(X)
             return self.kmeans.index.search(X.astype(numpy.float32), 1)[1].reshape(-1)
 
-    print('Using FAISS KMeans')
+
+    print('Using FAISS KMeans. nGpus:', faiss.get_num_gpus())
 else:
     from sklearn.cluster import KMeans
 
@@ -308,7 +310,7 @@ def silhouette_analysis(embeddings, min_n_clusters=1, max_n_clusters=100):
         print('\rSilhouette analysis: {}/{}'.format(k, max_n_clusters), end='' if k < max_n_clusters else '\n')
 
         kmeans = KMeans(n_clusters=k).fit(embeddings)
-        sc[k] = silhouette_score(embeddings, kmeans.labels_)
+        sc[k] = silhouette_score(embeddings, kmeans.labels_, n_jobs=-1)
 
         if k >= min_n_clusters and (optimal_k not in sc or sc[k] > sc[optimal_k]):
             optimal_k = k
