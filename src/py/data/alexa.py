@@ -10,10 +10,22 @@ from data.entity import Utterance
 
 def _parse_text_and_slots(utr):
     tokens = []
+
+    sts = []
     for t in utr.strip().split(' '):
         pos = t.find('|')
         assert pos >= 0
-        tokens.append((t[:pos], t[pos + 1:]))
+        sf = t[:pos]
+        sl = t[pos + 1:]
+
+        for s in ['\u200b', '\ufeff', '\u200e']:
+            sf = sf.replace(s, '')
+            assert s not in sl
+        if sf == '':
+            if sl != 'Other':
+                sts.append(sl)
+            continue
+        tokens.append((sf, sl))
 
     text = ' '.join([t[0] for t in tokens])
     slot = {}
@@ -27,6 +39,10 @@ def _parse_text_and_slots(utr):
                 'start': sum([len(t[0]) for t in tokens[:i]]) + i,
                 'end': sum([len(t[0]) for t in tokens[:j + 1]]) + j,
             }
+
+    for s in sts:
+        assert (s in slot)
+
     return text, slot
 
 
