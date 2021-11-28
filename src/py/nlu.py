@@ -1,4 +1,4 @@
-import json
+import multiprocessing as mp
 import os
 from typing import Callable, List
 
@@ -307,7 +307,100 @@ def save_finetuned(model_path):
     nlu_model.save_pretrained(model_path)
 
 
-def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
+shared_mp_data = None
+
+
+# Supports LINUX only, as multiprocessing uses FORK to create processes instead of SPAWN.
+def extract_intent_and_slots_from_logits_parallel(cur, i):
+    st_logits, ic_logits, tokenized_text, input_ids, attention_mask, offset_mapping = \
+        shared_mp_data[0][i], shared_mp_data[1][i], shared_mp_data[2][cur + i], \
+        shared_mp_data[3][i], shared_mp_data[4][i], shared_mp_data[5][i],
+
+    # intent
+    ic_prob = softmax(ic_logits, axis=-1)
+    ic_idx = numpy.argmax(ic_prob)
+
+    # slots
+    active_ids = [i for i, offset in enumerate(offset_mapping) if offset[0] == 0]
+    st_logits = st_logits[active_ids]
+    input_ids = input_ids[active_ids]
+    attention_mask = attention_mask[active_ids]
+
+    st_prob = softmax(st_logits, axis=-1)
+    n = numpy.sum(attention_mask) - 2
+
+    # DP decoding
+    cost = numpy.zeros((n + 1, nlu_model.config.st_num_labels))
+    trace = numpy.zeros((n + 1, nlu_model.config.st_num_labels), dtype=int)
+    for t in range(nlu_model.config.st_num_labels):
+        cost[0][t] == 0 if nlu_model.config.st_labels[t] == 'O' else -1
+    for c in range(1, n + 1):
+        for t in range(nlu_model.config.st_num_labels):
+            label = nlu_model.config.st_labels[t]
+            if label == 'O' or label.startswith('B_'):
+                best_previous_t = numpy.argmax(cost[c - 1])
+                cost[c][t] = -1 if cost[c - 1][best_previous_t] == -1 else cost[c - 1][best_previous_t] + \
+                                                                           st_prob[c][t]
+                trace[c][t] = best_previous_t
+            else:
+                cost[c][t] = -1
+                for p in range(nlu_model.config.st_num_labels):
+                    if nlu_model.config.st_labels[p] not in [label, 'B_' + label[2:]] or cost[c - 1][p] == -1:
+                        continue
+                    if cost[c - 1][p] + st_prob[c][t] > cost[c][t]:
+                        cost[c][t] = cost[c - 1][p] + st_prob[c][t]
+                        trace[c][t] = p
+    # decode
+    tags = [0] * (n + 1)
+    prob = [0] * (n + 1)
+
+    t = numpy.argmax(cost[n])
+    tag_prob = cost[n][t] / n
+    assert tag_prob >= 0
+    tag_prob_min = 1.0
+
+    c = n
+    while c > 0:
+        tags[c] = nlu_model.config.st_labels[t]
+        prob[c] = st_prob[c][t]
+        tag_prob_min = min(tag_prob_min, prob[c])
+        t = trace[c][t]
+        c -= 1
+
+    # resolve
+    slots = []
+    for c in range(1, n + 1):
+        if tags[c].startswith('B_'):
+            j = c
+            while j < n and tags[j + 1].startswith('I_'):
+                j += 1
+            slots.append(
+                {
+                    'slot': tags[c][2:],
+                    'start_token': c - 1,
+                    'end_token': j,
+                    'value': ' '.join(tokenized_text[c - 1:j]),
+                    'prob': numpy.average(prob[c:j + 1]).item()
+                }
+            )
+
+    return {
+        'intent': (nlu_model.config.ic_labels[ic_idx], ic_prob[ic_idx].item()),
+        'slots': {
+            # average prob over tags, including O
+            'tag_prob': tag_prob,
+            # min prob over tags, including O
+            'tag_prob_min': tag_prob_min,
+            # average prob over slots
+            'slot_prob': 0.0 if len(slots) == 0 else sum([s['prob'] for s in slots]) / len(slots),
+            'slots': slots
+        },
+        'tokens': list(zip(tokenized_text, tags[1:n + 1], [p.item() for p in prob[1:n + 1]]))
+    }
+
+
+def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64,
+                          multiprocessing=False, mp_batch_size=512):
     def extract_intent_and_slots_from_logits(st_logits, ic_logits, tokenized_text,
                                              input_ids, attention_mask, offset_mapping):
         # intent
@@ -395,28 +488,36 @@ def get_intents_and_slots(tokenized_utterances: List[List[str]], batch_size=64):
     outputs = []
     cur = 0
     while cur < len(tokenized_utterances):
-        last = min(len(tokenized_utterances), cur + batch_size)
+        last = min(len(tokenized_utterances), cur + mp_batch_size if multiprocessing else batch_size)
         # Tokenize sentences
         encoded_input = tokenizer(tokenized_utterances[cur: last], is_split_into_words=True, padding=True,
                                   truncation=True,
                                   return_offsets_mapping=True, return_tensors='pt')
         encoded_input.to(device)
 
-        offset_mapping = encoded_input.pop('offset_mapping')
+        offset_mapping = encoded_input.pop('offset_mapping').detach().cpu().numpy()
 
         # Compute token embeddings
         with torch.no_grad():
             model_output = nlu_model(**encoded_input)
-        st_logits, ic_logits = model_output[0], model_output[1]
 
-        for i in range(len(st_logits)):
-            outputs.append(extract_intent_and_slots_from_logits(st_logits[i].detach().cpu().numpy(),
-                                                                ic_logits[i].detach().cpu().numpy(),
-                                                                tokenized_utterances[cur + i],
-                                                                encoded_input['input_ids'][i].detach().cpu().numpy(),
-                                                                encoded_input['attention_mask'][
-                                                                    i].detach().cpu().numpy(),
-                                                                offset_mapping[i].detach().cpu().numpy()))
+        st_logits, ic_logits = model_output[0].detach().cpu().numpy(), model_output[1].detach().cpu().numpy()
+
+        input_ids = encoded_input['input_ids'].detach().cpu().numpy()
+        attention_mask = encoded_input['attention_mask'].detach().cpu().numpy()
+
+        if multiprocessing:
+            global shared_mp_data
+            shared_mp_data = [st_logits, ic_logits, tokenized_utterances, input_ids, attention_mask, offset_mapping]
+            with mp.Pool(os.cpu_count()) as pool:
+                for o in pool.starmap(extract_intent_and_slots_from_logits_parallel,
+                                      [(cur, i) for i in range(len(st_logits))]):
+                    outputs.append(o)
+        else:
+            for i in range(len(st_logits)):
+                outputs.append(extract_intent_and_slots_from_logits(st_logits[i], ic_logits[i],
+                                                                    tokenized_utterances[cur + i],
+                                                                    input_ids[i], attention_mask[i], offset_mapping[i]))
 
         cur = last
         print('\rInferencing: {}/{} ({:.1f}%)'.format(cur, len(tokenized_utterances),
@@ -438,4 +539,4 @@ if __name__ == '__main__':
     # load_finetuned('./models/temp_model')
 
     load_finetuned('./models/snips_nlu/inter_intent/nlu_model')
-    print(json.dumps(get_intents_and_slots(['I want to see movie times at 11:12'.split()]), indent=2))
+    print(get_intents_and_slots(['I want to see movie times at 11:12'.split()]))
