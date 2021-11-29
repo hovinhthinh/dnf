@@ -825,6 +825,9 @@ class Pipeline(object):
             nlu.save_finetuned(save_model_path)
 
     def _get_nlu_quality(self, nlu_outputs, true_intents, true_tags, keep_individual_stats=False):
+        if len(nlu_outputs) == 0:
+            return None
+
         intent = []
         acc = []
         acc_exclude_O = []
