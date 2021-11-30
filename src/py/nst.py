@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import precision_recall_curve, auc
 
 import nlu
-from data import snips
+from data import snips, alexa
 from data.entity import Utterance
 from sbert import PseudoClassificationModel, get_pseudo_classifier_confidence, \
     _split_text_and_slots_into_tokens_and_tags
@@ -269,18 +269,33 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
     return stats
 
 
-if __name__ == '__main__':
+def process_snips():
     _, inter_intent_data = snips.get_train_test_data(use_dev=True)
     p = Pipeline(inter_intent_data, dataset_name='inter_intent')
 
-    # compute_dev_pr_auc_for_nlu_model_for_support_detection(p, './models/snips_nlu_exclude_unseen/inter_intent/nlu_model',
-    #                                                        './reports/global/snips_SMC+US_PC_exclude_unseen/inter_intent/pc_trained_model',
-    #                                                        './reports/nst/nlu_validation/snips_inter_intent_exclude_unseen/')
-    # compute_pr_auc_for_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
-    #                                                    './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
-    #                                                    './reports/nst/nlu_validation/snips_inter_intent/')
-    print(evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
-                                                   './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
-                                                   nst_callback=lambda conf: conf['ic x ner_tag_min x pc'] > 0.5,
-                                                   output_file='./reports/nst/nlu_validation/snips_inter_intent/cluster_stats_ic x ner_tag_min x pc.txt'
-                                                   ))
+    compute_dev_pr_auc_for_nlu_model_for_support_detection(p,
+                                                           './models/snips_nlu_exclude_unseen/inter_intent/nlu_model',
+                                                           './reports/global/snips_SMC+US_PC_exclude_unseen/inter_intent/pc_trained_model',
+                                                           './reports/nst/nlu_validation/snips_inter_intent_exclude_unseen/')
+    compute_pr_auc_for_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
+                                                       './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
+                                                       './reports/nst/nlu_validation/snips_inter_intent/')
+    # print(evaluate_nlu_model_for_support_detection(p, './models/snips_nlu/inter_intent/nlu_model',
+    #                                                './reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model',
+    #                                                nst_callback=lambda conf: conf['ic x ner_tag_min x pc'] > 0.5,
+    #                                                output_file='./reports/nst/nlu_validation/snips_inter_intent/cluster_stats_ic x ner_tag_min x pc.txt'
+    #                                                ))
+
+
+def process_alexa_fr():
+    alexa_data = alexa.get_train_test_data()
+    p = Pipeline(alexa_data, dataset_name='inter_intent')
+
+    compute_pr_auc_for_nlu_model_for_support_detection(p, './models/alexa_fr_nlu/inter_intent/nlu_model',
+                                                       './reports/global/alexa_fr/SMC+US_PC_faiss_neu/inter_intent/pc_trained_model',
+                                                       './reports/nst/nlu_validation/alexa_fr/')
+
+
+if __name__ == '__main__':
+    # process_snips()
+    process_alexa_fr()
