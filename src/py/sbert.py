@@ -375,13 +375,14 @@ class PseudoClassificationModel(nn.Module):
 
     @staticmethod
     def load_model(path):
-        # Save base
+        # Load base
         load(path)
-        # Save classifier
-        data = torch.load(os.path.join(path, 'pseudo_classifier'), map_location=device)
+        # Load classifier
+        data = torch.load(os.path.join(path, 'pseudo_classifier'))
         loaded_model = PseudoClassificationModel(model, data['num_labels'])
         loaded_model.classifier.load_state_dict(data['params'])
         loaded_model.eval()
+        loaded_model.to(device)
 
         return loaded_model
 
