@@ -270,10 +270,12 @@ class Pipeline(object):
 
         n_clusters = None
         if None in [u.feature_name for u in self.utterances]:
-            n_clusters = elbow_analysis(self.embeddings,
-                                        min_n_clusters=len(self.cluster_label_2_index_map),
-                                        max_n_clusters=int(len(self.cluster_label_2_index_map) * 1.5))[0]
-            print('Pseudo-Classification with Elbow analysis: k={}'.format(n_clusters))
+            # n_clusters = elbow_analysis(self.embeddings,
+            #                             min_n_clusters=len(self.cluster_label_2_index_map),
+            #                             max_n_clusters=int(len(self.cluster_label_2_index_map) * 1.5))[0]
+            n_clusters = max(len(self.cluster_label_2_index_map),  # use nIntents as nPseudoClusters
+                             len(dict.fromkeys([u.intent_name for u in self.utterances])))
+            print('Pseudo-Classification with k={}'.format(n_clusters))
 
         if iterations is None:
             with tempfile.TemporaryDirectory() as temp_dir:
