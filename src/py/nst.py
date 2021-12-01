@@ -243,7 +243,7 @@ def evaluate_nlu_model_for_support_detection(pipeline: Pipeline, nlu_trained_mod
             'utterances': utterances
         }
 
-    def _quality(labels: list[int]):
+    def _quality(labels: List[int]):
         return {
             'total': len(labels),
             'acc': statistics.mean(labels)
