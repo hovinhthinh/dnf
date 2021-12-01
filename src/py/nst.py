@@ -152,10 +152,11 @@ def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, n
     nlu.load_finetuned(nlu_trained_model_path)
 
     # Cluster level
-    feature2novel = {u.feature_name: 0 for u in pipeline.utterances if
+    feature2novel = {u.feature_name: 0 for u in pipeline.utterances if u.feature_name is not None and
                      u.feature_name.endswith('_TRAIN') and u.part_type == 'DEV'}
     feature2novel.update(
-        {u.feature_name: 1 for u in pipeline.utterances if u.feature_name.endswith('_DEV') and u.part_type == 'DEV'})
+        {u.feature_name: 1 for u in pipeline.utterances if u.feature_name is not None and
+         u.feature_name.endswith('_DEV') and u.part_type == 'DEV'})
 
     pc = PseudoClassificationModel.load_model(pseudo_classification_trained_model_path)
     feature2conf = {}
@@ -177,7 +178,7 @@ def compute_dev_pr_auc_for_nlu_model_for_support_detection(pipeline: Pipeline, n
         feature2conf[f] = conf
 
     # Utterance level
-    utterances = [u for u in pipeline.utterances if u.part_type == 'DEV']
+    utterances = [u for u in pipeline.utterances if u.feature_name is not None and u.part_type == 'DEV']
     utterance_novelty = [1 if u.feature_name.endswith('_DEV') else 0 for u in utterances]
     individual_conf = _get_nlu_dev_quality(utterances)['individual']['conf']
     pc_conf = get_pseudo_classifier_confidence([u.text for u in utterances], pc)
@@ -291,15 +292,20 @@ def process_alexa_fr():
     alexa_data = alexa.get_train_test_data()
     p = Pipeline(alexa_data, dataset_name='inter_intent')
 
+    compute_dev_pr_auc_for_nlu_model_for_support_detection(p,
+                                                           './models/alexa_fr_nlu_exclude_unseen/inter_intent/nlu_model',
+                                                           './reports/global/alexa_fr/SMC+US_PC_exclude_unseen/inter_intent/pc_trained_model',
+                                                           './reports/nst/nlu_validation/alexa_fr_exclude_unseen/')
+
     # compute_pr_auc_for_nlu_model_for_support_detection(p, './models/alexa_fr_nlu/inter_intent/nlu_model',
     #                                                    './reports/global/alexa_fr/SMC+US_PC_faiss_neu/inter_intent/pc_trained_model',
     #                                                    './reports/nst/nlu_validation/alexa_fr/')
 
-    print(evaluate_nlu_model_for_support_detection(p, './models/alexa_fr_nlu/inter_intent/nlu_model',
-                                                   './reports/global/alexa_fr/SMC+US_PC_faiss_neu/inter_intent/pc_trained_model',
-                                                   nst_callback=lambda conf: conf['mean(ner_tag_min, ic, pc)'] > 0.77,
-                                                   output_file='./reports/nst/nlu_validation/alexa_fr/cluster_stats_mean(ic,ner_tag_min,pc).txt'
-                                                   ))
+    # print(evaluate_nlu_model_for_support_detection(p, './models/alexa_fr_nlu/inter_intent/nlu_model',
+    #                                                './reports/global/alexa_fr/SMC+US_PC_faiss_neu/inter_intent/pc_trained_model',
+    #                                                nst_callback=lambda conf: conf['mean(ner_tag_min, ic, pc)'] > 0.77,
+    #                                                output_file='./reports/nst/nlu_validation/alexa_fr/cluster_stats_mean(ic,ner_tag_min,pc).txt'
+    #                                                ))
 
 
 if __name__ == '__main__':
