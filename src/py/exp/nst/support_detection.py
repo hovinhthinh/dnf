@@ -16,7 +16,7 @@ nlu.load_finetuned('./models/snips_nlu/inter_intent/nlu_model')
 pc = PseudoClassificationModel.load_model('./reports/global/snips_SMC+US_PC/inter_intent/pc_trained_model')
 # Load thresholding stats
 metric2threshold = {
-    k: v['threshold'] for k, v in
+    k: v['unseen.threshold'] for k, v in
     json.loads(open('./reports/nst/nlu_validation/snips_inter_intent/cluster_level/stats.txt').read()).items()
 }
 

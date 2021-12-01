@@ -291,9 +291,15 @@ def process_alexa_fr():
     alexa_data = alexa.get_train_test_data()
     p = Pipeline(alexa_data, dataset_name='inter_intent')
 
-    compute_pr_auc_for_nlu_model_for_support_detection(p, './models/alexa_fr_nlu/inter_intent/nlu_model',
-                                                       './reports/global/alexa_fr/SMC+US_PC_faiss_neu/inter_intent/pc_trained_model',
-                                                       './reports/nst/nlu_validation/alexa_fr/')
+    # compute_pr_auc_for_nlu_model_for_support_detection(p, './models/alexa_fr_nlu/inter_intent/nlu_model',
+    #                                                    './reports/global/alexa_fr/SMC+US_PC_faiss_neu/inter_intent/pc_trained_model',
+    #                                                    './reports/nst/nlu_validation/alexa_fr/')
+
+    print(evaluate_nlu_model_for_support_detection(p, './models/alexa_fr_nlu/inter_intent/nlu_model',
+                                                   './reports/global/alexa_fr/SMC+US_PC_faiss_neu/inter_intent/pc_trained_model',
+                                                   nst_callback=lambda conf: conf['mean(ner_tag_min, ic, pc)'] > 0.77,
+                                                   output_file='./reports/nst/nlu_validation/alexa_fr/cluster_stats_mean(ic,ner_tag_min,pc).txt'
+                                                   ))
 
 
 if __name__ == '__main__':
